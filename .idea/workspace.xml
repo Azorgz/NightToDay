@@ -1,0 +1,227 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/MyTransform.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/copilot.data.migration.agent.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/copilot.data.migration.edit.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/Project_Default.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/inspectionProfiles/profiles_settings.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/modules.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Datasets/DatasetBase.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Datasets/FLIR.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Datasets/LYNRED.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Datasets/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Datasets/augmentation.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/.idea/CrossModalFlow.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/LICENSE" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/README.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/dataset.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/flow_utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/losses.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/corr.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/datasets.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/extractor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/raft-sintel.pth" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/raft.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/update.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/utils/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/utils/augmentor.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/utils/flow_viz.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/utils/frame_utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/RAFT/utils/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/basic_blocks.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/cross_raft.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/models/standard_raft.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/run_model.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/tf_args.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/train.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/trainer.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/utils.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/LETNet.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/MILO/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/MultiResTransGAN/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/MultiResTransGAN/decoder.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/MultiResTransGAN/encoder.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/MultiResTransGAN/vit.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/discriminators.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/generators.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/modules.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/segmentors.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/semantic_classes.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/ssim.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/utilities.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/NightToday/visualizers.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/train.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/MILO/MILO_runner.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/MILO/MILO_runner.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;Azorgz&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/ugurcogalan06/MILO.git&quot;,
+    &quot;accountId&quot;: &quot;6327679c-0848-4d0a-a914-9f4dfd2ce4e2&quot;
+  }
+}</component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 4
+}</component>
+  <component name="ProjectId" id="30BfGGtmEJKCL6P5Vf0EvYfLTGZ" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Python.encoders.executor": "Debug",
+    "Python.test.executor": "Debug",
+    "Python.train.executor": "Run",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
+    "git-widget-placeholder": "master",
+    "last_opened_file_path": "/home/godeta/PycharmProjects/MyTransform/checkpoints"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/checkpoints" />
+      <recent name="$PROJECT_DIR$/checkpoints/NightToday" />
+      <recent name="$PROJECT_DIR$" />
+      <recent name="$PROJECT_DIR$/NightToday" />
+      <recent name="$PROJECT_DIR$/NightToday/MultiResTransGAN" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/NightToday" />
+      <recent name="$PROJECT_DIR$/checkpoints/NightToday" />
+      <recent name="$PROJECT_DIR$/checkpoints" />
+      <recent name="$PROJECT_DIR$/NightToday/MultiResTransGAN" />
+      <recent name="$PROJECT_DIR$/Networks/configs" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.train">
+    <configuration name="test" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MyTransform" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/test.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="train" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="MyTransform" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/train.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.train" />
+        <item itemvalue="Python.test" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-python-sdk-5b207ade9991-746f403e7f0c-com.jetbrains.pycharm.community.sharedIndexes.bundled-PC-241.17890.14" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="" />
+      <created>1753105788418</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1753105788418</updated>
+    </task>
+    <servers />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/test.py</url>
+          <line>19</line>
+          <option name="timeStamp" value="29" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/NightToday/generators.py</url>
+          <line>67</line>
+          <option name="timeStamp" value="217" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/NightToday/generators.py</url>
+          <line>46</line>
+          <option name="timeStamp" value="218" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>
