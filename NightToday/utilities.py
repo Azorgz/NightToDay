@@ -555,7 +555,7 @@ def UpdateIRGTv1(seg_tensor1, seg_tensor2, ori_seg_GT, input_IR, prob_th=0.9):
     return mask_CurtVeg.unsqueeze(1).detach()
 
 
-def UpdateIRGTv2(seg_tensor1, seg_tensor2, ori_seg_GT, input_IR, prob_th=0.9):
+def UpdateIRGTv2(seg_tensor1, seg_tensor2, ori_seg_GT, input_IR, prob_th=0.8):
     """
     Update NTIR segmentation pseudo-labels using online semantic distillation
     and IR image refinement.
