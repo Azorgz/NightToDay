@@ -8,7 +8,6 @@ from NightToday import build_train_data_from_config
 from NightToday.NTIR2Day import Image2ImageGAT_Dual
 
 
-
 if __name__ == "__main__":
 
     # Build model from config  (Default: NightToday/NightToday.yaml)

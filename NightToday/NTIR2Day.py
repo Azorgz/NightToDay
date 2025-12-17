@@ -141,7 +141,7 @@ class Image2ImageGAT_Dual(nn.Module):
     def initialization(self, opt, *args, **kwargs) -> dict | None:
         checkpoint = None
         if isinstance(opt, (str, Path)):
-            if 'yaml' in opt.suffix or 'yml' in opt.suffix or 'json' in opt.suffix:
+            if 'yaml' in opt or 'yml' in opt or 'json' in opt:
                 self.opt = get_config(opt)
         else:
             checkpoint = opt
