@@ -12,7 +12,39 @@ from torchvision.transforms import Compose
 augmentations = {'hflip': RandomHorizontalFlip(same_on_batch=True)}
 
 
-class DatasetBase(Dataset):
+class TestDataset(Dataset):
+    """
+    Base class for test datasets.
+    """
+    name: str = 'BaseTest'
+    root: str = ''
+    test_D = ''
+    test_T = ''
+    test_N = ''
+
+    def __init__(self, opt):
+        self.load_size = opt.load_size
+        self.test_T = [os.path.join(self.test_T, f) for f in sorted(os.listdir(self.test_T))]
+        self.test_N = [os.path.join(self.test_N, f) for f in sorted(os.listdir(self.test_N))]
+        assert len(self.test_T) == len(self.test_N), "Number of thermal and night images must be equal."
+        self.normalize = Normalize(0.5, 0.5)
+
+    def __len__(self):
+        return max(len(self.test_D), len(self.test_T))
+
+    def __getitem__(self, idx):
+        image_T = self.normalize(self.load_image(self.test_T, idx % len(self.test_T)).GRAY().RGB('gray'))
+        image_N = self.normalize(self.load_image(self.test_N, idx % len(self.test_N)).match_shape(image_T))
+        return image_T, image_N
+
+    def load_image(self, path: list[str], idx: int, **kwargs) -> Tensor:
+        """
+        Load an image from a given path and return it as a Tensor.
+        """
+        return ImageTensor(path[idx])
+
+
+class TrainDataset(Dataset):
     """
     Base class for datasets.
     """
@@ -21,9 +53,6 @@ class DatasetBase(Dataset):
     train_D = ''
     train_T = ''
     train_N = ''
-    # test_D = ''
-    # test_T = ''
-    # test_N = ''
     TN_edges = ''
     D_edges = ''
     D_seg = ''
@@ -113,12 +142,13 @@ class DatasetBase(Dataset):
                 return image.resize(self.load_size, mode='nearest')
             return image.resize(self.load_size)
 
+
 class MasterDataset(Dataset):
     """
     Master dataset class to combine multiple datasets.
     """
 
-    def __init__(self, datasets: list[DatasetBase]):
+    def __init__(self, datasets: list[TrainDataset] | list[TestDataset]):
         self.datasets = datasets
         self.lengths = [len(dataset) for dataset in self.datasets]
         self.cumulative_lengths = [sum(self.lengths[:i + 1]) for i in range(len(self.lengths))]

@@ -3,10 +3,10 @@ from _socket import gethostname
 from ImagesCameras import ImageTensor
 from torch import Tensor
 
-from .DatasetBase import DatasetBase
+from .DatasetBase import TrainDataset, TestDataset
 
 
-class FLIR(DatasetBase):
+class FLIR(TrainDataset):
     """
     Dataset class for the FLIR dataset.
     """
@@ -56,40 +56,40 @@ class FLIR(DatasetBase):
             return image.resize(self.load_size)
 
 
-class FLIR_reg_night(DatasetBase):
+class FLIR_reg_night(TestDataset):
     """
     Dataset class for the FLIR dataset.
     """
     root_dir = "/home/godeta/Images/ICCV/Data_publi/FLIR_night/"
 
     def __init__(self, opt):
-        self.path_vis = self.root_dir + "vis/"
-        self.path_ir = self.root_dir + "ir_reg_ours/"
+        self.train_N = self.root_dir + "vis/"
+        self.train_T = self.root_dir + "ir_reg_ours/"
 
         super().__init__(opt)
 
 
-class FLIR_DAY_SAMPLES(DatasetBase):
+class FLIR_DAY_SAMPLES(TestDataset):
     """
     Dataset class for the FLIR day dataset samples.
     """
     root_dir = "/home/godeta/PycharmProjects/XCalib/examples/FLIR_DAY/"
 
     def __init__(self, opt):
-        self.path_vis = self.root_dir + "vis/"
-        self.path_ir = self.root_dir + "ir/"
+        self.train_N = self.root_dir + "vis/"
+        self.train_T = self.root_dir + "ir/"
 
         super().__init__(opt)
 
 
-class FLIR_NIGHT_SAMPLES(DatasetBase):
+class FLIR_NIGHT_SAMPLES(TestDataset):
     """
     Dataset class for the FLIR night dataset samples.
     """
     root_dir = "/home/godeta/PycharmProjects/XCalib/examples/FLIR_NIGHT/"
 
     def __init__(self, opt):
-        self.path_vis = self.root_dir + "vis/"
-        self.path_ir = self.root_dir + "ir/"
+        self.train_N = self.root_dir + "vis/"
+        self.train_T = self.root_dir + "ir/"
 
         super().__init__(opt)

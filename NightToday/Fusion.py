@@ -763,8 +763,9 @@ class U_ResNetFusion(nn.Module):
 
         return tanh_n(n1, n2 or n1)
 
-    def forward(self, ir, vis_night):
-        vis_night = self.spatial_aligner(vis_night, ir).detach()
+    def forward(self, ir, vis_night, align_first=True):
+        if align_first:
+            vis_night = self.spatial_aligner(vis_night, ir).detach()
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
         for layer in self.encoder:
             x_feat = layer(x_feat)

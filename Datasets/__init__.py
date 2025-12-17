@@ -4,7 +4,7 @@ from ImagesCameras import ImageTensor
 
 from .DatasetBase import MasterDataset
 from .FLIR import FLIR
-from .LYNRED import LYNRED
+from .LYNRED import LYNRED, LYNRED_NIGHT_SAMPLES, LYNRED_DAY_SAMPLES
 
 # from .LYNRED import LYNRED
 
@@ -19,12 +19,12 @@ DATASETS = {
     # 'FLIR_day_SAMPLES': FLIR_DAY_SAMPLES,
     # 'LYNRED_day': LYNRED_DAY,
     # 'LYNRED_night': LYNRED_NIGHT,
-    # 'LYNRED_night_SAMPLES': LYNRED_NIGHT_SAMPLES,
-    # 'LYNRED_day_SAMPLES': LYNRED_DAY_SAMPLES,
+    'LYNRED_NIGHT_SAMPLES': LYNRED_NIGHT_SAMPLES,
+    'LYNRED_DAY_SAMPLES': LYNRED_DAY_SAMPLES,
 }
 
 
-def collate_ImageTensor(batch):
+def collate_ImageTensor_train(batch):
     """
     Custom collate function to handle ImageTensor objects in a batch.
     """
@@ -44,29 +44,60 @@ def collate_ImageTensor(batch):
             'edges_TN': torch.cat(image_TN_edges)}
 
 
+def collate_ImageTensor_test(batch):
+    """
+    Custom collate function to handle ImageTensor objects in a batch.
+    """
+    image_T = [item[0] for item in batch]
+    image_N = [item[1] for item in batch]
+    return {'T': torch.cat(image_T),
+            'N': torch.cat(image_N)}
+
+
 def get_dataloaders(opt):
     """
     Get dataloaders for the specified datasets.
     """
-    datasets = opt.datasets
+    train_datasets = opt.train_datasets
     shuffle = opt.loader.shuffle
     num_workers = opt.loader.num_workers
     batch_size = opt.loader.batch_size
 
-    if not isinstance(datasets, list):
-        datasets = [datasets]
+    if not isinstance(train_datasets, list):
+        train_datasets = [train_datasets]
     datasets_loaded = []
-    for dataset_opt in datasets:
+    for dataset_opt in train_datasets:
         if dataset_opt.name in DATASETS:
 
             datasets_loaded.append(DATASETS[dataset_opt.name](dataset_opt))
         else:
-            raise ValueError(f"Dataset {dataset_opt.name} is not supported. Choose among: {', '.join(list(DATASETS.keys()))}")
+            raise ValueError(
+                f"Dataset {dataset_opt.name} is not supported. Choose among: {', '.join(list(DATASETS.keys()))}")
 
-    dataset = MasterDataset(datasets_loaded)
-    dataloader = DataLoader(dataset,
-                            batch_size=batch_size,
-                            num_workers=num_workers,
-                            shuffle=shuffle,
-                            collate_fn=collate_ImageTensor)
-    return dataloader
+    train_datasets = MasterDataset(datasets_loaded)
+    train_dataloader = DataLoader(train_datasets,
+                                  batch_size=batch_size,
+                                  num_workers=num_workers,
+                                  shuffle=shuffle,
+                                  collate_fn=collate_ImageTensor_train)
+    #  -------------------------------------------------------------
+    test_datasets = opt.test_datasets
+
+    if not isinstance(test_datasets, list):
+        test_datasets = [test_datasets]
+    datasets_loaded = []
+    for dataset_opt in test_datasets:
+        if dataset_opt.name in DATASETS:
+
+            datasets_loaded.append(DATASETS[dataset_opt.name](dataset_opt))
+        else:
+            raise ValueError(
+                f"Dataset {dataset_opt.name} is not supported. Choose among: {', '.join(list(DATASETS.keys()))}")
+
+    test_datasets = MasterDataset(datasets_loaded)
+    test_dataloader = DataLoader(test_datasets,
+                                 batch_size=1,
+                                 num_workers=1,
+                                 shuffle=False,
+                                 collate_fn=collate_ImageTensor_test)
+    return train_dataloader, test_dataloader

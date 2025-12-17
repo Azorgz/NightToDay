@@ -16,8 +16,6 @@ from torch import Tensor
 from torch.nn import LeakyReLU, ReLU
 from torchmetrics.functional.image import image_gradients
 from torchvision.transforms.v2 import Normalize
-
-from NightToday.MILO.MILO_runner import MILO, map_visualization
 from NightToday.ssim import SSIM
 from NightToday.utilities import RefineLightMask, ClsMeanPixelValue, GetFeaMatrixCenter, bhw_to_onehot, \
     detect_hotpoint_blob, center_of_mass
@@ -190,47 +188,47 @@ class GANLoss(nn.Module):
         return gp
 
 
-class MILO_Loss(nn.Module):
-    def __init__(self, device: torch.device = "cuda"):
-        super(MILO_Loss, self).__init__()
-        self.model = MILO().to(device)
-        self.model.eval()
-
-    def train(self, mode: bool = False):
-        """Override the default train() to make sure the model is always in eval mode."""
-        return super().train(False)
-
-    def forward(self, fake, real, mask=None):
-        """
-        Computes MILO loss between real visible and fake infrared images.
-        Args:
-            real: (B,3,H,W) real images
-            fake:  (B,3,H,W) generated images
-        """
-        real = (real + 1.0) * 0.5
-        fake = (fake + 1.0) * 0.5
-
-        if mask is not None:
-            mask_resized = F.interpolate(mask.float(), size=real.shape[-2:], mode='bilinear', align_corners=False)
-        else:
-            mask_resized = torch.ones_like(real[:, :1, :, :]).to(real.device)
-        return self.score(real, fake, mask_resized).squeeze()
-
-    def score(self, real, fake, mask):
-        """
-        Computes MILO map between real visible and fake infrared images.
-        Args:
-            real: (B,3,H,W) real images
-            fake:  (B,3,H,W) generated images
-            mask: (B,1,H,W) optional mask
-        """
-        score = self.model.MOS_score(real, fake, mask)
-        return score
-
-    def map(self, real, fake):
-        MILO_err, MILO_mask = self.model.MILO_map(fake, real)
-        MILO_err = ImageTensor(map_visualization(MILO_err))
-        return MILO_err, MILO_mask
+# class MILO_Loss(nn.Module):
+#     def __init__(self, device: torch.device = "cuda"):
+#         super(MILO_Loss, self).__init__()
+#         self.model = MILO().to(device)
+#         self.model.eval()
+#
+#     def train(self, mode: bool = False):
+#         """Override the default train() to make sure the model is always in eval mode."""
+#         return super().train(False)
+#
+#     def forward(self, fake, real, mask=None):
+#         """
+#         Computes MILO loss between real visible and fake infrared images.
+#         Args:
+#             real: (B,3,H,W) real images
+#             fake:  (B,3,H,W) generated images
+#         """
+#         real = (real + 1.0) * 0.5
+#         fake = (fake + 1.0) * 0.5
+#
+#         if mask is not None:
+#             mask_resized = F.interpolate(mask.float(), size=real.shape[-2:], mode='bilinear', align_corners=False)
+#         else:
+#             mask_resized = torch.ones_like(real[:, :1, :, :]).to(real.device)
+#         return self.score(real, fake, mask_resized).squeeze()
+#
+#     def score(self, real, fake, mask):
+#         """
+#         Computes MILO map between real visible and fake infrared images.
+#         Args:
+#             real: (B,3,H,W) real images
+#             fake:  (B,3,H,W) generated images
+#             mask: (B,1,H,W) optional mask
+#         """
+#         score = self.model.MOS_score(real, fake, mask)
+#         return score
+#
+#     def map(self, real, fake):
+#         MILO_err, MILO_mask = self.model.MILO_map(fake, real)
+#         MILO_err = ImageTensor(map_visualization(MILO_err))
+#         return MILO_err, MILO_mask
 
 
 def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, weights=None):
@@ -244,6 +242,7 @@ def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, 
     B = im_fake.shape[0]
     # color distance function
     color_dist = im_fake.color_distance(im_target)  # shape (B,1,H,W) or (B,H,W)
+    color_magn = im_target.LAB()[:, 1:3, :, :].norm(p=2, dim=1, keepdim=True)  # AB channels magnitude
     target_l, target_ab = rgb_to_lab(im_target).split([1, 2], 1)  # L channel
     low_lum = target_l < th_low
     high_lum = target_l > th_high
@@ -279,7 +278,7 @@ def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, 
 
         # Compute masked losses for each class in parallel:
         # (color_dist: B,1,H,W → broadcast to B,6,H,W)
-        masked_loss = (color_dist * masks).sum(dim=(2, 3))  # (B,6)
+        masked_loss = (color_dist * masks * color_magn/(color_magn.max()/2)).sum(dim=(2, 3))  # (B,6)
         masked_ssim_loss = (ssim_loss * masks[:, [2, 4, 5]]).sum(dim=(2, 3))  # (B,3)
 
         # Avoid division by zero: zero out empty masks
@@ -361,7 +360,7 @@ def ThermalLoss(image_fused, image_target, night_color, GT_seg, weights=None):
     total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2] + car_loss * weights[3]) /
             (weights * torch.stack([valid_sky, valid_veg, valid_person, valid_car], dim=-1).float()).sum(1)).mean()
 
-    thermal_noise_loss = ThermalNoiseLoss()(image_fused).mean() * 5
+    thermal_noise_loss = ThermalNoiseLoss()(image_fused).mean() * 2
 
     return total_classes_loss + thermal_noise_loss #  + trafficlight_loss
 
@@ -387,7 +386,7 @@ def TL_loss(I_ir, I_vi, I_fused, GT_mask):
                     mask_tl = (labels[i][None] == label).float()
                     mask_dilated = dilation(mask_tl, torch.ones(5*size_scaler, 3*size_scaler, device=GT_mask.device))
                     contours = (mask_dilated - mask_tl).squeeze()
-                    fake_TL[i] += create_fake_TL(I_ir[i][None], I_vi[i][None], mask_tl) * mask_tl[0]
+                    fake_TL[i] += create_fake_TL(I_ir[i][None], I_vi[i][None], mask_dilated) * mask_dilated[0]
                     mask_tl = mask_tl.squeeze()
                     if (contours * I_ir[i]).mean() > (mask_tl * I_ir[i]).mean():
                         fake_TL[i] += 1.05 * contours * ir + mask_tl*ir*0.95
@@ -400,11 +399,11 @@ def TL_loss(I_ir, I_vi, I_fused, GT_mask):
 
 def create_fake_TL(I_ir, I_vis, mask):
     # extract shape as mean sum(dim[mean +-std())
+    I_ir = (I_ir * 0.5 + 0.5).mean(dim=1).squeeze()
     mask = mask.squeeze()
-
-    I_ir = I_ir.mean(1).squeeze()
+    real_IR_TLight = I_ir * mask
+    cx, cy = center_of_mass(mask[None, None])
     h0, w0 = mask.sum(-2), mask.sum(-1)
-
     h_mean, h_std, w_mean, w_std = h0[h0 > 0].mean(), h0[h0 > 0].std(), w0[w0 > 0].mean(), w0[w0 > 0].std()
     h = int(h0[(h0 <= (h_mean + h_std)) * (h0 >= (h_mean - h_std))].mean())
     w = int(w0[(w0 <= (w_mean + w_std)) * (w0 >= (w_mean - w_std))].mean())
@@ -415,6 +414,14 @@ def create_fake_TL(I_ir, I_vis, mask):
     else:
         cut = False
         pad = [0, 0, 0, 0]
+    #  vertical borders
+    dx = (torch.abs(I_ir[:, 1:] - I_ir[:, :-1])*mask[:, 1:]).sum(-2)
+    left_border = torch.argmax(dx[: max(cx.long()-w//4, 0)], dim=-1) or 0
+    right_border = torch.argmax(dx[max(cx.long()+w//4, dx.shape[-1]-1):], dim=-1) or dx.shape[-1]-1
+
+
+
+
 
     # real IR values in the TL area
     TL_ir_target = I_ir[mask > 0].mean() + I_ir[mask > 0].std()

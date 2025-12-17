@@ -1,11 +1,15 @@
+import json
 import os
 from dataclasses import dataclass
+from os.path import isfile
 from pathlib import Path
 from typing import Literal, Tuple, Union, Iterable
 
 import torch
 import yaml
 from torch import device
+
+from Datasets import get_dataloaders
 
 
 @dataclass
@@ -119,7 +123,8 @@ class DatasetConfig:
 @dataclass
 class DataConfig:
     loader: LoaderConfig
-    datasets: list[DatasetConfig]
+    train_datasets: list[DatasetConfig]
+    test_datasets: list[DatasetConfig] = None
 
 
 @dataclass
@@ -150,9 +155,13 @@ class SemClassMapping:
     VEHICLES = [CAR, TRUCK, BUS, TRAIN, MOTORCYCLE, BICYCLE]
 
 
-def get_config() -> OptImage2ImageGATConfig:
-    with open(os.getcwd() + '/NightToday/configs/conf.yaml', 'r') as f:
-        conf = yaml.safe_load(f)
+def get_config(path=None) -> OptImage2ImageGATConfig:
+    if path is not None and isfile(path):
+        with open(path, 'r') as f:
+            conf = yaml.safe_load(f)
+    else:
+        with open(os.getcwd() + '/NightToday/configs/conf.yaml', 'r') as f:
+            conf = yaml.safe_load(f)
 
     # Model Config
     input_size = tuple([conf['model']['gen']['input_size'], conf['model']['gen']['input_size']]) if not isinstance(
@@ -160,11 +169,15 @@ def get_config() -> OptImage2ImageGATConfig:
     conf['model']['gen']['input_size'] = input_size
     seg_scheduleConfig = conf['model']['seg']['training_schedule']
     assert seg_scheduleConfig['start_epoch'] >= 0, "segmentation training schedule start_epoch must be >= 0"
-    seg_scheduleConfig['end_epoch'] = conf['training']['total_epochs'] if seg_scheduleConfig['end_epoch'] is None else seg_scheduleConfig['end_epoch']
-    assert seg_scheduleConfig['end_epoch'] > seg_scheduleConfig['start_epoch'], "segmentation training schedule end_epoch must be None or > start_epoch"
-    assert seg_scheduleConfig['end_epoch'] > seg_scheduleConfig['updateGT_D_start_epoch'] >= seg_scheduleConfig['start_epoch'], \
+    seg_scheduleConfig['end_epoch'] = conf['training']['total_epochs'] if seg_scheduleConfig['end_epoch'] is None else \
+    seg_scheduleConfig['end_epoch']
+    assert seg_scheduleConfig['end_epoch'] > seg_scheduleConfig[
+        'start_epoch'], "segmentation training schedule end_epoch must be None or > start_epoch"
+    assert seg_scheduleConfig['end_epoch'] > seg_scheduleConfig['updateGT_D_start_epoch'] >= seg_scheduleConfig[
+        'start_epoch'], \
         "segmentation training schedule updateGT_start_epoch must be >= start_epoch and < end_epoch"
-    assert seg_scheduleConfig['end_epoch'] > seg_scheduleConfig['updateGT_TN_start_epoch'] >= seg_scheduleConfig['start_epoch'], \
+    assert seg_scheduleConfig['end_epoch'] > seg_scheduleConfig['updateGT_TN_start_epoch'] >= seg_scheduleConfig[
+        'start_epoch'], \
         "segmentation training schedule updateGT_start_epoch must be >= start_epoch and < end_epoch"
     conf['model']['seg']['training_schedule'] = SegScheduleConfig(**seg_scheduleConfig)
     modelConfig = ModelConfig(name=conf['model']['name'],
@@ -191,8 +204,11 @@ def get_config() -> OptImage2ImageGATConfig:
         test_freq=conf['training']['test_freq'],
         start_epoch=conf['training']['start_epoch'],
         resume=conf['training']['resume'],
-        resume_epoch=validate_epoch_load(conf['training']['resume_epoch'], n_domains=len(modelConfig.names_domains), split=split_weights),
-        partial_train=validate_partial_train(conf['training']['partial_train'], n_domains=len(modelConfig.names_domains)) if conf['training']['split_optimizers'] else None,
+        resume_epoch=validate_epoch_load(conf['training']['resume_epoch'], n_domains=len(modelConfig.names_domains),
+                                         split=split_weights),
+        partial_train=validate_partial_train(conf['training']['partial_train'],
+                                             n_domains=len(modelConfig.names_domains)) if conf['training'][
+            'split_optimizers'] else None,
         total_epochs=conf['training']['total_epochs'],
         lr_G=conf['training']['lr']['G'],
         betas_G=tuple(conf['training']['betas']['G']),
@@ -214,11 +230,17 @@ def get_config() -> OptImage2ImageGATConfig:
     # Data Config
     loader_conf = conf['data']['loader']
     loader_conf['load_size'] = input_size
-    datasets_conf = [DatasetConfig(**d | {'load_size': loader_conf['load_size'],
-                                          'num_classes': conf['model']['seg']['num_classes'],
-                                          'resize_and_crop': loader_conf['resize_and_crop']})
-                     for d in conf['data']['datasets']]
-    data = DataConfig(loader=LoaderConfig(**loader_conf), datasets=datasets_conf)
+    datasets_conf_train = [DatasetConfig(**d | {'load_size': loader_conf['load_size'],
+                                                'num_classes': conf['model']['seg']['num_classes'],
+                                                'resize_and_crop': loader_conf['resize_and_crop']})
+                           for d in conf['data']['train_datasets']]
+    datasets_conf_test = [DatasetConfig(**d | {'load_size': loader_conf['load_size'],
+                                               'num_classes': conf['model']['seg']['num_classes'],
+                                               'resize_and_crop': loader_conf['resize_and_crop']})
+                          for d in conf['data']['test_datasets']] if 'test_datasets' in conf['data'] else None
+    data = DataConfig(loader=LoaderConfig(**loader_conf),
+                      train_datasets=datasets_conf_train,
+                      test_datasets=datasets_conf_test)
     return OptImage2ImageGATConfig(device=devices,
                                    model=modelConfig,
                                    training=trainConfig,
@@ -231,27 +253,27 @@ def validate_epoch_load(epoch_load: Union[str, dict, int], n_domains: int, split
         return epoch_load
     if isinstance(epoch_load, str):
         if epoch_load.lower() in ['latest', 'last']:
-            return ({f'G{i}': 'latest' for i in range(n_domains*2+1)} |
+            return ({f'G{i}': 'latest' for i in range(n_domains * 2 + 1)} |
                     {f'D{j}': 'latest' for j in range(n_domains)} |
                     {f'S{k}': 'latest' for k in range(n_domains)})
         elif epoch_load.isdigit():
-            return {f'G{i}': int(epoch_load) for i in range(n_domains*2+1)} | \
-                   {f'D{j}': int(epoch_load) for j in range(n_domains)} | \
-                   {f'S{k}': int(epoch_load) for k in range(n_domains)}
+            return {f'G{i}': int(epoch_load) for i in range(n_domains * 2 + 1)} | \
+                {f'D{j}': int(epoch_load) for j in range(n_domains)} | \
+                {f'S{k}': int(epoch_load) for k in range(n_domains)}
         else:
             raise ValueError("epoch_load must be 'latest', or an integer as str.")
     elif isinstance(epoch_load, int):
-        return {f'G{i}': int(epoch_load) for i in range(n_domains*2+1)} | \
-               {f'D{j}': int(epoch_load) for j in range(n_domains)} | \
-               {f'S{k}': int(epoch_load) for k in range(n_domains)}
+        return {f'G{i}': int(epoch_load) for i in range(n_domains * 2 + 1)} | \
+            {f'D{j}': int(epoch_load) for j in range(n_domains)} | \
+            {f'S{k}': int(epoch_load) for k in range(n_domains)}
     elif isinstance(epoch_load, dict):
-        ret = ({f'G{i}': None for i in range(n_domains*2+1)} |
+        ret = ({f'G{i}': None for i in range(n_domains * 2 + 1)} |
                {f'D{j}': None for j in range(n_domains)} |
                {f'S{k}': None for k in range(n_domains)})
         if 'G' in epoch_load:
             if epoch_load['G'] is not None:
                 G = int(epoch_load['G']) if not isinstance(epoch_load['G'], str) else epoch_load['G']
-                ret.update({f'G{i}': G for i in range(n_domains*2+1)})
+                ret.update({f'G{i}': G for i in range(n_domains * 2 + 1)})
         if 'D' in epoch_load:
             if epoch_load['D'] is not None:
                 D = int(epoch_load['D']) if not isinstance(epoch_load['D'], str) else epoch_load['D']
@@ -267,7 +289,7 @@ def validate_epoch_load(epoch_load: Union[str, dict, int], n_domains: int, split
 
 
 def validate_partial_train(partial_train: dict | None, n_domains) -> dict | None:
-    ret = {f'G': list(range(n_domains*2+1)), f'D': list(range(n_domains)), f'S': list(range(n_domains))}
+    ret = {f'G': list(range(n_domains * 2 + 1)), f'D': list(range(n_domains)), f'S': list(range(n_domains))}
     if partial_train is None:
         return ret
     else:
@@ -281,3 +303,11 @@ def validate_partial_train(partial_train: dict | None, n_domains) -> dict | None
                 elif values is None:
                     ret[key] = []
     return ret
+
+
+def build_train_data_from_config():
+    """Builds ImageToImageGAT_Dual + optional LossScheduler + segmentation nets."""
+    # --- Model creation ---
+    model_params = get_config()
+    train_dataloaders, test_dataloaders = get_dataloaders(model_params.data)
+    return train_dataloaders, test_dataloaders, model_params

@@ -16,16 +16,17 @@ Usage: open this file in the editor and adapt patch sizes / transformer sizes to
 import os
 from collections import OrderedDict
 from functools import partial
+from pathlib import Path
 
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
 from torch import Tensor
-from torch.nn.functional import interpolate, relu, softmax
-
+from torch.nn.functional import interpolate, relu
+from . import get_config
 from NightToday import OptImage2ImageGATConfig
 from NightToday.losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
-    FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, MILO_Loss, \
+    FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
     ThermalLoss, SharpFusionLoss
 from NightToday.modules import LossScheduler, Get_gradmag_gray
 from NightToday.plexers import G_Plexer, D_Plexer, S_Plexer
@@ -42,35 +43,29 @@ class Image2ImageGAT_Dual(nn.Module):
     """
     _partial_train_net: dict[str, list[int]]
 
-    def __init__(self, opt: OptImage2ImageGATConfig):
+    def __init__(self, opt: OptImage2ImageGATConfig | str | Path | dict | None = None,
+                 *args, trainable: bool = True, **kwargs):
         # region initialization sequence
         # If building from checkpoint, load config from the checkpoint given by resume_epoch
         super().__init__()
-        self.opt = opt
-        self.device = opt.device
-        self.mode = 'train'
-        if opt.model.build_from_checkpoint and opt.training.resume:
-            checkpoint = self.load(opt.training.resume_epoch, return_checkpoint=True)
-            self.opt.model = checkpoint['config'].model
-        else:
-            checkpoint = None
+        checkpoint = self.initialization(opt, *args, **kwargs)
         self.opt.model.gen.fusion_first = self.opt.model.fusion_first
         self.opt.model.discr.fusion_first = self.opt.model.fusion_first
         self.opt.model.seg.fusion_first = self.opt.model.fusion_first
-        self.model_name = opt.model.gen.type
-        self.names_domains = opt.model.names_domains
-        self.mode = opt.model.mode
-        self.checkpoint_dir = opt.training.checkpoint_dir
+        self.model_name = self.opt.model.gen.type
+        self.names_domains = self.opt.model.names_domains
+        self.mode = self.opt.model.mode if trainable else 'test'
+        self.checkpoint_dir = self.opt.training.checkpoint_dir
         os.makedirs(self.checkpoint_dir, exist_ok=True)
-        self.visualize_dir = opt.training.visualize_dir
+        self.visualize_dir = self.opt.training.visualize_dir
         os.makedirs(self.visualize_dir, exist_ok=True)
         # endregion
 
         # region Networks
-        self.netG = G_Plexer(self.names_domains, self.opt.model.gen, opt.training, self.device)
-        self.netD = D_Plexer(self.names_domains, self.opt.model.discr, opt.training, self.device)
-        self.netS = S_Plexer(self.names_domains, self.opt.model.seg, opt.training, self.device)
-        self.load(opt.training.resume_epoch, checkpoint=checkpoint)
+        self.netG = G_Plexer(self.names_domains, self.opt.model.gen, self.opt.training, self.device)
+        self.netD = D_Plexer(self.names_domains, self.opt.model.discr, self.opt.training, self.device)
+        self.netS = S_Plexer(self.names_domains, self.opt.model.seg, self.opt.training, self.device)
+        self.load(self.opt.training.resume_epoch, checkpoint=checkpoint)
         # endregion
 
         # region Inputs / Outputs buffers
@@ -78,30 +73,33 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region Train parameters, criterion and losses
-        if self.mode == 'train':
-            self.visualizer = Visualizer(opt.training)
+        if self.mode == 'train' and trainable:
+            self.visualizer = Visualizer(self.opt.training)
             # Training functions
             self.att_input = AttackImages(device=self.device)
             # criteria
             self.get_gradmag = Get_gradmag_gray()
             self.used_losses = []
             self.sum_lambdas = -1.0
-            self.GANLoss = GANLoss(gan_type=opt.training.gan_type, device=self.device)
+            self.GANLoss = GANLoss(gan_type=self.opt.training.gan_type, device=self.device)
             self.L1 = nn.SmoothL1Loss()
             self.L1_sum = nn.SmoothL1Loss(reduction='sum')
             self.downsample = torch.nn.AvgPool2d(3, stride=2)
             self.criterion_gan = lambda d, r, p_r, f, v: self.GANLoss(d, r, p_r, f, v)
             self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
-            self.criterion_cycle = lambda rec, real: nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec, real) / self.lambda_cycle
-            self.criterion_mean_var = lambda f_tn, r_t: relu(torch.abs(f_tn.mean() - r_t.mean() -0.1)) + relu(torch.abs(f_tn.std() - r_t.std())-0.05)
+            self.criterion_cycle = lambda rec, real: nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec,
+                                                                                                                real) / self.lambda_cycle
+            self.criterion_mean_var = lambda f_tn, r_t: relu(torch.abs(f_tn.mean() - r_t.mean() - 0.1)) + relu(
+                torch.abs(f_tn.std() - r_t.std()) - 0.05)
             self.criterion_latent = lambda y, t: self.L1(y, t.detach())
             self.criterion_ssim = lambda x, y: SSIM_Loss()((x + 1) / 2, (y + 1) / 2) * self.lambda_ssim
             self.criterion_tv = TVLoss(TVLoss_weight=1)
             self.criterion_color = ColorLoss
             self.criterion_thermal = ThermalLoss
-            self.criterion_att = lambda rec, fake: self.criterion_cycle(rec, self.real_TN) + self.criterion_cycle(fake, self.fake_D.detach())
+            self.criterion_att = lambda rec, fake: self.criterion_cycle(rec, self.real_TN) + self.criterion_cycle(fake,
+                                                                                                                  self.fake_D.detach())
             self.criterion_detail = lambda f_d, r_t: self.L1(self.get_gradmag(f_d), self.get_gradmag(r_t.detach()))
-            self.criterion_milo = lambda f_d, r_t, m=None: MILO_Loss(self.device)(f_d, r_t.detach(), m)
+            # self.criterion_milo = lambda f_d, r_t, m=None: MILO_Loss(self.device)(f_d, r_t.detach(), m)
             self.criterion_semEdge = partial(SemEdgeLoss, num_classes=self.netS.num_classes)
             self.criterion_sharpness = SharpFusionLoss()
             self.criterion_cgr = lambda f_d, seg_t, r_t: CondGradRepaLoss(f_d,
@@ -121,8 +119,8 @@ class Image2ImageGAT_Dual(nn.Module):
 
             # Losses storage
             self.initialize_losses()
-            self.epoch = opt.training.start_epoch
-            self.losses_scheduler = LossScheduler(opt.training.loss_scheduler, epoch=self.epoch)
+            self.epoch = self.opt.training.start_epoch
+            self.losses_scheduler = LossScheduler(self.opt.training.loss_scheduler, epoch=self.epoch)
             # Loss Weights
             for lam in self.losses_scheduler.current.keys():
                 setattr(self, f'{lam}', self.losses_scheduler.get(f'{lam}'))
@@ -133,9 +131,35 @@ class Image2ImageGAT_Dual(nn.Module):
 
             # Partial training setup
             self.set_partial_train()
+
         # endregion
 
+
+
     # region ------------------------ Setup Functions ------------------------ #
+
+    def initialization(self, opt, *args, **kwargs) -> dict | None:
+        checkpoint = None
+        if isinstance(opt, (str, Path)):
+            if 'yaml' in opt.suffix or 'yml' in opt.suffix or 'json' in opt.suffix:
+                self.opt = get_config(opt)
+        else:
+            checkpoint = opt
+            self.opt = get_config()
+            if isinstance(checkpoint, (str, Path)) and os.path.isfile(checkpoint):
+                checkpoint = torch.load(checkpoint, weights_only=False, map_location='cpu')
+                self.opt.model = checkpoint['config']
+            elif isinstance(checkpoint, dict):
+                self.opt.model = checkpoint['config'].model
+            else:  # None case
+                self.mode = 'train'
+                if self.opt.model.build_from_checkpoint and self.opt.training.resume:
+                    checkpoint = self.load(self.opt.training.resume_epoch, return_checkpoint=True)
+                    self.opt.model = checkpoint['config'].model
+                else:
+                    checkpoint = None
+        self.device = self.opt.device
+        return checkpoint
 
     def save(self, epoch):
         checkpoint = {'epoch': epoch,
@@ -247,12 +271,15 @@ class Image2ImageGAT_Dual(nn.Module):
 
     # region ------------------------ Inference Function -------------------- #
     @torch.no_grad()
-    def forward(self, thermal, night, return_fused_IR=False):
+    def forward(self, data, return_fused_IR=False):
+        thermal = data.get('T', ImageTensor.rand(1, 3, 256, 256)).to(self.device)
+        night = data.get('N', ImageTensor.rand(1, 3, 256, 256)).to(self.device)
         encoded_TN, fused_IR, _ = self.netG.encode(thermal, night, from_=self.T)
         fake_D = self.netG.decode(encoded_TN, to_=self.D)
         if return_fused_IR:
-            return fake_D, fused_IR
-        return fake_D
+            return fake_D*0.5+0.5, fused_IR*0.5+0.5
+        return fake_D*0.5+0.5
+
     # endregion
 
     # region ------------------------ Training Functions --------------------- #
@@ -305,7 +332,8 @@ class Image2ImageGAT_Dual(nn.Module):
         # region GAN loss
         """D_T(G_T(D))"""
         self.fake_TN = self.netG.decode(encoded_D, to_=self.T)
-        self.fake_T, self.fake_N = (self.fake_TN[:, :3], self.fake_TN[:, 3:]) if not self.opt.model.fusion_first else (self.fake_TN, None)
+        self.fake_T, self.fake_N = (self.fake_TN[:, :3], self.fake_TN[:, 3:]) if not self.opt.model.fusion_first else (
+        self.fake_TN, None)
 
         self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.real_T,
                                                  self.pred_real_T, self.fake_T, False, loss_name='G')
@@ -315,7 +343,8 @@ class Image2ImageGAT_Dual(nn.Module):
                                                      self.pred_real_N, self.fake_N, False, loss_name='G')
         else:
             self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.real_T,
-                                                     self.pred_real_T, self.real_TN if self.fake_N is None else self.fake_N
+                                                     self.pred_real_T,
+                                                     self.real_TN if self.fake_N is None else self.fake_N
                                                      , False, loss_name='G')
         """D_D(G_D(T))"""
         self.fake_D = self.netG.decode(encoded_TN, to_=self.D)
@@ -334,7 +363,8 @@ class Image2ImageGAT_Dual(nn.Module):
         # Backward
         rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
         self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
-        self.rec_T, self.rec_N = (self.rec_TN[:, :3], self.rec_TN[:, 3:]) if self.rec_TN.shape[1] == 6 else (self.rec_TN, None)
+        self.rec_T, self.rec_N = (self.rec_TN[:, :3], self.rec_TN[:, 3:]) if self.rec_TN.shape[1] == 6 else (
+        self.rec_TN, None)
         self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.real_TN, loss_name='cycle')
         if self.rec_N is not None:
             self.loss_cycle[self.N] += self.compute_loss('cycle', self.rec_N, self.real_N, loss_name='cycle')
@@ -367,7 +397,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                    criterion_lambda='ssim', loss_name='sga')
         self.loss_sga[self.T] += self.compute_loss('sga', self.get_gradmag(self.real_TN), self.get_gradmag(self.fake_D))
         self.loss_sga[self.T] += self.compute_loss('IRClsDis', self.segMask_TN_update if
-                                                   self.segMask_TN_update is not None else self.segMask_TN,
+        self.segMask_TN_update is not None else self.segMask_TN,
                                                    self.real_TN.mean(dim=1, keepdim=True),
                                                    criterion_lambda='ssim', loss_name='sga')
         # endregion
@@ -409,9 +439,9 @@ class Image2ImageGAT_Dual(nn.Module):
             if self.opt.model.fusion_first:
                 self.loss_att[self.T] += self.compute_loss('cycle', self.real_TN,
                                                            -self.real_N.mean(dim=1, keepdim=True).repeat(1, 3, 1, 1),
-                                                       loss_name='att', criterion_lambda='att')
+                                                           loss_name='att', criterion_lambda='att')
                 self.loss_att[self.T] += self.compute_loss('cycle', self.real_TN, self.real_T,
-                                                       loss_name='att', criterion_lambda='att')
+                                                           loss_name='att', criterion_lambda='att')
 
         #     # att_T, att_N = self.att_input(self.real_T, self.real_N, balance=0.5, epsilon=0.25)
         #     # fake_D_att = self.netG.decode(self.netG.encode(att_T, att_N, from_=self.T), to_=self.D)
@@ -479,9 +509,12 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region Color/Thermal loss
-        self.loss_color[self.T] += self.compute_loss('color', self.fake_D, self.real_N, self.segMask_TN_update, weights=self.class_weight)
-        self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D, weights=self.class_weight)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.real_T, self.real_N, self.segMask_TN_update, weights=self.class_weight)
+        self.loss_color[self.T] += self.compute_loss('color', self.fake_D, self.real_N, self.segMask_TN_update,
+                                                     weights=self.class_weight)
+        self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
+                                                     weights=self.class_weight)
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.real_T, self.real_N,
+                                                       self.segMask_TN_update, weights=self.class_weight)
         # endregion
 
         # region Perception Loss (MILO)
@@ -558,8 +591,8 @@ class Image2ImageGAT_Dual(nn.Module):
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
                 self.segMask_TN_update = (UpdateIRGTv1(real_T_pred_seg.detach(), fake_D_pred_seg_d,
-                                                      255 * torch.ones_like(segMask_D_s), real_T_s) *
-                                          mask_uncertain + ~mask_uncertain*segMask_TN_s)
+                                                       255 * torch.ones_like(segMask_D_s), real_T_s) *
+                                          mask_uncertain + ~mask_uncertain * segMask_TN_s)
 
             elif stage == 'update_TN':
                 segMask_D_s = interpolate(self.segMask_D, size=rand_size, mode='nearest').long()
@@ -578,7 +611,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
                 self.segMask_TN_update = (UpdateIRGTv2(fake_TN_pred_seg_d.detach(), fake_D_pred_seg_d, segMask_TN_s,
-                                          real_T_s).long() * mask_uncertain + ~mask_uncertain*segMask_TN_s)
+                                                       real_T_s, prob_th=0.9).long() * mask_uncertain + ~mask_uncertain * segMask_TN_s)
                 self.criterion_seg = self.update_class_criterion(self.segMask_TN_update)
                 self.loss_seg[self.T] += self.compute_loss('seg', real_T_pred_seg.squeeze(1),
                                                            self.segMask_TN_update.squeeze(1))
@@ -597,7 +630,8 @@ class Image2ImageGAT_Dual(nn.Module):
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
                 self.segMask_TN_update = (UpdateIRGTv2(real_T_pred_seg.detach(), fake_D_pred_seg_d, segMask_TN_s,
-                                                      real_T_s[:, :3]) * mask_uncertain + ~mask_uncertain*segMask_TN_s)
+                                                       real_T_s[:,
+                                                       :3]) * mask_uncertain + ~mask_uncertain * segMask_TN_s)
                 segMask_TN_update_s = interpolate(self.segMask_TN_update.float(), size=rand_size, mode='nearest').long()
                 self.criterion_seg = self.update_class_criterion(segMask_TN_update_s)
                 self.loss_seg[self.T] = self.compute_loss('seg', fake_D_pred_seg,
@@ -700,7 +734,7 @@ class Image2ImageGAT_Dual(nn.Module):
                    'real_N': (self.real_N * 0.5 + 0.5 if self.real_N is not None else None),
                    'fake_D': (self.fake_D * 0.5 + 0.5 if self.fake_D is not None else None),
                    'fake_T': (self.fake_T * 0.5 + 0.5 if self.fake_T is not None else None),
-                   'fake_N': (self.fake_N * 0.5 + 0.5 if self.fake_N is not None else self.real_TN *0.5 +0.5),
+                   'fake_N': (self.fake_N * 0.5 + 0.5 if self.fake_N is not None else self.real_TN * 0.5 + 0.5),
                    'rec_D': (self.rec_D * 0.5 + 0.5 if self.rec_D is not None else None),
                    'rec_T': (self.rec_T * 0.5 + 0.5 if self.rec_T is not None else None),
                    'rec_N': (self.rec_N * 0.5 + 0.5 if self.rec_N is not None else None)}

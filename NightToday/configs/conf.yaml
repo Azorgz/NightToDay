@@ -41,8 +41,8 @@ training:
   split_weights: False
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
-  test_freq: 1  # epochs
-  start_epoch: 41
+  test_freq: 0  # epochs
+  start_epoch: 64
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -64,7 +64,7 @@ training:
     D: [0.5, 0.999]
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
-    lambda_color: [[ 0,  ], 10.0]
+    lambda_color: [[ 0,  ], 25.0]
     lambda_id: [[ 0,  ], 1.0]
     lambda_cycle:  [[ 0,  ], 5.]
     lambda_ssim:  [[ 0,  ], 2.5]
@@ -90,17 +90,27 @@ data:
     num_workers: 1
     shuffle: True
     resize_and_crop: True
-  datasets:
+  train_datasets:
     - name: 'FLIR'
       sampling: 1
       augmentations:
         hflip: True
-#    - name: 'LYNRED'
-#      sampling: 1
-#      augmentations:
-#        hflip: True
+    - name: 'LYNRED'
+      sampling: 1
+      augmentations:
+        hflip: True
 #    - name: 'Lynred_reg'
 #      sampling: 0.5
 #      augmentations:
 #        hflip: True
+  test_datasets:
+#      - name: 'LYNRED_DAY_SAMPLES'
+#        sampling: 1
+#        augmentations:
+#          hflip: False
+      - name: 'LYNRED_NIGHT_SAMPLES'
+        sampling: 1
+        augmentations:
+          hflip: False
+
 

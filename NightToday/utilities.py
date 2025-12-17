@@ -4,9 +4,11 @@ import numpy as np
 import skimage
 import torch
 from kmeans_pytorch import kmeans
-from kornia.color import rgb_to_lab, lab_to_rgb
+from kornia.color import rgb_to_lab, lab_to_rgb, rgb_to_hsv
 from kornia.contrib import connected_components
+from kornia.filters import gaussian_blur2d
 from kornia.morphology import closing, dilation
+from matplotlib import pyplot as plt
 from scipy.ndimage import gaussian_filter
 from skimage import measure
 from torch import nn, tensor
@@ -30,6 +32,7 @@ TRAIN = 16
 MOTORCYCLE = 17
 BICYCLE = 18
 VEHICLES = [CAR, TRUCK, BUS, TRAIN, MOTORCYCLE, BICYCLE]
+
 
 # region ------------------------ Utilities ---------------------------
 
@@ -421,6 +424,91 @@ def center_of_mass(img):
     return cx, cy
 
 
+
+
+def detect_TL_blobs_mask_free(I_vi,
+                              sigmas=(2, 4, 6),
+                              sat_thresh=0.18,
+                              visualize=False):
+    # ---- Luminance ----
+    Y = 0.299 * I_vi[:, 0:1] + 0.587 * I_vi[:, 1:2] + 0.114 * I_vi[:, 2:3]
+
+    # ---- Multi-scale DoG ----
+    responses = []
+    for s in sigmas:
+        g1 = gaussian_blur2d(Y, (2 * s + 1, 2 * s + 1), (s, s))
+        g2 = gaussian_blur2d(Y, (2 * (s + 1) + 1, 2 * (s + 1) + 1), (s + 1, s + 1))
+        responses.append(g1 - g2)
+
+    DoG = torch.stack(responses).max(0)[0]
+    DoG = DoG.clamp(min=0)
+
+    # ---- Threshold ----
+    th = 0.7 * DoG.std(dim=(2, 3), keepdim=True)
+    M = (DoG > th).float()
+
+    # ---- Saturation enclosure ----
+    hsv = rgb_to_hsv(I_vi)
+    S = hsv[:, 1:2]
+
+    kernel = torch.ones(5, 5, device=I_vi.device)
+    ring = dilation(M, kernel) - M
+    ring = ring.clamp(min=0)
+
+    sat_score = (S * ring).sum((2, 3)) / (ring.sum((2, 3)) + 1e-6)
+
+    # ---- Keep only saturated blobs ----
+    valid = sat_score > sat_thresh
+    if not valid.any():
+        return None  # no TL detected
+
+    # ---- Center + radius ----
+    yy, xx = torch.meshgrid(
+        torch.arange(I_vi.shape[-2], device=I_vi.device),
+        torch.arange(I_vi.shape[-1], device=I_vi.device),
+        indexing='ij'
+    )
+    weights = Y * M
+    cx = (weights * xx).sum() / (weights.sum() + 1e-6)
+    cy = (weights * yy).sum() / (weights.sum() + 1e-6)
+    r = torch.sqrt(M.sum() / torch.pi)
+
+    if visualize:
+        _visualize_detection(I_vi, M, cx, cy, r)
+
+    return cx.item(), cy.item(), r.item()
+
+
+def _visualize_detection(I_vi, M, cx, cy, r):
+    """
+    Helper function for visualization
+    """
+    img = I_vi[0].permute(1,2,0).detach().cpu().numpy()
+    H, W, _ = img.shape
+
+    plt.figure(figsize=(6,6))
+    plt.imshow(img)
+    plt.axis("off")
+
+    if M is not None:
+        mask = M[0, 0].detach().cpu().numpy()
+        plt.imshow(mask, cmap='autumn', alpha=0.4)
+
+        # Center
+        plt.scatter(cx.item(), cy.item(), c='red', s=60, marker='+')
+
+        # Radius
+        circle = plt.Circle((cx.item(), cy.item()),
+                            r.item(),
+                            color='red',
+                            fill=False,
+                            linewidth=2)
+        plt.gca().add_patch(circle)
+
+    plt.title("Traffic Light Blob Detection")
+    plt.show()
+
+
 def detect_hotpoint_blob(I_vi, M_tl, contrast_k=0.98, sigma_ratio=0.20):
     """
     Detect hot-point inside TL mask based on brightness blob + COM.
@@ -475,7 +563,7 @@ def detect_hotpoint_blob(I_vi, M_tl, contrast_k=0.98, sigma_ratio=0.20):
     M_hot = M_hot.unsqueeze(1)  # Bx1xHxW
     M_hot = M_hot / (M_hot.flatten(2).max(dim=-1, keepdim=True)[0] + 1e-6)  # normalize
     M_hot = M_hot * M_tl[valid_blob]  # mask outside TL region
-    ret[valid_blob] = M_hot/2
+    ret[valid_blob] = M_hot / 2
     return ret
 
 
@@ -723,6 +811,7 @@ import torch.nn.functional as F
 # Use kornia color conversions if available; otherwise provide a fallback.
 try:
     import kornia.color as kcolor  # kornia expects RGB in [0,1]
+
     _HAS_KORNIA = True
 except Exception:
     _HAS_KORNIA = False
@@ -755,9 +844,9 @@ def LocalVerticalFlip(input_mask: torch.Tensor,
     H = input_mask.shape[0]
 
     # flip full images along vertical axis (height dim 0 for mask; dim 1 for C,H,W tensors)
-    mask_flip = torch.flip(input_mask, dims=[0])                       # (H, W)
-    fake_flip = torch.flip(fake_IR, dims=[1])                          # (C, H, W)
-    vis_flip = torch.flip(real_vis, dims=[1])                          # (C, H, W)
+    mask_flip = torch.flip(input_mask, dims=[0])  # (H, W)
+    fake_flip = torch.flip(fake_IR, dims=[1])  # (C, H, W)
+    vis_flip = torch.flip(real_vis, dims=[1])  # (C, H, W)
 
     # compute flipped region indices (these are torch scalars but used for slicing, convert to int)
     # Using python ints for slicing is acceptable; they don't move large tensors.
@@ -765,9 +854,9 @@ def LocalVerticalFlip(input_mask: torch.Tensor,
     flip_rmax = int(H - region_min_row - 1)
 
     # prepare outputs (zeros_like keeps dtype/device)
-    out_mask = torch.zeros_like(input_mask)                             # (H, W)
-    out_fake = torch.zeros_like(fake_IR)                                # (C, H, W)
-    out_vis = torch.zeros_like(real_vis)                                # (C, H, W)
+    out_mask = torch.zeros_like(input_mask)  # (H, W)
+    out_fake = torch.zeros_like(fake_IR)  # (C, H, W)
+    out_vis = torch.zeros_like(real_vis)  # (C, H, W)
 
     # copy flipped region into the original region positions
     out_mask[region_min_row:region_max_row + 1, :] = mask_flip[flip_rmin:flip_rmax + 1, :]
@@ -784,12 +873,12 @@ def _dilate_mask_torch(mask: torch.Tensor, k: int = 5) -> torch.Tensor:
     returns dilated mask (H,W) float
     """
     # convert to shape (1,1,H,W) for pool
-    m = mask.unsqueeze(0).unsqueeze(0)                                  # (1,1,H,W)
+    m = mask.unsqueeze(0).unsqueeze(0)  # (1,1,H,W)
     # max pool (same padding)
     pad = (k - 1) // 2
-    m1 = -F.max_pool2d(-m, kernel_size=k, stride=1, padding=pad)        # dilate (first pass)
-    m2 = -F.max_pool2d(-m1, kernel_size=k, stride=1, padding=pad)       # dilate (second pass)
-    return m2.squeeze(0).squeeze(0)                                     # (H,W)
+    m1 = -F.max_pool2d(-m, kernel_size=k, stride=1, padding=pad)  # dilate (first pass)
+    m2 = -F.max_pool2d(-m1, kernel_size=k, stride=1, padding=pad)  # dilate (second pass)
+    return m2.squeeze(0).squeeze(0)  # (H,W)
 
 
 def Red2Green(input_rgb: torch.Tensor, input_mask: torch.Tensor):
@@ -806,19 +895,19 @@ def Red2Green(input_rgb: torch.Tensor, input_mask: torch.Tensor):
     """
     dev = input_rgb.device
     # normalize to [0,1] as original did
-    rgb_norm = (input_rgb + 1.0) * 0.5                                  # (C,H,W)
+    rgb_norm = (input_rgb + 1.0) * 0.5  # (C,H,W)
 
     # apply mask (broadcast)
-    masked_rgb = rgb_norm * input_mask.unsqueeze(0)                      # (C,H,W)
+    masked_rgb = rgb_norm * input_mask.unsqueeze(0)  # (C,H,W)
 
     # convert to HSV (kornia expects (B, C, H, W) and RGB in [0,1])
-    hsv = kcolor.rgb_to_hsv(masked_rgb.unsqueeze(0))                     # (1,3,H,W) with H in [0,1]
-    hsv = hsv.squeeze(0)                                                 # (3,H,W)
+    hsv = kcolor.rgb_to_hsv(masked_rgb.unsqueeze(0))  # (1,3,H,W) with H in [0,1]
+    hsv = hsv.squeeze(0)  # (3,H,W)
 
     # match original scalings:
-    Hchan = hsv[0, :, :] * 180.0                                         # hue in [0,180)
-    Schan = hsv[1, :, :] * 255.0                                         # saturation in [0,255]
-    Vchan = hsv[2, :, :] * 255.0                                         # value in [0,255]
+    Hchan = hsv[0, :, :] * 180.0  # hue in [0,180)
+    Schan = hsv[1, :, :] * 255.0  # saturation in [0,255]
+    Vchan = hsv[2, :, :] * 255.0  # value in [0,255]
 
     # threshold masks as original
     s_mask = (Schan > 42.0).float()
@@ -827,15 +916,15 @@ def Red2Green(input_rgb: torch.Tensor, input_mask: torch.Tensor):
     h_mask2 = (Hchan > 155.0).float()
 
     # two red candidate masks
-    red1 = s_mask * v_mask * h_mask1                                     # (H,W)
-    red2 = s_mask * v_mask * h_mask2                                     # (H,W)
+    red1 = s_mask * v_mask * h_mask1  # (H,W)
+    red2 = s_mask * v_mask * h_mask2  # (H,W)
 
     # dilate both masks using torch pooling trick (double negative max pool)
     red1_d = _dilate_mask_torch(red1)
     red2_d = _dilate_mask_torch(red2)
 
     # fused mask and areas
-    red_mask_fused = (red1_d + red2_d).clamp(0.0, 1.0)                    # (H,W)
+    red_mask_fused = (red1_d + red2_d).clamp(0.0, 1.0)  # (H,W)
     area1 = red1_d.sum()
     area2 = red2_d.sum()
     red_mask_area = area1 + area2
@@ -848,16 +937,16 @@ def Red2Green(input_rgb: torch.Tensor, input_mask: torch.Tensor):
 
     # compose final hue: keep original where not red, replace where red
     not_red = (1.0 - red1_d - red2_d).clamp(0.0, 1.0)
-    h_out = not_red * Hchan + h_r2g_out1 + h_r2g_out2                      # (H,W)
+    h_out = not_red * Hchan + h_r2g_out1 + h_r2g_out2  # (H,W)
 
     # assemble HSV output (scale back to kornia expected ranges [0,1])
     hsv_out = torch.empty_like(hsv, device=dev)
-    hsv_out[0] = h_out / 180.0                                              # hue in [0,1]
-    hsv_out[1] = not_red * hsv[1] + (red1_d + red2_d) * (hsv[1] * 0.5)      # saturation mixing like original
-    hsv_out[2] = hsv[2]                                                      # keep V
+    hsv_out[0] = h_out / 180.0  # hue in [0,1]
+    hsv_out[1] = not_red * hsv[1] + (red1_d + red2_d) * (hsv[1] * 0.5)  # saturation mixing like original
+    hsv_out[2] = hsv[2]  # keep V
 
     # back to RGB in [0,1]
-    rgb_out = kcolor.hsv_to_rgb(hsv_out.unsqueeze(0)).squeeze(0)            # (3,H,W) in [0,1]
+    rgb_out = kcolor.hsv_to_rgb(hsv_out.unsqueeze(0)).squeeze(0)  # (3,H,W) in [0,1]
 
     return rgb_out, red_mask_area, red_mask_fused
 
@@ -934,8 +1023,8 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     H, W = temp_connect_mask.shape
 
     # compute row/col sums for aspect ratio estimate (like original)
-    row_sum = temp_connect_mask.sum(dim=1)                                # (H,)
-    col_sum = temp_connect_mask.sum(dim=0)                                # (W,)
+    row_sum = temp_connect_mask.sum(dim=1)  # (H,)
+    col_sum = temp_connect_mask.sum(dim=0)  # (W,)
     # avoid division-by-zero: add tiny eps
     region_AspectRatio = (col_sum.max() + 1e-10) / (row_sum.max() + 1e-10)
 
@@ -945,23 +1034,23 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
 
     # compute row position matrix (H,W) without extra big temporaries when possible
     rows = torch.arange(patch_height, device=dev, dtype=temp_connect_mask.dtype).view(patch_height, 1)  # (H,1)
-    row_pos = rows.expand(-1, patch_height)                                 # (H,H) but H==patch_height
+    row_pos = rows.expand(-1, patch_height)  # (H,H) but H==patch_height
     # mask_pos stores row index inside mask, 0 elsewhere
-    mask_pos = temp_connect_mask * row_pos                                   # (H,W) when W==patch_height in orig; if not, broadcasting will align
+    mask_pos = temp_connect_mask * row_pos  # (H,W) when W==patch_height in orig; if not, broadcasting will align
     # mask_pos padding sets non-mask to patch_height
     mask_pos_padding_h = temp_connect_mask * row_pos + (1.0 - temp_connect_mask) * float(patch_height)
 
     # compute min / max rows covered by mask (tensors)
-    mask_pos_row_min = mask_pos_padding_h.min()                              # scalar tensor
-    mask_pos_row_max = mask_pos.max()                                        # scalar tensor
-    mask_mid_row = ((mask_pos_row_min + mask_pos_row_max) / 2.0).floor()      # scalar tensor
+    mask_pos_row_min = mask_pos_padding_h.min()  # scalar tensor
+    mask_pos_row_max = mask_pos.max()  # scalar tensor
+    mask_mid_row = ((mask_pos_row_min + mask_pos_row_max) / 2.0).floor()  # scalar tensor
 
     # top/bottom masks as boolean comparisons (no slicing ints)
     top_mask = ((row_pos >= mask_pos_row_min) & (row_pos <= mask_mid_row)).float()  # (H,H)
     # if W != H we must tile top_mask to (H,W) properly: make a (H,1) comparison then expand to W
     if top_mask.shape[1] != W:
         top_mask = ((rows >= mask_pos_row_min) & (rows <= mask_mid_row)).float().expand(-1, W)  # (H,W)
-    bottom_mask = 1.0 - top_mask                                                 # (H,W)
+    bottom_mask = 1.0 - top_mask  # (H,W)
 
     IoU_th = 0.5
 
@@ -984,7 +1073,7 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
         _, temp_r2g_area, temp_red_mask = Red2Green(temp_VerFlip_realVis, temp_VerFlip_mask)
         _, temp_g2r_area, temp_green_mask = Green2Red(temp_VerFlip_realVis, temp_VerFlip_mask)
 
-        DLS_idx = torch.rand(1, device=dev)                                       # double-light synthesis coin flip
+        DLS_idx = torch.rand(1, device=dev)  # double-light synthesis coin flip
         Decay_factor = 1.0
 
         if ver_flip_idx.item() > 0.5:
@@ -1000,7 +1089,8 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
                     mask_vertical_IoU = ComIoU(temp_VerFlip_mask, temp_connect_mask)
                     if mask_vertical_IoU.item() > IoU_th:
                         # synthesize top/bottom fused fake IR
-                        top_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (top_mask * temp_connect_mask * fake_IR_masked)
+                        top_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (
+                                    top_mask * temp_connect_mask * fake_IR_masked)
                         bottom_fake_IR_masked = bottom_mask * temp_VerFlip_mask * temp_VerFlip_fakeIR
                         output_FG_FakeIR = top_fake_IR_masked + bottom_fake_IR_masked
                         fused_mask = top_mask * temp_connect_mask + bottom_mask * temp_VerFlip_mask
@@ -1021,7 +1111,8 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
                 if DLS_idx.item() > 0.5:
                     mask_vertical_IoU = ComIoU(temp_VerFlip_mask, temp_connect_mask)
                     if mask_vertical_IoU.item() > IoU_th:
-                        bottom_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (bottom_mask * temp_connect_mask * fake_IR_masked)
+                        bottom_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (
+                                    bottom_mask * temp_connect_mask * fake_IR_masked)
                         top_fake_IR_masked = top_mask * temp_VerFlip_mask * temp_VerFlip_fakeIR
                         output_FG_FakeIR = top_fake_IR_masked + bottom_fake_IR_masked
                         fused_mask = bottom_mask * temp_connect_mask + top_mask * temp_VerFlip_mask
@@ -1042,7 +1133,8 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
                     mask_vertical_IoU = ComIoU(temp_VerFlip_mask, temp_connect_mask)
                     if mask_vertical_IoU.item() > IoU_th:
                         top_fake_IR_masked = top_mask * temp_connect_mask * fake_IR_masked
-                        bottom_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (bottom_mask * temp_VerFlip_mask * temp_VerFlip_fakeIR)
+                        bottom_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (
+                                    bottom_mask * temp_VerFlip_mask * temp_VerFlip_fakeIR)
                         output_FG_FakeIR = top_fake_IR_masked + bottom_fake_IR_masked
                         fused_mask = top_mask * temp_connect_mask + bottom_mask * temp_VerFlip_mask
                         output_FG_Mask = temp_connect_mask * fused_mask
@@ -1057,7 +1149,8 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
                 if DLS_idx.item() > 0.5:
                     mask_vertical_IoU = ComIoU(temp_VerFlip_mask, temp_connect_mask)
                     if mask_vertical_IoU.item() > IoU_th:
-                        top_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (top_mask * temp_VerFlip_mask * temp_VerFlip_fakeIR)
+                        top_fake_IR_masked = (0.25 + 0.5 * Decay_factor) * (
+                                    top_mask * temp_VerFlip_mask * temp_VerFlip_fakeIR)
                         bottom_fake_IR_masked = bottom_mask * temp_connect_mask * fake_IR_masked
                         output_FG_FakeIR = top_fake_IR_masked + bottom_fake_IR_masked
                         fused_mask = top_mask * temp_VerFlip_mask + bottom_mask * temp_connect_mask
