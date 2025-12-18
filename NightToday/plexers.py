@@ -182,11 +182,11 @@ class G_Plexer(Plexer):
         self.train()
         self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
 
-    def encode(self, x, *args, from_: str = None):
+    def encode(self, x, *args, from_: str = None, **kwargs):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
         return_x = False
         if len(args) and self.fusion_first:
-            x, n = self.fusion(x, *args)
+            x, n = self.fusion(x, *args, **kwargs)
             return_x = True
         elif len(args) and not self.fusion_first:
             x = torch.cat((x, *args), dim=1)
