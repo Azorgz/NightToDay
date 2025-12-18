@@ -232,7 +232,8 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'real_D', kwargs.get('D', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
         setattr(self, 'real_T', kwargs.get('T', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
         setattr(self, 'real_N', kwargs.get('N', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
-        setattr(self, 'real_TN', torch.cat([self.real_T, self.real_N], dim=1))
+        setattr(self, 'real_TN', None)
+        setattr(self, 'remapped_T', None)
         setattr(self, 'segMask_D', kwargs.get('seg_D', ImageTensor.rand(1, 1, 4, 4)).to(self.device))
         setattr(self, 'segMask_TN', kwargs.get('seg_TN', ImageTensor.rand(1, 1, 4, 4)).to(self.device))
         setattr(self, 'edges_D', kwargs.get('edges_D', ImageTensor.rand(1, 1, 4, 4)).to(self.device))
@@ -297,7 +298,6 @@ class Image2ImageGAT_Dual(nn.Module):
             setattr(self, f'{lam}', self.losses_scheduler.get(f'{lam}'))
         self.pred_real_D = self.netD(self.real_D, from_=self.D)
         self.pred_real_T = self.netD(self.real_T, from_=self.T)
-        self.pred_real_N = self.netD(self.real_N, from_=self.N) if not self.opt.model.fusion_first else None
 
         # G_A and G_B
         self.netG.zero_grads(), self.netS.zero_grads()
@@ -311,11 +311,11 @@ class Image2ImageGAT_Dual(nn.Module):
 
     def backward_G(self):
         encoded_D = self.netG.encode(self.real_D, from_=self.D)
-        encoded_TN, self.real_TN, self.real_N = self.netG.encode(self.real_T, self.real_N, from_=self.T)
+        encoded_TN, self.real_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N, from_=self.T)
 
         # region Fusion Loss
         if self.opt.model.fusion_first:
-            self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
+            self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.remapped_T)
         # endregion
 
         # region Identity "auto-encode" loss
@@ -324,7 +324,6 @@ class Image2ImageGAT_Dual(nn.Module):
             id_D = self.netG.decode(encoded_D, to_=self.D)
             self.loss_id[self.D] += self.compute_loss('id', id_D, self.real_D)
             id_TN = self.netG.decode(encoded_TN, to_=self.T)
-            # self.loss_id[self.T] += self.compute_loss('id', id_TN, self.real_T)
             self.loss_id[self.T] += self.compute_loss('id', id_TN, self.real_TN)
         # endregion
 
@@ -334,14 +333,14 @@ class Image2ImageGAT_Dual(nn.Module):
         self.fake_T, self.fake_N = (self.fake_TN[:, :3], self.fake_TN[:, 3:]) if not self.opt.model.fusion_first else (
         self.fake_TN, None)
 
-        self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.real_T,
+        self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.remapped_T,
                                                  self.pred_real_T, self.fake_T, False, loss_name='G')
         """D_N(G_N(T))"""
         if self.fake_N is not None:
             self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.N), self.real_N,
                                                      self.pred_real_N, self.fake_N, False, loss_name='G')
         else:
-            self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.real_T,
+            self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.remapped_T,
                                                      self.pred_real_T,
                                                      self.real_TN if self.fake_N is None else self.fake_N
                                                      , False, loss_name='G')
@@ -439,7 +438,7 @@ class Image2ImageGAT_Dual(nn.Module):
                 self.loss_att[self.T] += self.compute_loss('cycle', self.real_TN,
                                                            -self.real_N.mean(dim=1, keepdim=True).repeat(1, 3, 1, 1),
                                                            loss_name='att', criterion_lambda='att')
-                self.loss_att[self.T] += self.compute_loss('cycle', self.real_TN, self.real_T,
+                self.loss_att[self.T] += self.compute_loss('cycle', self.real_TN, self.remapped_T,
                                                            loss_name='att', criterion_lambda='att')
 
         #     # att_T, att_N = self.att_input(self.real_T, self.real_N, balance=0.5, epsilon=0.25)
@@ -512,7 +511,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                      weights=self.class_weight)
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.real_T, self.real_N,
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
         # endregion
 
@@ -527,14 +526,9 @@ class Image2ImageGAT_Dual(nn.Module):
         self.sum_losses().backward()
 
     def backward_D(self):
-        #  D_Night
-        if self.pred_real_N is not None:
-            D = partial(self.netD, from_=self.N)
-            self.loss_D[self.N] += self.compute_loss('gan', D, self.real_N, self.pred_real_N,
-                                                     self.fake_N, True, loss_name='D')
         #  D_Thermal
         D = partial(self.netD, from_=self.T)
-        self.loss_D[self.T] += self.compute_loss('gan', D, self.real_T, self.pred_real_T,
+        self.loss_D[self.T] += self.compute_loss('gan', D, self.remapped_T, self.pred_real_T,
                                                  self.fake_T, True, loss_name='D')
         #  D_Day
         D = partial(self.netD, from_=self.D)
@@ -556,7 +550,7 @@ class Image2ImageGAT_Dual(nn.Module):
             rand_size = int(rand_scale.item() * 16)
 
             real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
-            real_T_s = interpolate(self.real_T, size=rand_size, mode='bilinear', align_corners=False)
+            real_T_s = interpolate(self.remapped_T, size=rand_size, mode='bilinear', align_corners=False)
             real_TN_s = interpolate(self.real_TN, size=rand_size, mode='bilinear', align_corners=False)
             fake_TN_s = interpolate(self.fake_TN, size=rand_size, mode='bilinear', align_corners=False)
             fake_D_s = interpolate(self.fake_D, size=rand_size, mode='bilinear', align_corners=False)
@@ -731,12 +725,12 @@ class Image2ImageGAT_Dual(nn.Module):
         visuals = {'real_D': (self.real_D * 0.5 + 0.5 if self.real_D is not None else None),
                    'real_T': (self.real_T * 0.5 + 0.5 if self.real_T is not None else None),
                    'real_N': (self.real_N * 0.5 + 0.5 if self.real_N is not None else None),
-                   'fake_D': (self.fake_D * 0.5 + 0.5 if self.fake_D is not None else None),
                    'fake_T': (self.fake_T * 0.5 + 0.5 if self.fake_T is not None else None),
-                   'fake_N': (self.fake_N * 0.5 + 0.5 if self.fake_N is not None else self.real_TN * 0.5 + 0.5),
+                   'remapped_T': (self.remapped_T * 0.5 + 0.5 if self.remapped_T is not None else None),
+                   'real_TN': (self.real_TN * 0.5 + 0.5 if self.real_TN is not None else None),
                    'rec_D': (self.rec_D * 0.5 + 0.5 if self.rec_D is not None else None),
                    'rec_T': (self.rec_T * 0.5 + 0.5 if self.rec_T is not None else None),
-                   'rec_N': (self.rec_N * 0.5 + 0.5 if self.rec_N is not None else None)}
+                   'fake_D': (self.fake_D * 0.5 + 0.5 if self.fake_D is not None else None)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         self.visualizer.display_current_results(out)
         if save:

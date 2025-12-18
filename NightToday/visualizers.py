@@ -17,7 +17,7 @@ class Visualizer:
 
     def display_current_results(self, visuals: dict[str, ImageTensor]):
         """Display the current visuals on screen."""
-        labels = ['real_D', 'real_T', 'real_N', 'fake_D', 'fake_T', 'fake_N', 'rec_D', 'rec_T', 'rec_N']
+        labels = ['real_D', 'real_T', 'real_N', 'fake_T', 'remapped_T', 'real_TN', 'rec_D', 'rec_T', 'fake_D']
         shape = visuals['real_D'].shape
         composition = None
         row = None

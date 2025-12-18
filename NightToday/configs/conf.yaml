@@ -42,7 +42,7 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 64
+  start_epoch: 70
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -91,10 +91,10 @@ data:
     shuffle: True
     resize_and_crop: True
   train_datasets:
-    - name: 'FLIR'
-      sampling: 1
-      augmentations:
-        hflip: True
+#    - name: 'FLIR'
+#      sampling: 1
+#      augmentations:
+#        hflip: True
     - name: 'LYNRED'
       sampling: 1
       augmentations:

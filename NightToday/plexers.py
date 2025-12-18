@@ -1,7 +1,7 @@
 #### PLEXERS
 import itertools
 from os.path import isfile
-from typing import Literal
+from typing import Literal, Iterable
 
 import torch
 from torch import nn
@@ -184,28 +184,30 @@ class G_Plexer(Plexer):
 
     def encode(self, x, *args, from_: str = None, **kwargs):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
-        return_x = False
+        return_im = False
         if len(args) and self.fusion_first:
-            x, n = self.fusion(x, *args, **kwargs)
-            return_x = True
+            x, ir, n = self.fusion(x, *args, **kwargs)
+            return_im = True
         elif len(args) and not self.fusion_first:
             x = torch.cat((x, *args), dim=1)
             n = args[0]
-            return_x = True
+            return_im = True
         self.ori_shape = x.shape
         scale = 2**self.opt.downscaling
-        if self.input_size < 0:
+        input_size = self.input_size if isinstance(self.input_size, (list, tuple)) else (self.input_size, self.input_size)
+        if self.input_size[0] < 0:
             input_size = self.ori_shape[-2]//scale*scale, self.ori_shape[-1]//scale*scale
-        elif self.input_size / scale != self.input_size // scale:
-            input_size = (self.input_size[0]//scale*scale, self.input_size[1]//scale*scale)
         else:
-            input_size = self.input_size
+            if self.input_size[0] / scale != self.input_size[0] // scale:
+                input_size[0] = self.input_size[0] // scale * scale
+            if self.input_size[1] / scale != self.input_size[1] // scale:
+                input_size[1] = self.input_size[1] // scale * scale
         x = interpolate(x, size=input_size, mode='bilinear', align_corners=False) if \
             (x.size(-1) != self.input_size[0] or x.size(-2) != self.input_size[1]) else x
         output = self.encoders[self.names_domains[from_]](x)
         output = self.shared_encoder(output)
-        if return_x:
-            return output, x, n
+        if return_im:
+            return output, x, ir, n
         return output
 
     def decode(self, encoded, to_: str = None):

@@ -740,6 +740,7 @@ class U_ResNetFusion(nn.Module):
         self.final_conv = nn.Sequential(nn.Conv2d(1, 1,
                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
         self.spatial_aligner = get_wrapper('vis2ir')
+        self.thermal_preprocess = MonotonicThermalLUT()
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -764,6 +765,7 @@ class U_ResNetFusion(nn.Module):
         return tanh_n(n1, n2 or n1)
 
     def forward(self, ir, vis_night, align_first=True):
+        ir = self.thermal_preprocess(ir)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
@@ -775,10 +777,8 @@ class U_ResNetFusion(nn.Module):
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
             x_feat = layer(x_feat)
         x = ir.mean(dim=1, keepdim=True)
-        # mask = torch.abs(x_feat) < torch.abs(x)
-        # x_feat[mask] = x[mask]
         out = self.final_conv(x_feat) + self.extract_hf(x)/2
-        return self.tanh_n(1)(out).repeat(1, vis_night.shape[1], 1, 1), vis_night  # match input channels
+        return self.tanh_n(1)(out).repeat(1, vis_night.shape[1], 1, 1), ir, vis_night  # match input channels
 
     def extract_hf(self, x):
         k_s = 7
@@ -788,3 +788,60 @@ class U_ResNetFusion(nn.Module):
     def train(self, mode: bool = True) -> None:
         super().train(mode)
         self.spatial_aligner.train(False)
+
+
+class MonotonicThermalLUT(nn.Module):
+    """
+    Learnable monotonic LUT for thermal re-binning.
+    Identity-initialized.
+    """
+
+    def __init__(self, bins=512, eps=1e-6):
+        super().__init__()
+        self.bins = bins
+        self.eps = eps
+
+        # Identity initialization:
+        # softplus(delta) ≈ constant → cumsum ≈ linear ramp
+        init_delta = torch.ones(bins) * 1.0
+        self.delta = nn.Parameter(init_delta)
+
+    def forward(self, x):
+        """
+        x: Tensor of shape (B,1,H,W) or (B,3,H,W)
+           assumed normalized to [0,1]
+        """
+        if x.shape[1] == 3:
+            x = x.mean(dim=1, keepdim=True)  # convert to grayscale
+        # Robust normalization to [0,1]
+        x = self.robust_norm(x, p_low=2., p_high=98., eps=self.eps)
+        # Build monotonic LUT
+        increments = F.softplus(self.delta) + self.eps
+        lut = torch.cumsum(increments, dim=0)
+        lut = lut / (lut[-1] + self.eps) * 2 - 1  # normalize to [-1,1]
+
+        # Apply LUT
+        idx = (x * (self.bins - 1)).long().clamp(0, self.bins - 1)
+        y = lut[idx]
+
+        return y.repeat(1, 3, 1, 1)
+
+    def robust_norm(self, x, p_low=0.5, p_high=99.5, eps=1e-6):
+        """
+        x: (B,1,H,W) or (B,H,W)
+        """
+        if x.dim() == 4:
+            B = x.shape[0]
+            x_flat = x.view(B, -1)
+            lo = torch.quantile(x_flat, p_low / 100.0, dim=1, keepdim=True)
+            hi = torch.quantile(x_flat, p_high / 100.0, dim=1, keepdim=True)
+            lo = lo.view(B, 1, 1, 1)
+            hi = hi.view(B, 1, 1, 1)
+        else:
+            x_flat = x.view(1, -1)
+            lo = torch.quantile(x_flat, p_low / 100.0, dim=1, keepdim=True)
+            hi = torch.quantile(x_flat, p_high / 100.0, dim=1, keepdim=True)
+            lo = lo.view(1, 1)
+            hi = hi.view(1, 1)
+
+        return ((x - lo) / (hi - lo + eps)).clamp(0, 1)
