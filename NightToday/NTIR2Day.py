@@ -272,6 +272,7 @@ class Image2ImageGAT_Dual(nn.Module):
     # region ------------------------ Inference Function -------------------- #
     @torch.no_grad()
     def forward(self, thermal, night, return_fused_IR=False, align_first=True):
+        thermal, night = thermal * 2 - 1, night * 2 - 1
         encoded_TN, fused_IR, _ = self.netG.encode(thermal, night, from_=self.T, align_first=align_first)
         fake_D = self.netG.decode(encoded_TN, to_=self.D)
         if return_fused_IR:
