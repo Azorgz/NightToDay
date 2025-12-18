@@ -55,6 +55,8 @@ class Image2ImageGAT_Dual(nn.Module):
         self.model_name = self.opt.model.gen.type
         self.names_domains = self.opt.model.names_domains
         self.mode = self.opt.model.mode if trainable else 'test'
+        if self.mode == 'test':
+            self.opt.model.gen.input_size = -1
         self.checkpoint_dir = self.opt.training.checkpoint_dir
         os.makedirs(self.checkpoint_dir, exist_ok=True)
         self.visualize_dir = self.opt.training.visualize_dir

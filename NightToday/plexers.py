@@ -139,6 +139,7 @@ class G_Plexer(Plexer):
         super(G_Plexer, self).__init__(names, device, training_cfg.split_optimizers)
         self.input_size = opt.input_size
         self.fusion_first = opt.fusion_first
+        self.opt = opt
         if opt.type == 'ViT':
             # encoders = [MultiResGANEncoder for _ in range(len(self.names_domains))]
             encoders = [TransformerEncoderMono, TransformerEncoderDual]
@@ -181,11 +182,6 @@ class G_Plexer(Plexer):
         self.train()
         self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
 
-    def get_encoding(self, domain) -> torch.Tensor | None:
-        """Get the encoder of a specific domain."""
-        enc = self.encoders[self.names_domains[domain]]
-        return enc.encoding if hasattr(enc, 'encoding') else None
-
     def encode(self, x, *args, from_: str = None):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
         return_x = False
@@ -197,7 +193,14 @@ class G_Plexer(Plexer):
             n = args[0]
             return_x = True
         self.ori_shape = x.shape
-        x = interpolate(x, size=self.input_size, mode='bilinear', align_corners=False) if \
+        scale = 2**self.opt.downscaling
+        if self.input_size < 0:
+            input_size = self.ori_shape[-2]//scale*scale, self.ori_shape[-1]//scale*scale
+        elif self.input_size / scale != self.input_size // scale:
+            input_size = (self.input_size[0]//scale*scale, self.input_size[1]//scale*scale)
+        else:
+            input_size = self.input_size
+        x = interpolate(x, size=input_size, mode='bilinear', align_corners=False) if \
             (x.size(-1) != self.input_size[0] or x.size(-2) != self.input_size[1]) else x
         output = self.encoders[self.names_domains[from_]](x)
         output = self.shared_encoder(output)

@@ -424,8 +424,6 @@ def center_of_mass(img):
     return cx, cy
 
 
-
-
 def detect_TL_blobs_mask_free(I_vi,
                               sigmas=(2, 4, 6),
                               sat_thresh=0.18,
