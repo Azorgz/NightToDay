@@ -4,8 +4,8 @@ import torch.nn as nn
 import torch
 from torch import tensor
 
-from NightToday.modules import SNConv2d
-from NightToday.utilities import gkern_2d
+from .modules import SNConv2d
+from .utilities import gkern_2d
 
 
 class NLayerDiscriminatorSN(nn.Module):
@@ -66,6 +66,7 @@ class NLayerDiscriminatorSN(nn.Module):
             gray = blurred
         elif self.input_nc == 3:
             gray = x.mean(dim=1, keepdim=True)
+            gray = (.299 * x[:, 0, :, :] + .587 * x[:, 1, :, :] + .114 * x[:, 2, :, :]).unsqueeze_(1)
         else:
             gray = (.299 * x[:, 0, :, :] + .587 * x[:, 1, :, :] + .114 * x[:, 2, :, :]).unsqueeze_(1)
 

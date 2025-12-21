@@ -8,17 +8,16 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from ImagesCameras import ImageTensor
-from kornia.color import rgb_to_lab
+from kornia.color import rgb_to_lab, rgb_to_hsv
 from kornia.contrib import connected_components
 from kornia.filters import sobel, laplacian, get_gaussian_kernel2d
-from kornia.morphology import erosion, closing, opening, dilation
-from torch import Tensor
+from kornia.morphology import erosion, closing, dilation
 from torch.nn import LeakyReLU, ReLU
 from torchmetrics.functional.image import image_gradients
-from torchvision.transforms.v2 import Normalize
-from NightToday.ssim import SSIM
-from NightToday.utilities import RefineLightMask, ClsMeanPixelValue, GetFeaMatrixCenter, bhw_to_onehot, \
-    detect_hotpoint_blob, center_of_mass
+
+from .ssim import SSIM
+from .utilities import ClsMeanPixelValue, GetFeaMatrixCenter, bhw_to_onehot, \
+    center_of_mass
 
 ROAD = 0
 PAVEMENT = 1
@@ -230,10 +229,23 @@ class GANLoss(nn.Module):
 #         MILO_err = ImageTensor(map_visualization(MILO_err))
 #         return MILO_err, MILO_mask
 
+def saturation_loss_color(fake_rgb, real_n, tau=0.05):
+    """
+    thermal: (B,1,H,W) normalized to [0,1]
+    """
+    hsv_fake = rgb_to_hsv(fake_rgb*0.5+0.5)
+    hsv_real = rgb_to_hsv(real_n*0.5+.5)
+
+    V_mask = (hsv_real[:, 2] > 0.2).float().squeeze(1)
+    weight = ((hsv_real[:, 1] > hsv_fake[:, 1]) * V_mask).float().squeeze(1)
+    Sat_diff = torch.abs(hsv_real[:, 1] - hsv_fake[:, 1]).squeeze(1)
+    S = F.relu(Sat_diff - tau)*1/5
+    H = torch.sqrt((hsv_real[:, 0] - hsv_fake[:, 0]) ** 2 + 1e-6).squeeze(1)
+
+    return (S * H * weight).sum() / (weight.sum() + 1e-6)
 
 def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, weights=None):
     """
-
     """
     # Normalize back to [0,1]
     assert image_fake.shape == image_target.shape, "Input images must have the same dimensions."
@@ -242,11 +254,13 @@ def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, 
     B = im_fake.shape[0]
     # color distance function
     color_dist = im_fake.color_distance(im_target)  # shape (B,1,H,W) or (B,H,W)
-    color_magn = im_target.LAB()[:, 1:3, :, :].norm(p=2, dim=1, keepdim=True)  # AB channels magnitude
+    hsv_target = im_target.HSV()
+    hsv_fake = im_fake.HSV()
+    color_magn = hsv_target[:, 1:2, :, :] * hsv_target[:, 2:3, :, :]
     target_l, target_ab = rgb_to_lab(im_target).split([1, 2], 1)  # L channel
-    low_lum = target_l < th_low
-    high_lum = target_l > th_high
-    valid = 1 - (low_lum * 1. + high_lum * 1.)
+    low_lum = target_l < th_low * 100
+    high_lum = target_l > th_high * 100
+    valid = low_lum * high_lum * 1.
     color_dist = color_dist * valid
     ssim_loss = SSIM_Loss(channel=3)(im_fake, im_target, full=True).mean(dim=1, keepdim=True) * (1 - low_lum * 1.)
     weights = weights[[CAR, TRUCK, BUILDING, MOTORCYCLE, SIGN, ROAD]].to(im_target.device) if weights is not None else \
@@ -298,7 +312,10 @@ def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, 
         color_mask = target_l.clamp(0, 25) * ((target_ab / 128) ** 2).sum(1, keepdim=True)
         high_color_mask = (color_mask > color_mask.mean() + 2 * color_mask.std()) * valid * (GT_seg != SKY)
         loss = (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
-    return loss.mean() / 20
+    # mid_low_lum = hsv_target[:, 2:, :, :] < 0.75
+    # mid_high_lum = hsv_target[:, 2:, :, :] > 0.3
+    loss += saturation_loss_color(im_fake, im_target)
+    return loss.mean()
 
 
 def ThermalLoss(image_fused, image_target, night_color, GT_seg, weights=None):
@@ -418,10 +435,6 @@ def create_fake_TL(I_ir, I_vis, mask):
     dx = (torch.abs(I_ir[:, 1:] - I_ir[:, :-1])*mask[:, 1:]).sum(-2)
     left_border = torch.argmax(dx[: max(cx.long()-w//4, 0)], dim=-1) or 0
     right_border = torch.argmax(dx[max(cx.long()+w//4, dx.shape[-1]-1):], dim=-1) or dx.shape[-1]-1
-
-
-
-
 
     # real IR values in the TL area
     TL_ir_target = I_ir[mask > 0].mean() + I_ir[mask > 0].std()

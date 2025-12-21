@@ -1,23 +1,20 @@
 #### PLEXERS
-import itertools
 from os.path import isfile
-from typing import Literal, Iterable
+from typing import Literal
 
 import torch
 from torch import nn
 from torch.nn.functional import interpolate
 
-from NightToday import GenConfig, TrainConfig, SegConfig, DiscrConfig
-from NightToday.Fusion import SimpleCondViT, U_ResNetFusion
-from NightToday.LETNet import LETNet
-from NightToday.MultiResTransGAN.decoder import MultiresConvDecoder
-from NightToday.MultiResTransGAN.encoder import MultiResGANEncoder
-from NightToday.discriminators import NLayerDiscriminatorSN
-from NightToday.generators import TransformerEncoderMono, TransformerEncoderDual, TransformerDecoder, \
+from . import GenConfig, TrainConfig, SegConfig, DiscrConfig
+from .Fusion import SimpleCondViT, U_ResNetFusion
+from .LETNet import LETNet
+from .discriminators import NLayerDiscriminatorSN
+from .generators import TransformerEncoderMono, TransformerEncoderDual, TransformerDecoder, \
     TransformerEncoderBlock, ResnetGenEncoder, ResnetGenDecoder, ResnetBlock
-from NightToday.modules import Sequential, FeaturesFusionModule
-from NightToday.segmentors import SegmentorHeadv2, LightweightSegHead
-from NightToday.utilities import weights_init
+from .modules import Sequential, FeaturesFusionModule
+from .segmentors import SegmentorHeadv2
+from .utilities import weights_init
 
 
 class Plexer(nn.Module):
@@ -162,8 +159,9 @@ class G_Plexer(Plexer):
                         (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
             block_shared = ResnetBlock
             shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
-
-        self.fusion = U_ResNetFusion() if opt.fusion_first else nn.Identity()
+        fus = opt.fus
+        self.fusion = U_ResNetFusion(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
+                                     n_downscaling=fus.n_downscaling, thermal_preprocessCfg=fus.preprocess_thermal)
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
         self.networks: list = self.encoders + self.decoders + [self.fusion]
@@ -209,6 +207,9 @@ class G_Plexer(Plexer):
         if return_im:
             return output, x, ir, n
         return output
+
+    def clean_IR(self, ir):
+        return self.fusion.thermal_preprocess(ir)
 
     def decode(self, encoded, to_: str = None):
         assert to_ in self.names_domains, f"Unknown target domain: {to_}"

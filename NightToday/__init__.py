@@ -31,17 +31,35 @@ class SegConfig:
 
 
 @dataclass
+class ThermalPreprocessConfig:
+    bins: int
+    scene: int
+    start_training: int = 0
+    naive_train_first: bool = True
+
+
+@dataclass
+class FusConfig:
+    preprocess_thermal: ThermalPreprocessConfig
+    hidden_dim: 256
+    n_enc_layers: 4
+    dropout: 0.25
+    n_downscaling: 2
+
+
+@dataclass
 class GenConfig:
     type: Literal['ResNet', 'ViT']
     downscaling: int
     ViT_model: Literal['dinov3_vits16', 'dinov3_convnext_tiny']
+    fus: FusConfig
     input_size: int | Tuple[int, int] = 256
     hidden_dim: int = 256
     n_enc_layers: int = 4
     n_shared_layers: int = 2
     n_dec_layers: int = 4
     dropout: float = 0.1
-    fusion_first: bool = False
+    fusion_first: bool = True
 
 
 @dataclass
@@ -180,6 +198,9 @@ def get_config(path=None) -> OptImage2ImageGATConfig:
         'start_epoch'], \
         "segmentation training schedule updateGT_start_epoch must be >= start_epoch and < end_epoch"
     conf['model']['seg']['training_schedule'] = SegScheduleConfig(**seg_scheduleConfig)
+    conf['model']['gen']['fus']['preprocess_thermal']['start_training'] = seg_scheduleConfig['updateGT_TN_start_epoch']
+    conf['model']['gen']['fus']['preprocess_thermal'] = ThermalPreprocessConfig(**conf['model']['gen']['fus']['preprocess_thermal'])
+    conf['model']['gen']['fus'] = FusConfig(**conf['model']['gen']['fus'])
     modelConfig = ModelConfig(name=conf['model']['name'],
                               names_domains=conf['model']['names_domains'],
                               mode=conf['model']['mode'],

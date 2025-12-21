@@ -1,5 +1,5 @@
 from ImagesCameras import ImageTensor
-from NightToday import TrainConfig
+from . import TrainConfig
 
 
 class Visualizer:

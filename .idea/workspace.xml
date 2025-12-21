@@ -4,19 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Huge update">
-      <change beforePath="$PROJECT_DIR$/.idea/vcs.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Plexer">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Datasets/DatasetBase.py" beforeDir="false" afterPath="$PROJECT_DIR$/Datasets/DatasetBase.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Datasets/FLIR.py" beforeDir="false" afterPath="$PROJECT_DIR$/Datasets/FLIR.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Datasets/LYNRED.py" beforeDir="false" afterPath="$PROJECT_DIR$/Datasets/LYNRED.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Datasets/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/Datasets/__init__.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/discriminators.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/discriminators.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/train.py" beforeDir="false" afterPath="$PROJECT_DIR$/train.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/segmentors.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/segmentors.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/utilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/utilities.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/visualizers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/visualizers.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -63,14 +62,14 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "main",
-    "last_opened_file_path": "/home/godeta/PycharmProjects/MyTransform/checkpoints/NightToday",
+    "last_opened_file_path": "/home/godeta/PycharmProjects/MyTransform/checkpoints",
     "settings.editor.selected.configurable": "project.propVCSSupport.DirectoryMappings"
   }
 }]]></component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
-      <recent name="$PROJECT_DIR$/checkpoints/NightToday" />
       <recent name="$PROJECT_DIR$/checkpoints" />
+      <recent name="$PROJECT_DIR$/checkpoints/NightToday" />
       <recent name="$PROJECT_DIR$" />
       <recent name="$PROJECT_DIR$/NightToday" />
       <recent name="$PROJECT_DIR$/NightToday/MultiResTransGAN" />
@@ -159,7 +158,63 @@
       <option name="project" value="LOCAL" />
       <updated>1765751942915</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Creation update">
+      <option name="closed" value="true" />
+      <created>1765983021719</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1765983021719</updated>
+    </task>
+    <task id="LOCAL-00003" summary="Creation update">
+      <option name="closed" value="true" />
+      <created>1765988871679</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1765988871679</updated>
+    </task>
+    <task id="LOCAL-00004" summary="Creation update">
+      <option name="closed" value="true" />
+      <created>1766047095498</created>
+      <option name="number" value="00004" />
+      <option name="presentableId" value="LOCAL-00004" />
+      <option name="project" value="LOCAL" />
+      <updated>1766047095498</updated>
+    </task>
+    <task id="LOCAL-00005" summary="Plexer">
+      <option name="closed" value="true" />
+      <created>1766047826529</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1766047826529</updated>
+    </task>
+    <task id="LOCAL-00006" summary="Plexer">
+      <option name="closed" value="true" />
+      <created>1766047918868</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1766047918868</updated>
+    </task>
+    <task id="LOCAL-00007" summary="Plexer">
+      <option name="closed" value="true" />
+      <created>1766048898428</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1766048898428</updated>
+    </task>
+    <task id="LOCAL-00008" summary="Plexer">
+      <option name="closed" value="true" />
+      <created>1766069299901</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1766069299901</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -175,16 +230,13 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Huge update" />
-    <option name="LAST_COMMIT_MESSAGE" value="Huge update" />
+    <MESSAGE value="Creation update" />
+    <MESSAGE value="Plexer" />
+    <option name="LAST_COMMIT_MESSAGE" value="Plexer" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
       <breakpoints>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/test.py</url>
-          <line>19</line>
-          <option name="timeStamp" value="29" />
-        </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/generators.py</url>
           <line>67</line>
@@ -197,18 +249,33 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
-          <line>419</line>
+          <line>436</line>
           <option name="timeStamp" value="227" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
-          <line>417</line>
+          <line>434</line>
           <option name="timeStamp" value="229" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
-          <line>404</line>
+          <line>421</line>
           <option name="timeStamp" value="230" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/test.py</url>
+          <line>51</line>
+          <option name="timeStamp" value="250" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/test.py</url>
+          <line>19</line>
+          <option name="timeStamp" value="251" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/test.py</url>
+          <line>27</line>
+          <option name="timeStamp" value="256" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

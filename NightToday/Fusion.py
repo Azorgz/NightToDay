@@ -5,12 +5,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 from typing import Optional, Tuple
 
-from kornia.filters import median_blur
+from kornia.filters import median_blur, bilateral_blur
 from kornia.geometry import PyrDown, PyrUp
 from kornia.morphology import dilation, erosion
 from torch import conv2d
 from torch.nn import AvgPool2d
 
+from NightToday import ThermalPreprocessConfig
 from NightToday.CrossRAFT import get_wrapper
 from NightToday.modules import ResnetBlock
 from NightToday.utilities import get_norm_layer
@@ -698,8 +699,8 @@ class U_ResNetFusion(nn.Module):
     Simple ResNet-based fusion module to combine two feature maps.
     """
 
-    def __init__(self, input_channel=6, hidden_dim=256, n_enc_layers=4, dropout=0.25, n_downscaling=2,
-                 norm_layer='instance', use_bias=True):
+    def __init__(self, thermal_preprocessCfg: ThermalPreprocessConfig, input_channel=6, hidden_dim=256,
+                 n_enc_layers=4, dropout=0.25, n_downscaling=2, norm_layer='instance', use_bias=True):
         super(U_ResNetFusion, self).__init__()
         self.input_channel = input_channel
         norm_layer = get_norm_layer(norm_layer)
@@ -740,7 +741,10 @@ class U_ResNetFusion(nn.Module):
         self.final_conv = nn.Sequential(nn.Conv2d(1, 1,
                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
         self.spatial_aligner = get_wrapper('vis2ir')
-        self.thermal_preprocess = MonotonicThermalLUT()
+        self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
+                                                      thermal_preprocessCfg.scene,
+                                                      thermal_preprocessCfg.naive_train_first,
+                                                      thermal_preprocessCfg.start_training)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -764,8 +768,8 @@ class U_ResNetFusion(nn.Module):
 
         return tanh_n(n1, n2 or n1)
 
-    def forward(self, ir, vis_night, align_first=True):
-        ir = self.thermal_preprocess(ir)
+    def forward(self, ir, vis_night, align_first=True, **kwargs):
+        ir = self.thermal_preprocess(ir, vis_night, **kwargs)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
@@ -777,9 +781,9 @@ class U_ResNetFusion(nn.Module):
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
             x_feat = layer(x_feat)
         x = ir.mean(dim=1, keepdim=True)
-        out = self.final_conv(x_feat) + self.extract_hf(x)/2
+        out = self.final_conv(x_feat) #+ self.extract_hf(x)/2
         return self.tanh_n(1)(out).repeat(1, vis_night.shape[1], 1, 1), ir, vis_night  # match input channels
-
+#
     def extract_hf(self, x):
         k_s = 7
         x1 = conv2d(x, weight=torch.ones(1, 1, k_s, k_s, device=x.device)/k_s**2, padding=k_s//2)
@@ -789,6 +793,10 @@ class U_ResNetFusion(nn.Module):
         super().train(mode)
         self.spatial_aligner.train(False)
 
+    @property
+    def scene_idx(self):
+        return self.thermal_preprocess.scene_idx
+
 
 class MonotonicThermalLUT(nn.Module):
     """
@@ -796,52 +804,144 @@ class MonotonicThermalLUT(nn.Module):
     Identity-initialized.
     """
 
-    def __init__(self, bins=512, eps=1e-6):
+    def __init__(self, bins: int = 2048, scene: int = 8,
+                 naive_train_first: bool = True, start_training: int = 0, eps=1e-8):
         super().__init__()
         self.bins = bins
+        self.scene = scene
         self.eps = eps
 
         # Identity initialization:
         # softplus(delta) ≈ constant → cumsum ≈ linear ramp
-        init_delta = torch.ones(bins) * 1.0
+        init_delta = torch.ones(scene, bins) * 1.0
         self.delta = nn.Parameter(init_delta)
+        self.scene_selection = SceneSelector()
+        self.scene_idx = None
+        self.naive_train = naive_train_first
+        self.start_training = start_training
 
-    def forward(self, x):
+    def forward(self, x, *args, epoch=0):
         """
-        x: Tensor of shape (B,1,H,W) or (B,3,H,W)
+        x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
            assumed normalized to [0,1]
+        args: complementary modality for scene selection
         """
         if x.shape[1] == 3:
             x = x.mean(dim=1, keepdim=True)  # convert to grayscale
         # Robust normalization to [0,1]
-        x = self.robust_norm(x, p_low=2., p_high=98., eps=self.eps)
-        # Build monotonic LUT
-        increments = F.softplus(self.delta) + self.eps
-        lut = torch.cumsum(increments, dim=0)
-        lut = lut / (lut[-1] + self.eps) * 2 - 1  # normalize to [-1,1]
+        x = self.robust_norm(x, p_low=2., p_high=99.5, eps=self.eps)
+        if epoch > self.start_training:
+            self.scene_idx = self.scene_selection(x, *args)  # (B, scene) long tensor
+        elif self.naive_train:
+            self.scene_idx = self.naive_scene_selection(x)
+        else:
+            idx = torch.zeros([x.shape[0], self.scene], device=x.device)
+            idx[0] = 1.
+            self.scene_idx = idx
+            # Build monotonic LUT
+        increments = F.softplus(torch.mm(self.scene_idx, self.delta)) + self.eps
+        luts = torch.cumsum(increments, dim=1)
+        luts = luts / (luts[:, -1] + self.eps) * 2 - 1  # normalize to [-1,1]
 
         # Apply LUT
-        idx = (x * (self.bins - 1)).long().clamp(0, self.bins - 1)
-        y = lut[idx]
+        y = []
+        for i, lut in enumerate(luts):
+            idx = (x[i][None] * (self.bins - 1)).long().clamp(0, self.bins - 1)
+            y.append(lut[idx])
 
+        y = torch.cat(y, 0)
         return y.repeat(1, 3, 1, 1)
+
+    def naive_scene_selection(self, x):
+        x_mean_t = x[:, :, ::2].mean(dim=[1, 2, 3])
+        x_mean_b = x[:, :, 2::].mean(dim=[1, 2, 3])
+        x_std_t = x[:, :, ::2].std(dim=[1, 2, 3])
+        x_std = x[:, :, ].std(dim=[1, 2, 3])
+        low_lum_t = (x[:, :, 2::] < -0.95).sum(dim=[1, 2, 3]) / (x[:, :, 2::]>=-1).sum(dim=[1, 2, 3])
+        cond1 = x_mean_b > x_mean_t * 2
+        cond2 = x_std_t > x_std
+        cond3 = low_lum_t > 0.1
+        out = torch.zeros([x.shape[0], self.scene], device=x.device)
+        idx = cond1 + 2 * cond2 + 4 * cond3
+        out[:, idx] = 1.
+        return out
 
     def robust_norm(self, x, p_low=0.5, p_high=99.5, eps=1e-6):
         """
         x: (B,1,H,W) or (B,H,W)
         """
-        if x.dim() == 4:
-            B = x.shape[0]
-            x_flat = x.view(B, -1)
-            lo = torch.quantile(x_flat, p_low / 100.0, dim=1, keepdim=True)
-            hi = torch.quantile(x_flat, p_high / 100.0, dim=1, keepdim=True)
-            lo = lo.view(B, 1, 1, 1)
-            hi = hi.view(B, 1, 1, 1)
-        else:
-            x_flat = x.view(1, -1)
-            lo = torch.quantile(x_flat, p_low / 100.0, dim=1, keepdim=True)
-            hi = torch.quantile(x_flat, p_high / 100.0, dim=1, keepdim=True)
-            lo = lo.view(1, 1)
-            hi = hi.view(1, 1)
+        B = x.shape[0]
+        x_flat = x.view(B, -1)
+        lo = torch.quantile(x_flat, p_low / 100.0, dim=1, keepdim=True)
+        hi = torch.quantile(x_flat, p_high / 100.0, dim=1, keepdim=True)
+        lo = lo.view(B, 1, 1, 1)
+        hi = hi.view(B, 1, 1, 1)
 
         return ((x - lo) / (hi - lo + eps)).clamp(0, 1)
+
+
+class SceneSelector(nn.Module):
+    def __init__(self,
+                 scene: int = 8,
+                 embed_dim: int = 64):
+        super().__init__()
+        self.scene = scene
+        self.first_conv = nn.Sequential(nn.Conv2d(3, 3, 5, padding=2),
+                                        nn.ReLU(),
+                                        nn.Conv2d(3, 3, 5, padding=2),
+                                        nn.ReLU(),
+                                        nn.Conv2d(3, 1, 5, padding=2),
+                                        nn.ReLU(),
+                                        )
+        self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d(1),
+            nn.Flatten(1),
+            nn.Linear(256, embed_dim),
+            nn.Linear(embed_dim, scene))
+
+    def forward(self, x, *args):
+        """
+        x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
+           assumed normalized to [0,1]
+        args: complementary modality for scene selection
+        """
+        if x.shape[1] == 1:
+            x_ = x.repeat(1, 3, 1, 1)
+        elif x.shape[1] == 3:
+            x_ = x
+        else:
+            raise NotImplementedError
+        x_rs = F.interpolate(x_, (256, 256))
+        x_conv = self.first_conv(x_rs)
+        x_patches = self.split(x_conv)
+        scene_logits = self.classifier(x_patches)
+        if args is not None:
+            for arg in args:
+                if arg.shape[1] == 1:
+                    y = arg.repeat(1, 3, 1, 1)
+                elif arg.shape[1] == 3:
+                    y = arg
+                else:
+                    raise NotImplementedError
+                y_rs = F.interpolate(y, (256, 256))
+                y_conv = self.first_conv(y_rs)
+                y_patches = self.split(y_conv)
+                y_digit = self.classifier(y_patches)
+                scene_logits = scene_logits + y_digit
+
+        scene_idx = torch.softmax(scene_logits, dim=-1)  # (B, scene)
+        return scene_idx
+
+    def split(self, x: torch.Tensor) -> torch.Tensor:
+        """Split the input into small patches with sliding window."""
+        x_patch_list = []
+        for j in range(16):
+            j0 = j * 16
+            j1 = j0 + 16
+
+            for i in range(16):
+                i0 = i * 16
+                i1 = i0 + 16
+                x_patch_list.append(x[..., j0:j1, i0:i1])
+
+        return torch.cat(x_patch_list, dim=1)

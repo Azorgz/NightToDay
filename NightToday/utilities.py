@@ -1,8 +1,6 @@
 import functools
 
 import numpy as np
-import skimage
-import torch
 from kmeans_pytorch import kmeans
 from kornia.color import rgb_to_lab, lab_to_rgb, rgb_to_hsv
 from kornia.contrib import connected_components
@@ -11,9 +9,8 @@ from kornia.morphology import closing, dilation
 from matplotlib import pyplot as plt
 from scipy.ndimage import gaussian_filter
 from skimage import measure
-from torch import nn, tensor
+from torch import nn
 from torch.nn.functional import conv2d
-import torch.nn.functional as F
 from torchvision.transforms.functional import gaussian_blur
 
 ROAD = 0

@@ -1,8 +1,6 @@
 # Defines the SegmentorHeadv2. Zero Padding and CSG for positional encoding.
-import torch
-from torch import nn
-from NightToday.modules import ResnetBlock, ASPP, CatersianGrid
-from NightToday.utilities import get_norm_layer
+from .modules import ResnetBlock, ASPP, CatersianGrid
+from .utilities import get_norm_layer
 from typing import Optional, Tuple
 import math
 

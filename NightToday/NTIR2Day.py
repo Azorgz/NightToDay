@@ -18,20 +18,21 @@ from collections import OrderedDict
 from functools import partial
 from pathlib import Path
 
+import numpy as np
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
 from torch import Tensor
 from torch.nn.functional import interpolate, relu
 from . import get_config
-from NightToday import OptImage2ImageGATConfig
-from NightToday.losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
+from . import OptImage2ImageGATConfig
+from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
     ThermalLoss, SharpFusionLoss
-from NightToday.modules import LossScheduler, Get_gradmag_gray
-from NightToday.plexers import G_Plexer, D_Plexer, S_Plexer
-from NightToday.utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_FG_MergeMask
-from NightToday.visualizers import Visualizer
+from .modules import LossScheduler, Get_gradmag_gray
+from .plexers import G_Plexer, D_Plexer, S_Plexer
+from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_FG_MergeMask
+from .visualizers import Visualizer
 
 
 # ------------------------ Main GAT Class ------------------------ #
@@ -104,6 +105,7 @@ class Image2ImageGAT_Dual(nn.Module):
             # self.criterion_milo = lambda f_d, r_t, m=None: MILO_Loss(self.device)(f_d, r_t.detach(), m)
             self.criterion_semEdge = partial(SemEdgeLoss, num_classes=self.netS.num_classes)
             self.criterion_sharpness = SharpFusionLoss()
+            self.criterion_scene_id = nn.CrossEntropyLoss()
             self.criterion_cgr = lambda f_d, seg_t, r_t: CondGradRepaLoss(f_d,
                                                                           seg_t.detach() if seg_t is not None else seg_t,
                                                                           self.get_gradmag(f_d),
@@ -267,6 +269,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'loss_milo', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_thermal', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_sharpness', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_scene_id', {k: 0. for k in self.names_domains})
 
     # endregion
 
@@ -274,7 +277,8 @@ class Image2ImageGAT_Dual(nn.Module):
     @torch.no_grad()
     def forward(self, thermal, night, return_fused_IR=False, align_first=True):
         thermal, night = thermal * 2 - 1, night * 2 - 1
-        encoded_TN, fused_IR, _ = self.netG.encode(thermal, night, from_=self.T, align_first=align_first)
+        encoded_TN, fused_IR, *_ = self.netG.encode(thermal, night,
+                                                    from_=self.T, align_first=align_first, epoch=self.epoch)
         fake_D = self.netG.decode(encoded_TN, to_=self.D)
         if return_fused_IR:
             return fake_D*0.5+0.5, fused_IR*0.5+0.5
@@ -311,12 +315,8 @@ class Image2ImageGAT_Dual(nn.Module):
 
     def backward_G(self):
         encoded_D = self.netG.encode(self.real_D, from_=self.D)
-        encoded_TN, self.real_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N, from_=self.T)
-
-        # region Fusion Loss
-        if self.opt.model.fusion_first:
-            self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.remapped_T)
-        # endregion
+        encoded_TN, self.real_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
+                                                                                  from_=self.T, epoch=self.epoch)
 
         # region Identity "auto-encode" loss
         if self.lambda_id > 0:
@@ -368,6 +368,11 @@ class Image2ImageGAT_Dual(nn.Module):
             self.loss_cycle[self.N] += self.compute_loss('cycle', self.rec_N, self.real_N, loss_name='cycle')
         # endregion
 
+        # region Fusion Loss
+        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
+        # self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_D, self.real_TN.detach(), self.real_T)
+        # endregion
+
         # region Cycle loss on Latent Space
         if self.lambda_latent > 0:
             self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
@@ -382,8 +387,12 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region Segmentation Distillation Knowledge
-        rand_size = self.backward_S()
+        rand_size, seg_IR = self.backward_S()
+        scene_logits = self.scene_logit(seg_IR, self.real_T)
         # endregion
+
+        # region Scene identification
+        self.loss_scene_id[self.T] += self.compute_loss('scene_id', self.netG.fusion.scene_idx, scene_logits.detach())
 
         # region Structure-Gradient Alignment loss
         self.loss_sga[self.D] += self.compute_loss('sga', self.edges_D, self.get_gradmag(self.fake_T))
@@ -401,26 +410,12 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region Scale Robustness Loss
-        # if self.netS.stage in ['update_D', 'update_TN', 'trained']:
-        #     if torch.rand(1) > 0.5:
-        #         real_D_s = interpolate(self.real_D, size=[128, 128], mode='bilinear', align_corners=False)
-        #         real_TN_s = interpolate(self.real_TN, size=[128, 128], mode='bilinear', align_corners=False)
-        #         fake_TN_s = self.netG.decode(self.netG.encode(real_D_s, from_=self.D), to_=self.T)
-        #         fake_D_s = self.netG.decode(self.netG.encode(real_TN_s, from_=self.T), to_=self.D)
-        #         fake_D = interpolate(self.fake_D, size=[128, 128], mode='bilinear', align_corners=False)
-        #         fake_TN = interpolate(self.fake_TN, size=[128, 128], mode='bilinear', align_corners=False)
-        #     else:
-        #         real_D_s = interpolate(self.real_D, size=[384, 384], mode='bilinear', align_corners=False)
-        #         real_TN_s = interpolate(self.real_TN, size=[384, 384], mode='bilinear', align_corners=False)
-        #         fake_TN_s = interpolate(self.netG.decode(self.netG.encode(real_D_s, from_=self.D), to_=self.T),
-        #                                 size=[256, 256], mode='bilinear', align_corners=False)
-        #         fake_D_s = interpolate(self.netG.decode(self.netG.encode(real_TN_s, from_=self.T), to_=self.D),
-        #                                size=[256, 256], mode='bilinear', align_corners=False)
-        #         fake_D = self.fake_D
-        #         fake_TN = self.fake_TN
-        #
-        #     self.loss_scale_robustness[self.D] = self.compute_loss('cycle', fake_TN_s, fake_TN.detach())
-        #     self.loss_scale_robustness[self.T] = self.compute_loss('cycle', fake_D_s, fake_D.detach())
+        scale = float(np.random.randint(0, 2, 1))*2
+        real_TN_s = interpolate(self.real_TN, scale_factor=scale or 1/2, mode='bilinear', align_corners=False)
+        fake_D_s = interpolate(self.netG.decode(self.netG.encode(real_TN_s, from_=self.T), to_=self.D),
+                               size=[256, 256], mode='bilinear', align_corners=False)
+        fake_D = self.fake_D
+        self.loss_scale_robustness[self.T] = self.compute_loss('cycle', fake_D_s, fake_D.detach())
         # endregion
 
         # region Domain-specific losses include CGR loss and ACA loss.
@@ -537,14 +532,14 @@ class Image2ImageGAT_Dual(nn.Module):
         # combined loss
         self.sum_losses().backward()
 
-    def backward_S(self) -> int:
+    def backward_S(self) -> tuple[int, Tensor]:
         """Random size for segmentation network training. Then, retain original image size."""
         stage = self.netS.stage
         if stage == 'freeze_all':
             rand_size = 256
             self.segMask_D_update = self.segMask_D
             self.segMask_TN_update = self.segMask_TN
-            return rand_size
+            return rand_size, self.segMask_TN
         else:
             rand_scale = torch.randint(8, 20, (1, 1))
             rand_size = int(rand_scale.item() * 16)
@@ -563,6 +558,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                          segMask_D_s.long().squeeze(1), loss_name='S')
                 self.segMask_D_update = segMask_D_s.long().detach()
                 self.segMask_TN_update = self.segMask_TN
+                IR_pred_seg = self.segMask_TN
 
             elif stage == 'update_D':
                 # Start updating D seg labels and train Thermal Seg with pseudo TIR images and Day labels
@@ -586,6 +582,7 @@ class Image2ImageGAT_Dual(nn.Module):
                 self.segMask_TN_update = (UpdateIRGTv1(real_T_pred_seg.detach(), fake_D_pred_seg_d,
                                                        255 * torch.ones_like(segMask_D_s), real_T_s) *
                                           mask_uncertain + ~mask_uncertain * segMask_TN_s)
+                IR_pred_seg = fake_D_pred_seg_d
 
             elif stage == 'update_TN':
                 segMask_D_s = interpolate(self.segMask_D, size=rand_size, mode='nearest').long()
@@ -608,6 +605,7 @@ class Image2ImageGAT_Dual(nn.Module):
                 self.criterion_seg = self.update_class_criterion(self.segMask_TN_update)
                 self.loss_seg[self.T] += self.compute_loss('seg', real_T_pred_seg.squeeze(1),
                                                            self.segMask_TN_update.squeeze(1))
+                IR_pred_seg = fake_D_pred_seg_d
 
             else:
                 segMask_D_s = interpolate(self.segMask_D, size=rand_size, mode='nearest').long()
@@ -629,7 +627,8 @@ class Image2ImageGAT_Dual(nn.Module):
                 self.criterion_seg = self.update_class_criterion(segMask_TN_update_s)
                 self.loss_seg[self.T] = self.compute_loss('seg', fake_D_pred_seg,
                                                           segMask_TN_update_s.squeeze(1))
-            return rand_size
+                IR_pred_seg = fake_D_pred_seg_d
+            return rand_size, IR_pred_seg
 
     def update_class_criterion(self, labels):
         # labels: (N, H, W)
@@ -663,6 +662,24 @@ class Image2ImageGAT_Dual(nn.Module):
         # Final class weights
         self.class_weight = weight * self.often_weight
         return nn.CrossEntropyLoss(weight=self.class_weight, ignore_index=255)
+
+    def scene_logit(self, seg_mask, ir):
+        seg_mask = seg_mask.argmax(1, keepdim=True)
+        ir = interpolate(ir, seg_mask.shape[-2:])
+        area = seg_mask.shape[-1] * seg_mask.shape[-2]
+        sky = seg_mask == 10
+        sky_area = sky.sum(dim=[1, 2, 3])
+        veg = seg_mask == 8
+        veg_area = veg.sum(dim=[1, 2, 3])
+        build = seg_mask <= 2
+        build_area = build.sum(dim=[1, 2, 3])
+        cond1 = (seg_mask == 10).sum(dim=[1, 2, 3]) > (0.05 * area)
+        cond2 = (sky * ir).sum(dim=[1, 2, 3]) / sky_area < ((veg * ir).sum(dim=[1, 2, 3]) / veg_area / 3)
+        cond3 = sky_area + veg_area > build_area
+        out = torch.zeros([ir.shape[0], self.netG.fusion.thermal_preprocess.scene], device=ir.device)
+        idx = cond1 + 2 * cond2 + 4 * cond3
+        out[:, idx] = 1.
+        return out
 
     def compute_loss(self, criterion: str, *inputs, criterion_lambda: str = '', loss_name: str = '', **kwargs):
         """Compute a specific loss with given inputs and apply its lambda weight."""
