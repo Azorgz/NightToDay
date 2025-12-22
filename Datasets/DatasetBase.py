@@ -3,13 +3,11 @@ from _socket import gethostname
 
 import oyaml
 import torch
-from kornia.augmentation import RandomHorizontalFlip, Normalize
+from kornia.augmentation import Normalize
+from kornia.geometry import hflip
 from torch import Tensor
 from torch.utils.data import Dataset
 from ImagesCameras import ImageTensor
-from torchvision.transforms import Compose
-
-augmentations = {'hflip': RandomHorizontalFlip(same_on_batch=True)}
 
 
 class TestDataset(Dataset):
@@ -27,13 +25,12 @@ class TestDataset(Dataset):
         self.test_T = [os.path.join(self.test_T, f) for f in sorted(os.listdir(self.test_T))]
         self.test_N = [os.path.join(self.test_N, f) for f in sorted(os.listdir(self.test_N))]
         assert len(self.test_T) == len(self.test_N), "Number of thermal and night images must be equal."
-        self.normalize = Normalize(0.5, 0.5)
 
     def __len__(self):
         return max(len(self.test_D), len(self.test_T))
 
     def __getitem__(self, idx):
-        image_T = self.normalize(self.load_image(self.test_T, idx % len(self.test_T)).GRAY().RGB('gray'))
+        image_T = self.load_image(self.test_T, idx % len(self.test_T)).GRAY().RGB('gray')
         image_N = self.normalize(self.load_image(self.test_N, idx % len(self.test_N)).match_shape(image_T))
         return image_T, image_N
 
@@ -61,7 +58,7 @@ class TrainDataset(Dataset):
 
     def __init__(self, opt):
         self.num_classes = opt.num_classes
-        self.augmentations = Compose([augmentations[a] for a in opt.augmentations if a in augmentations])
+        self.augmentations = hflip
         self.load_size = opt.load_size
         self.resize_and_crop = opt.resize_and_crop
         opt.sampling = opt.sampling if opt.sampling > 0 else 1
@@ -104,11 +101,11 @@ class TrainDataset(Dataset):
         image_D = self.normalize(self.load_image(self.train_D, idx % len(self.train_D)))
         image_T = self.normalize(self.load_image(self.train_T, idx % len(self.train_T), True).GRAY().RGB('gray'))
         image_N = self.normalize(self.load_image(self.train_N, idx % len(self.train_N), True))
-        image_D_seg = (self.load_image(self.D_seg, idx % (len(self.D_seg) or 1), seg=True)).to(torch.uint8)
-        image_TN_seg = (self.load_image(self.TN_seg, idx % (len(self.TN_seg) or 1), seg=True, crop=True)).to(torch.uint8)
-        image_D_edges = self.load_image(self.D_edges, idx % (len(self.D_edges) or 1))
-        image_TN_edges = self.load_image(self.TN_edges, idx % (len(self.TN_edges) or 1), True)
-        if self.augmentations:
+        image_D_seg = (self.load_image(self.D_seg, idx % (len(self.D_seg) or 1), seg=True).to_tensor()).to(torch.uint8)
+        image_TN_seg = (self.load_image(self.TN_seg, idx % (len(self.TN_seg) or 1), seg=True, crop=True).to_tensor()).to(torch.uint8)
+        image_D_edges = self.load_image(self.D_edges, idx % (len(self.D_edges) or 1)).to_tensor()
+        image_TN_edges = self.load_image(self.TN_edges, idx % (len(self.TN_edges) or 1), True).to_tensor()
+        if torch.rand(1) < 0.5:
             image_D, image_D_seg, image_D_edges = self.augmentations(torch.cat([image_D, image_D_seg, image_D_edges], dim=1)).split([3, 1, 1], 1)
             image_T, image_N, image_TN_edges, image_TN_seg = self.augmentations(torch.cat([image_T, image_N, image_TN_edges, image_TN_seg], dim=1)).split([3, 3, 1, 1], 1)
         return image_D, image_T, image_N, image_D_seg, image_TN_seg, image_D_edges, image_TN_edges

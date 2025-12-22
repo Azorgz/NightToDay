@@ -58,10 +58,9 @@ class Image2ImageGAT_Dual(nn.Module):
         self.mode = self.opt.model.mode if trainable else 'test'
         if self.mode == 'test':
             self.opt.model.gen.input_size = -1
-        self.checkpoint_dir = self.opt.training.checkpoint_dir
-        os.makedirs(self.checkpoint_dir, exist_ok=True)
-        self.visualize_dir = self.opt.training.visualize_dir
-        os.makedirs(self.visualize_dir, exist_ok=True)
+            self.input_size = -1
+        else:
+            self.input_size = self.opt.model.gen.input_size
         # endregion
 
         # region Networks
@@ -77,6 +76,10 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Train parameters, criterion and losses
         if self.mode == 'train' and trainable:
+            self.checkpoint_dir = self.opt.training.checkpoint_dir
+            os.makedirs(self.checkpoint_dir, exist_ok=True)
+            self.visualize_dir = self.opt.training.visualize_dir
+            os.makedirs(self.visualize_dir, exist_ok=True)
             self.visualizer = Visualizer(self.opt.training)
             # Training functions
             self.att_input = AttackImages(device=self.device)
@@ -240,6 +243,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'segMask_TN', kwargs.get('seg_TN', ImageTensor.rand(1, 1, 4, 4)).to(self.device))
         setattr(self, 'edges_D', kwargs.get('edges_D', ImageTensor.rand(1, 1, 4, 4)).to(self.device))
         setattr(self, 'edges_TN', kwargs.get('edges_TN', ImageTensor.rand(1, 1, 4, 4)).to(self.device))
+        setattr(self, 'input_size', self.real_D.shape[-2:])
         setattr(self, 'segMask_D_update', None)
         setattr(self, 'segMask_TN_update', None)
         setattr(self, 'pred_real_D', None)
@@ -264,6 +268,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'loss_mean_std', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_seg', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_att', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_fus', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_scale_robustness', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_mean_var', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_milo', {k: 0. for k in self.names_domains})
@@ -370,7 +375,11 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Fusion Loss
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
-        # self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_D, self.real_TN.detach(), self.real_T)
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN,
+                                                   -self.real_N.mean(dim=1, keepdim=True).repeat(1, 3, 1, 1),
+                                                   loss_name='fus', criterion_lambda='fus')
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, self.remapped_T,
+                                                   loss_name='fus', criterion_lambda='fus')
         # endregion
 
         # region Cycle loss on Latent Space
@@ -388,11 +397,9 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Segmentation Distillation Knowledge
         rand_size, seg_IR = self.backward_S()
-        scene_logits = self.scene_logit(seg_IR, self.real_T)
+        # scene_logits = self.scene_logit(seg_IR, self.real_T)
+        # self.loss_scene_id[self.T] += self.compute_loss('scene_id', self.netG.fusion.scene_idx, scene_logits.detach())
         # endregion
-
-        # region Scene identification
-        self.loss_scene_id[self.T] += self.compute_loss('scene_id', self.netG.fusion.scene_idx, scene_logits.detach())
 
         # region Structure-Gradient Alignment loss
         self.loss_sga[self.D] += self.compute_loss('sga', self.edges_D, self.get_gradmag(self.fake_T))
@@ -411,11 +418,17 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Scale Robustness Loss
         scale = float(np.random.randint(0, 2, 1))*2
-        real_TN_s = interpolate(self.real_TN, scale_factor=scale or 1/2, mode='bilinear', align_corners=False)
-        fake_D_s = interpolate(self.netG.decode(self.netG.encode(real_TN_s, from_=self.T), to_=self.D),
-                               size=[256, 256], mode='bilinear', align_corners=False)
-        fake_D = self.fake_D
-        self.loss_scale_robustness[self.T] = self.compute_loss('cycle', fake_D_s, fake_D.detach())
+        real_T_s = interpolate(self.real_T, scale_factor=scale or 1/2, mode='bilinear', align_corners=False)
+        real_N_s = interpolate(self.real_N, scale_factor=scale or 1/2, mode='bilinear', align_corners=False)
+        fake_TN_encoded, fake_fused_IR_s, *_ = self.netG.encode(real_T_s, real_N_s,
+                                                              from_=self.T, align_first=False)
+        fake_D_s = interpolate(self.netG.decode(fake_TN_encoded, to_=self.D),
+                               size=self.input_size, mode='bilinear', align_corners=False)
+        fake_D = self.fake_D.detach()
+        fake_fused_IR_s = interpolate(fake_fused_IR_s, size=self.input_size, mode='bilinear', align_corners=False)
+        fake_fused_IR = self.real_TN.detach()
+        self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D_s, fake_D)
+        self.loss_scale_robustness[self.N] += self.compute_loss('cycle', fake_fused_IR_s, fake_fused_IR)
         # endregion
 
         # region Domain-specific losses include CGR loss and ACA loss.
@@ -428,13 +441,8 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region Attacks stability loss
-        if self.lambda_att > 0.0:
-            if self.opt.model.fusion_first:
-                self.loss_att[self.T] += self.compute_loss('cycle', self.real_TN,
-                                                           -self.real_N.mean(dim=1, keepdim=True).repeat(1, 3, 1, 1),
-                                                           loss_name='att', criterion_lambda='att')
-                self.loss_att[self.T] += self.compute_loss('cycle', self.real_TN, self.remapped_T,
-                                                           loss_name='att', criterion_lambda='att')
+        # if self.lambda_att > 0.0:
+
 
         #     # att_T, att_N = self.att_input(self.real_T, self.real_N, balance=0.5, epsilon=0.25)
         #     # fake_D_att = self.netG.decode(self.netG.encode(att_T, att_N, from_=self.T), to_=self.D)
@@ -449,8 +457,8 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region ACL
-        # if self.netS.stage in ['trained']: #'update_TN',
-        #     fake_D_Mask = interpolate(fake_D_pred_seg_d.float(), size=[256, 256], mode='bilinear')
+        if self.netS.stage in ['trained']: #'update_TN',
+            fake_D_Mask = interpolate(self.segMask_D_update.float(), size=self.input_size, mode='bilinear')
         #     ##########Fake_IR_Composition, OAMix-TIR
         #     valid, FG_Mask, FG_FakeTN, FG_RealVis, HL_Mask, ComIR_Light_Mask = \
         #         get_FG_MergeMask(self.segMask_D, fake_D_Mask, self.real_D, self.fake_TN.detach())
@@ -673,9 +681,9 @@ class Image2ImageGAT_Dual(nn.Module):
         veg_area = veg.sum(dim=[1, 2, 3])
         build = seg_mask <= 2
         build_area = build.sum(dim=[1, 2, 3])
-        cond1 = (seg_mask == 10).sum(dim=[1, 2, 3]) > (0.05 * area)
+        cond1 = (seg_mask == 10).sum(dim=[1, 2, 3]) > (0.1 * area)
         cond2 = (sky * ir).sum(dim=[1, 2, 3]) / sky_area < ((veg * ir).sum(dim=[1, 2, 3]) / veg_area / 3)
-        cond3 = sky_area + veg_area > build_area
+        cond3 = (veg * ir).sum(dim=[1, 2, 3]) / veg_area > (build * ir).sum(dim=[1, 2, 3]) / build_area
         out = torch.zeros([ir.shape[0], self.netG.fusion.thermal_preprocess.scene], device=ir.device)
         idx = cond1 + 2 * cond2 + 4 * cond3
         out[:, idx] = 1.

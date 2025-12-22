@@ -4,18 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Plexer">
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Update of the LUT">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/discriminators.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/discriminators.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/segmentors.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/segmentors.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/utilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/utilities.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/visualizers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/visualizers.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -58,11 +53,11 @@
   "keyToString": {
     "Python.encoders.executor": "Debug",
     "Python.test.executor": "Debug",
-    "Python.train.executor": "Debug",
+    "Python.train.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "main",
-    "last_opened_file_path": "/home/godeta/PycharmProjects/MyTransform/checkpoints",
+    "last_opened_file_path": "/home/godeta/PycharmProjects/MyTransform/checkpoints/NightToday",
     "settings.editor.selected.configurable": "project.propVCSSupport.DirectoryMappings"
   }
 }]]></component>
@@ -214,7 +209,15 @@
       <option name="project" value="LOCAL" />
       <updated>1766069299901</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="Update of the LUT">
+      <option name="closed" value="true" />
+      <created>1766342265282</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1766342265282</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -232,7 +235,8 @@
     <MESSAGE value="Huge update" />
     <MESSAGE value="Creation update" />
     <MESSAGE value="Plexer" />
-    <option name="LAST_COMMIT_MESSAGE" value="Plexer" />
+    <MESSAGE value="Update of the LUT" />
+    <option name="LAST_COMMIT_MESSAGE" value="Update of the LUT" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -249,17 +253,17 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
-          <line>436</line>
+          <line>448</line>
           <option name="timeStamp" value="227" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
-          <line>434</line>
+          <line>446</line>
           <option name="timeStamp" value="229" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
-          <line>421</line>
+          <line>433</line>
           <option name="timeStamp" value="230" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">

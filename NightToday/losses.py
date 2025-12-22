@@ -17,7 +17,7 @@ from torchmetrics.functional.image import image_gradients
 
 from .ssim import SSIM
 from .utilities import ClsMeanPixelValue, GetFeaMatrixCenter, bhw_to_onehot, \
-    center_of_mass
+    center_of_mass, detect_TL_blobs_mask_free
 
 ROAD = 0
 PAVEMENT = 1
@@ -244,6 +244,7 @@ def saturation_loss_color(fake_rgb, real_n, tau=0.05):
 
     return (S * H * weight).sum() / (weight.sum() + 1e-6)
 
+
 def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, weights=None):
     """
     """
@@ -312,8 +313,6 @@ def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, 
         color_mask = target_l.clamp(0, 25) * ((target_ab / 128) ** 2).sum(1, keepdim=True)
         high_color_mask = (color_mask > color_mask.mean() + 2 * color_mask.std()) * valid * (GT_seg != SKY)
         loss = (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
-    # mid_low_lum = hsv_target[:, 2:, :, :] < 0.75
-    # mid_high_lum = hsv_target[:, 2:, :, :] > 0.3
     loss += saturation_loss_color(im_fake, im_target)
     return loss.mean()
 
@@ -362,7 +361,7 @@ def ThermalLoss(image_fused, image_target, night_color, GT_seg, weights=None):
 
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
-    # trafficlight_loss = TL_loss(image_target, night_color, image_fused, GT_resized).sum()
+    trafficlight_loss = TL_loss(image_target, night_color, image_fused, GT_resized).sum()
 
     #  Sharpness enhancement losses
     dx, dy = image_gradients(
@@ -379,7 +378,7 @@ def ThermalLoss(image_fused, image_target, night_color, GT_seg, weights=None):
 
     thermal_noise_loss = ThermalNoiseLoss()(image_fused).mean() * 2
 
-    return total_classes_loss + thermal_noise_loss #  + trafficlight_loss
+    return total_classes_loss + thermal_noise_loss + trafficlight_loss
 
 
 def TL_loss(I_ir, I_vi, I_fused, GT_mask):
@@ -389,6 +388,7 @@ def TL_loss(I_ir, I_vi, I_fused, GT_mask):
     valid_trafficlight = area_trafficlight > 50
     if not valid_trafficlight.any():
         return loss_tl
+    blobs = detect_TL_blobs_mask_free(I_vi*0.5+0.5, I_ir*0.5+0.5)
     labels = connected_components(mask_trafficlight)
     fake_TL = torch.zeros_like(GT_mask, device=GT_mask.device).float()
     for i, val in enumerate(valid_trafficlight):
@@ -401,14 +401,14 @@ def TL_loss(I_ir, I_vi, I_fused, GT_mask):
                 else:
                     size_scaler = (count // 50)
                     mask_tl = (labels[i][None] == label).float()
-                    mask_dilated = dilation(mask_tl, torch.ones(5*size_scaler, 3*size_scaler, device=GT_mask.device))
-                    contours = (mask_dilated - mask_tl).squeeze()
-                    fake_TL[i] += create_fake_TL(I_ir[i][None], I_vi[i][None], mask_dilated) * mask_dilated[0]
+                    mask_dilated = dilation(mask_tl, torch.ones(5*size_scaler, 3*size_scaler, device=GT_mask.device)).squeeze()
                     mask_tl = mask_tl.squeeze()
+                    contours = mask_dilated - mask_tl
+                    fake_TL[i] += mask_dilated * ir - mask_dilated * blobs[i] * 0.9 * ir
                     if (contours * I_ir[i]).mean() > (mask_tl * I_ir[i]).mean():
-                        fake_TL[i] += 1.05 * contours * ir + mask_tl*ir*0.95
+                        fake_TL[i] += 1.02 * contours * ir + mask_tl*ir*0.98
                     else:
-                        fake_TL[i] += 0.95 * contours * ir + mask_tl*ir*1.05
+                        fake_TL[i] += 0.98 * contours * ir + mask_tl*ir*1.02
 
     # --- Traffic Light reconstitution ---
     return ReLU()(((fake_TL > 0) * (I_fused*0.5+0.5).mean(dim=1, keepdim=True) - fake_TL.clamp(0, 1)) ** 2).mean(dim=[1, 2, 3]).sum()

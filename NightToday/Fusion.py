@@ -742,9 +742,7 @@ class U_ResNetFusion(nn.Module):
                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
-                                                      thermal_preprocessCfg.scene,
-                                                      thermal_preprocessCfg.naive_train_first,
-                                                      thermal_preprocessCfg.start_training)
+                                                      thermal_preprocessCfg.scene)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -780,8 +778,7 @@ class U_ResNetFusion(nn.Module):
                 hook_output = getattr(self, f'encoder_hook_{self.hook[-(i + 1)]}')
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
             x_feat = layer(x_feat)
-        x = ir.mean(dim=1, keepdim=True)
-        out = self.final_conv(x_feat) #+ self.extract_hf(x)/2
+        out = self.final_conv(x_feat)
         return self.tanh_n(1)(out).repeat(1, vis_night.shape[1], 1, 1), ir, vis_night  # match input channels
 #
     def extract_hf(self, x):
@@ -804,8 +801,7 @@ class MonotonicThermalLUT(nn.Module):
     Identity-initialized.
     """
 
-    def __init__(self, bins: int = 2048, scene: int = 8,
-                 naive_train_first: bool = True, start_training: int = 0, eps=1e-8):
+    def __init__(self, bins: int = 2048, scene: int = 8, eps=1e-8):
         super().__init__()
         self.bins = bins
         self.scene = scene
@@ -817,8 +813,6 @@ class MonotonicThermalLUT(nn.Module):
         self.delta = nn.Parameter(init_delta)
         self.scene_selection = SceneSelector()
         self.scene_idx = None
-        self.naive_train = naive_train_first
-        self.start_training = start_training
 
     def forward(self, x, *args, epoch=0):
         """
@@ -830,15 +824,8 @@ class MonotonicThermalLUT(nn.Module):
             x = x.mean(dim=1, keepdim=True)  # convert to grayscale
         # Robust normalization to [0,1]
         x = self.robust_norm(x, p_low=2., p_high=99.5, eps=self.eps)
-        if epoch > self.start_training:
-            self.scene_idx = self.scene_selection(x, *args)  # (B, scene) long tensor
-        elif self.naive_train:
-            self.scene_idx = self.naive_scene_selection(x)
-        else:
-            idx = torch.zeros([x.shape[0], self.scene], device=x.device)
-            idx[0] = 1.
-            self.scene_idx = idx
-            # Build monotonic LUT
+        self.scene_idx = self.naive_scene_selection(x)
+        # Build monotonic LUT
         increments = F.softplus(torch.mm(self.scene_idx, self.delta)) + self.eps
         luts = torch.cumsum(increments, dim=1)
         luts = luts / (luts[:, -1] + self.eps) * 2 - 1  # normalize to [-1,1]
@@ -857,7 +844,7 @@ class MonotonicThermalLUT(nn.Module):
         x_mean_b = x[:, :, 2::].mean(dim=[1, 2, 3])
         x_std_t = x[:, :, ::2].std(dim=[1, 2, 3])
         x_std = x[:, :, ].std(dim=[1, 2, 3])
-        low_lum_t = (x[:, :, 2::] < -0.95).sum(dim=[1, 2, 3]) / (x[:, :, 2::]>=-1).sum(dim=[1, 2, 3])
+        low_lum_t = (x[:, :, 2::] < -0.90).sum(dim=[1, 2, 3]) / (x[:, :, 2::]>=-1).sum(dim=[1, 2, 3])
         cond1 = x_mean_b > x_mean_t * 2
         cond2 = x_std_t > x_std
         cond3 = low_lum_t > 0.1

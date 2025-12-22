@@ -5,10 +5,11 @@ from kmeans_pytorch import kmeans
 from kornia.color import rgb_to_lab, lab_to_rgb, rgb_to_hsv
 from kornia.contrib import connected_components
 from kornia.filters import gaussian_blur2d
-from kornia.morphology import closing, dilation
+from kornia.morphology import closing, dilation, erosion
 from matplotlib import pyplot as plt
 from scipy.ndimage import gaussian_filter
 from skimage import measure
+from skimage.morphology import disk
 from torch import nn
 from torch.nn.functional import conv2d
 from torchvision.transforms.functional import gaussian_blur
@@ -421,87 +422,45 @@ def center_of_mass(img):
     return cx, cy
 
 
-def detect_TL_blobs_mask_free(I_vi,
-                              sigmas=(2, 4, 6),
-                              sat_thresh=0.18,
-                              visualize=False):
+def detect_TL_blobs_mask_free(I_vi, I_ir):
     # ---- Luminance ----
-    Y = 0.299 * I_vi[:, 0:1] + 0.587 * I_vi[:, 1:2] + 0.114 * I_vi[:, 2:3]
+    scale = I_ir.shape[-2] / 256
+    R = 1. * I_vi[:, 0:1] - 0.75 * I_vi[:, 1:2] - 0.75 * I_vi[:, 2:3]
+    G = 1. * I_vi[:, 1:2] - 2 * I_vi[:, 0:1] + 0.5 * I_vi[:, 2:]
+    O = 0.75 * I_vi[:, 0:1] - 0.25 * I_vi[:, 1:2] - 1 * I_vi[:, 2:3]
+    IR = I_ir.mean(1, keepdim=True)
+    C_intensity = torch.max(torch.max(R*IR, G*IR), O*IR)
+    C_intensity = (C_intensity - C_intensity.min()) / (C_intensity.max() - C_intensity.min() + 1e-6)
+    Y = I_vi.mean(1, keepdim=True) * (I_vi.std(1, keepdim=True) < 0.05)
 
-    # ---- Multi-scale DoG ----
-    responses = []
-    for s in sigmas:
-        g1 = gaussian_blur2d(Y, (2 * s + 1, 2 * s + 1), (s, s))
-        g2 = gaussian_blur2d(Y, (2 * (s + 1) + 1, 2 * (s + 1) + 1), (s + 1, s + 1))
-        responses.append(g1 - g2)
-
-    DoG = torch.stack(responses).max(0)[0]
-    DoG = DoG.clamp(min=0)
-
-    # ---- Threshold ----
-    th = 0.7 * DoG.std(dim=(2, 3), keepdim=True)
-    M = (DoG > th).float()
-
+    # ---- Blobs mapping ----
+    M = (Y > min((Y.mean() + 3 * Y.std(), 0.95))).float()
+    labels = connected_components(M)
     # ---- Saturation enclosure ----
-    hsv = rgb_to_hsv(I_vi)
-    S = hsv[:, 1:2]
+    uniques = labels.unique(return_counts=True)
+    kernel_ring = torch.from_numpy(disk(7)).to(device=I_vi.device).float()
+    for i, (uni, count) in enumerate(zip(*uniques)):
+        mask = (labels == uni).float()
+        if i == 0:
+            continue
+        elif not (200 * scale > count > 20):
+            M = M - mask
+            continue
 
-    kernel = torch.ones(5, 5, device=I_vi.device)
-    ring = dilation(M, kernel) - M
-    ring = ring.clamp(min=0)
+        surrounding = dilation(mask, kernel=kernel_ring) - mask
+        mean_sat = ((C_intensity * surrounding).sum()) / (surrounding.sum() + 1e-6)
+        if mean_sat < C_intensity.std() + C_intensity.std()*5:
+            M = M - mask
+        else:
+            kernel_process = torch.from_numpy(disk(int(np.sqrt(count.cpu() / np.pi / 4)))).to(
+                device=I_vi.device).float()
+            M = M + closing(mask, kernel=kernel_process)
 
-    sat_score = (S * ring).sum((2, 3)) / (ring.sum((2, 3)) + 1e-6)
+    # ---- Intensity cleaning ----
+    M = M * I_ir.mean(1, keepdim=True) > F.interpolate(nn.AvgPool2d(11, padding=5)(I_ir.mean(1, keepdim=True)),
+                                                       I_ir.shape[-2:])*0.8 # keep only bright areas in IR
 
-    # ---- Keep only saturated blobs ----
-    valid = sat_score > sat_thresh
-    if not valid.any():
-        return None  # no TL detected
-
-    # ---- Center + radius ----
-    yy, xx = torch.meshgrid(
-        torch.arange(I_vi.shape[-2], device=I_vi.device),
-        torch.arange(I_vi.shape[-1], device=I_vi.device),
-        indexing='ij'
-    )
-    weights = Y * M
-    cx = (weights * xx).sum() / (weights.sum() + 1e-6)
-    cy = (weights * yy).sum() / (weights.sum() + 1e-6)
-    r = torch.sqrt(M.sum() / torch.pi)
-
-    if visualize:
-        _visualize_detection(I_vi, M, cx, cy, r)
-
-    return cx.item(), cy.item(), r.item()
-
-
-def _visualize_detection(I_vi, M, cx, cy, r):
-    """
-    Helper function for visualization
-    """
-    img = I_vi[0].permute(1,2,0).detach().cpu().numpy()
-    H, W, _ = img.shape
-
-    plt.figure(figsize=(6,6))
-    plt.imshow(img)
-    plt.axis("off")
-
-    if M is not None:
-        mask = M[0, 0].detach().cpu().numpy()
-        plt.imshow(mask, cmap='autumn', alpha=0.4)
-
-        # Center
-        plt.scatter(cx.item(), cy.item(), c='red', s=60, marker='+')
-
-        # Radius
-        circle = plt.Circle((cx.item(), cy.item()),
-                            r.item(),
-                            color='red',
-                            fill=False,
-                            linewidth=2)
-        plt.gca().add_patch(circle)
-
-    plt.title("Traffic Light Blob Detection")
-    plt.show()
+    return M
 
 
 def detect_hotpoint_blob(I_vi, M_tl, contrast_k=0.98, sigma_ratio=0.20):

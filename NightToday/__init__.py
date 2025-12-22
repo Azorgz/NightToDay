@@ -34,9 +34,6 @@ class SegConfig:
 class ThermalPreprocessConfig:
     bins: int
     scene: int
-    start_training: int = 0
-    naive_train_first: bool = True
-
 
 @dataclass
 class FusConfig:
@@ -198,7 +195,6 @@ def get_config(path=None) -> OptImage2ImageGATConfig:
         'start_epoch'], \
         "segmentation training schedule updateGT_start_epoch must be >= start_epoch and < end_epoch"
     conf['model']['seg']['training_schedule'] = SegScheduleConfig(**seg_scheduleConfig)
-    conf['model']['gen']['fus']['preprocess_thermal']['start_training'] = seg_scheduleConfig['updateGT_TN_start_epoch']
     conf['model']['gen']['fus']['preprocess_thermal'] = ThermalPreprocessConfig(**conf['model']['gen']['fus']['preprocess_thermal'])
     conf['model']['gen']['fus'] = FusConfig(**conf['model']['gen']['fus'])
     modelConfig = ModelConfig(name=conf['model']['name'],

@@ -1,12 +1,8 @@
 import torch
 from torch.utils.data import DataLoader
-from ImagesCameras import ImageTensor
-
 from .DatasetBase import MasterDataset
 from .FLIR import FLIR
 from .LYNRED import LYNRED, LYNRED_NIGHT_SAMPLES, LYNRED_DAY_SAMPLES
-
-# from .LYNRED import LYNRED
 
 DATASETS = {
     'FLIR': FLIR,

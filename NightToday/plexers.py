@@ -200,8 +200,7 @@ class G_Plexer(Plexer):
                 input_size[0] = self.input_size[0] // scale * scale
             if self.input_size[1] / scale != self.input_size[1] // scale:
                 input_size[1] = self.input_size[1] // scale * scale
-        x = interpolate(x, size=input_size, mode='bilinear', align_corners=False) if \
-            (x.size(-1) != self.input_size[0] or x.size(-2) != self.input_size[1]) else x
+        x = interpolate(x, size=input_size, mode='bilinear', align_corners=False)
         output = self.encoders[self.names_domains[from_]](x)
         output = self.shared_encoder(output)
         if return_im:
