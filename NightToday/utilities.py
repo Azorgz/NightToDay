@@ -2,11 +2,9 @@ import functools
 
 import numpy as np
 from kmeans_pytorch import kmeans
-from kornia.color import rgb_to_lab, lab_to_rgb, rgb_to_hsv
+from kornia.color import rgb_to_lab, lab_to_rgb
 from kornia.contrib import connected_components
-from kornia.filters import gaussian_blur2d
-from kornia.morphology import closing, dilation, erosion
-from matplotlib import pyplot as plt
+from kornia.morphology import closing, dilation
 from scipy.ndimage import gaussian_filter
 from skimage import measure
 from skimage.morphology import disk
