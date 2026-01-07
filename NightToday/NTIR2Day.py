@@ -149,15 +149,18 @@ class Image2ImageGAT_Dual(nn.Module):
     def initialization(self, opt, *args, **kwargs) -> dict | None:
         checkpoint = None
         if isinstance(opt, (str, Path)):
+            # Load config from yaml/json if given, else from checkpoint
             if 'yaml' in opt or 'yml' in opt or 'json' in opt:
                 self.opt = get_config(opt)
+            else:
+                checkpoint = torch.load(opt, weights_only=False, map_location='cpu')
+                self.opt = get_config()
+                self.opt.model = checkpoint['config'].model
         else:
             checkpoint = opt
             self.opt = get_config()
-            if isinstance(checkpoint, (str, Path)) and os.path.isfile(checkpoint):
-                checkpoint = torch.load(checkpoint, weights_only=False, map_location='cpu')
-                self.opt.model = checkpoint['config']
-            elif isinstance(checkpoint, dict):
+            if isinstance(checkpoint, dict):
+                # Checkpoint case
                 self.opt.model = checkpoint['config'].model
             else:  # None case
                 self.mode = 'train'
