@@ -7,12 +7,11 @@ from torch import nn
 from torch.nn.functional import interpolate
 
 from . import GenConfig, TrainConfig, SegConfig, DiscrConfig
-from .Fusion import SimpleCondViT, U_ResNetFusion
+from .Fusion import U_ResNetFusion
 from .LETNet import LETNet
 from .discriminators import NLayerDiscriminatorSN
-from .generators import TransformerEncoderMono, TransformerEncoderDual, TransformerDecoder, \
-    TransformerEncoderBlock, ResnetGenEncoder, ResnetGenDecoder, ResnetBlock
-from .modules import Sequential, FeaturesFusionModule
+from .generators import ResnetGenEncoder, ResnetGenDecoder, ResnetBlock
+from .modules import Sequential
 from .segmentors import SegmentorHeadv2
 from .utilities import weights_init
 
@@ -137,28 +136,14 @@ class G_Plexer(Plexer):
         self.input_size = opt.input_size
         self.fusion_first = opt.fusion_first
         self.opt = opt
-        if opt.type == 'ViT':
-            # encoders = [MultiResGANEncoder for _ in range(len(self.names_domains))]
-            encoders = [TransformerEncoderMono, TransformerEncoderDual]
-            decoders = [ResnetGenDecoder for _ in range(len(self.names_domains))]
-            # decoders = [TransformerDecoder for _ in range(len(self.names_domains))]
-            enc_args = [(opt.hidden_dim, opt.n_enc_layers),
-                        (opt.hidden_dim, opt.n_enc_layers)]
-            dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout),
-                        (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout)]
-            # opt.n_shared_layers = 0
-            block_shared = FeaturesFusionModule
-            shenc_args = (opt.hidden_dim, 2048, opt.n_shared_layers)
-            opt.n_shared_layers = 1  # set to 1 to use the fusion module
-        else:
-            encoders = [ResnetGenEncoder] * 2
-            decoders = [ResnetGenDecoder] * 2  # for _ in range(len(self.names_domains))]
-            enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
-                        (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling)]
-            dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
-                        (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
-            block_shared = ResnetBlock
-            shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
+        encoders = [ResnetGenEncoder] * 2
+        decoders = [ResnetGenDecoder] * 2  # for _ in range(len(self.names_domains))]
+        enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
+                    (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling)]
+        dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
+                    (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
+        block_shared = ResnetBlock
+        shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
         fus = opt.fus
         self.fusion = U_ResNetFusion(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
                                      n_downscaling=fus.n_downscaling, thermal_preprocessCfg=fus.preprocess_thermal)
@@ -174,7 +159,6 @@ class G_Plexer(Plexer):
             self.names.append('GenShared')
         else:
             self.shared_encoder = nn.Identity()
-        # self.apply(weights_init)
         self.to(self.device)
         self.ori_shape = None
         self.train()
@@ -193,13 +177,13 @@ class G_Plexer(Plexer):
         self.ori_shape = x.shape
         scale = 2**self.opt.downscaling
         input_size = self.input_size if isinstance(self.input_size, (list, tuple)) else (self.input_size, self.input_size)
-        if self.input_size[0] < 0:
+        if input_size[0] < 0:
             input_size = self.ori_shape[-2]//scale*scale, self.ori_shape[-1]//scale*scale
         else:
-            if self.input_size[0] / scale != self.input_size[0] // scale:
-                input_size[0] = self.input_size[0] // scale * scale
-            if self.input_size[1] / scale != self.input_size[1] // scale:
-                input_size[1] = self.input_size[1] // scale * scale
+            if input_size[0] / scale != input_size[0] // scale:
+                input_size[0] = input_size[0] // scale * scale
+            if input_size[1] / scale != input_size[1] // scale:
+                input_size[1] = input_size[1] // scale * scale
         x = interpolate(x, size=input_size, mode='bilinear', align_corners=False)
         output = self.encoders[self.names_domains[from_]](x)
         output = self.shared_encoder(output)

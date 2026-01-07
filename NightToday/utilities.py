@@ -1,14 +1,16 @@
 import functools
+from dataclasses import dataclass
+from typing import Literal
 
 import numpy as np
 from kmeans_pytorch import kmeans
 from kornia.color import rgb_to_lab, lab_to_rgb
 from kornia.contrib import connected_components
-from kornia.morphology import closing, dilation
+from kornia.morphology import closing, dilation, opening
 from scipy.ndimage import gaussian_filter
 from skimage import measure
 from skimage.morphology import disk
-from torch import nn
+from torch import nn, Tensor
 from torch.nn.functional import conv2d
 from torchvision.transforms.functional import gaussian_blur
 
@@ -293,12 +295,14 @@ def ClsMeanPixelValue(input_tensor, SegMask, num_class, exclude_classes=None):
 
 def RefineLightMask(Seg_mask, real_vis):
     """Denoising of the traffic light mask region."""
-    Segmask_Light_DN_k5 = LightMaskDenoised(Seg_mask, real_vis, 5)
-    Segmask_Light_DN_k3 = LightMaskDenoised(Segmask_Light_DN_k5, real_vis, 3)
-    return torch.where(Segmask_Light_DN_k3 == TRAFFICLIGHT, 1., 0.)
+    Seg_mask = Seg_mask.clone()
+    if ((Seg_mask == TRAFFICLIGHT).sum(dim=[1, 2, 3]) > 50).any():
+        Seg_mask = LightMaskDenoised(Seg_mask, real_vis, 5)
+        Seg_mask = LightMaskDenoised(Seg_mask, real_vis, 3)
+    return Seg_mask == TRAFFICLIGHT
 
 
-def LightMaskDenoised(Seg_mask, real_vis, Avg_KernelSize, min_area_ratio=0.001):
+def LightMaskDenoised(Seg_mask, real_vis, Avg_KernelSize):
     """
     Fully batched denoising of traffic light masks.
 
@@ -312,7 +316,6 @@ def LightMaskDenoised(Seg_mask, real_vis, Avg_KernelSize, min_area_ratio=0.001):
         out_mask: (B, H,W) denoised mask
     """
     B, _, H, W = real_vis.shape
-    device = real_vis.device
 
     # Original masks
     Seg_mask = Seg_mask.squeeze(1)  # (B,H,W)
@@ -324,8 +327,8 @@ def LightMaskDenoised(Seg_mask, real_vis, Avg_KernelSize, min_area_ratio=0.001):
 
     # Local average pooling
     padsize = Avg_KernelSize // 2
-    local_mean = F.avg_pool2d(light_mask_ori * real_gray, Avg_KernelSize, stride=1,
-                              padding=padsize)
+    local_mean = F.avg_pool2d(light_mask_ori * real_gray, Avg_KernelSize,
+                              stride=1, padding=padsize)
 
     # Sky mean per batch
     sky_sum = sky_mask.sum(dim=[1, 2], keepdim=True)
@@ -343,29 +346,49 @@ def LightMaskDenoised(Seg_mask, real_vis, Avg_KernelSize, min_area_ratio=0.001):
     light_mask_denoised = F.relu(light_mask_ori - sky_noise)
 
     # Small-hole filling (vectorized)
-    # # Invert mask
-    # inverted = 1 - light_mask_denoised.unsqueeze(1)  # (B,1,H,W)
-    #
-    # # Label connected regions using max pooling approximation
-    # filled = F.max_pool2d(inverted, 3, stride=1, padding=1)
-    # small_holes = (filled > 0) & (inverted > 0)
-    #
-    # # Estimate area threshold based on batch-wise mask area
-    # mask_area = light_mask_ori.sum(dim=[1, 2], keepdim=True).clamp(min=1.0)
-    # area_th = (mask_area * min_area_ratio).view(B, 1, 1, 1)
-    #
-    # # Fill only small holes
-    # filled_holes = F.relu(inverted - small_holes.float())
-    # filled_holes = torch.where(filled_holes.sum(dim=[2, 3], keepdim=True) < area_th, 1.0, 0.0)
-    #
-    # # Combine with denoised mask
-    # light_mask_denoised = torch.clamp(light_mask_denoised + filled_holes.squeeze(1), 0, 1)
-
+    light_mask_denoised = fill_holes(light_mask_denoised.unsqueeze(1))  # (B,1,H,W)
+    # area_th = light_mask_ori.sum(dim=[1, 2]) - light_mask_denoised.sum(dim=[1, 2])  # (B,)
+    # th = max(1, area_th.cpu()//2+1).numpy()
+    # # # Invert mask
+    # kernel = torch.tensor(disk(th), device=light_mask_ori.device).float()
+    # hole = closing(light_mask_denoised.unsqueeze(1), kernel) - light_mask_denoised.unsqueeze(1)  # (B,1,H,W)
+    # hole = opening(hole, torch.ones(3, 3, device=light_mask_ori.device))  # Remove noise
+    # #
+    # light_mask_denoised = closing(light_mask_denoised.unsqueeze(1) + hole, torch.ones(3, 3, device=light_mask_ori.device))
     # Construct final mask
-    out_mask = (1 - light_mask_ori) * Seg_mask + 6.0 * light_mask_denoised + 255.0 * (
-            light_mask_ori - light_mask_denoised)
+    out_mask = ((1 - light_mask_ori) * Seg_mask + 6.0 * light_mask_denoised +
+                255.0 * (light_mask_ori - light_mask_denoised))
 
-    return out_mask.unsqueeze(1)  # (B,1,H,W)
+    return out_mask  # (B,1,H,W)
+
+
+def fill_holes(mask: Tensor, max_iters=200):
+    """
+    mask: (B, 1, H, W), binary {0,1}, on GPU
+    """
+    # Invert mask
+    inv = 1.0 - mask
+
+    # Marker = background connected to borders
+    marker = torch.zeros_like(inv)
+    marker[..., 0, :]  = inv[..., 0, :]
+    marker[..., -1, :] = inv[..., -1, :]
+    marker[..., :, 0]  = inv[..., :, 0]
+    marker[..., :, -1] = inv[..., :, -1]
+
+    kernel = torch.ones((3, 3), device=mask.device)
+
+    # Morphological reconstruction by dilation
+    for _ in range(max_iters):
+        new_marker = dilation(marker, kernel)
+        new_marker = torch.minimum(new_marker, inv)
+        if torch.equal(new_marker, marker):
+            break
+        marker = new_marker
+
+    # Holes are what's not connected to border
+    filled = 1.0 - marker
+    return filled
 
 
 def create_fake_TLight(img, img_fake, mask_p):
@@ -425,38 +448,38 @@ def detect_TL_blobs_mask_free(I_vi, I_ir):
     scale = I_ir.shape[-2] / 256
     R = 1. * I_vi[:, 0:1] - 0.75 * I_vi[:, 1:2] - 0.75 * I_vi[:, 2:3]
     G = 1. * I_vi[:, 1:2] - 2 * I_vi[:, 0:1] + 0.5 * I_vi[:, 2:]
-    O = 0.75 * I_vi[:, 0:1] - 0.25 * I_vi[:, 1:2] - 1 * I_vi[:, 2:3]
-    IR = I_ir.mean(1, keepdim=True)
-    C_intensity = torch.max(torch.max(R*IR, G*IR), O*IR)
+    B = -0.75 * I_vi[:, 0:1] + 0.25 * I_vi[:, 1:2] + 1 * I_vi[:, 2:3]
+    IR = I_ir.mean(1, keepdim=True).clamp(0, 0.7) / 0.7
+    C_intensity = torch.max(torch.max(R, G), B)
     C_intensity = (C_intensity - C_intensity.min()) / (C_intensity.max() - C_intensity.min() + 1e-6)
+    c_maps = I_vi * C_intensity
+    c_maps = (c_maps * c_maps.std(1, keepdim=True)) ** 2
+    C_intensity = (c_maps - c_maps.min()) / (c_maps.max() - c_maps.min() + 1e-6)
     Y = I_vi.mean(1, keepdim=True) * (I_vi.std(1, keepdim=True) < 0.05)
+    criterion = C_intensity.mean() + C_intensity.std() * 5
 
     # ---- Blobs mapping ----
-    M = (Y > min((Y.mean() + 3 * Y.std(), 0.95))).float()
+    M = (Y * IR > min((Y.mean() + 2 * Y.std(), 0.80))).float()
     labels = connected_components(M)
     # ---- Saturation enclosure ----
     uniques = labels.unique(return_counts=True)
-    kernel_ring = torch.from_numpy(disk(7)).to(device=I_vi.device).float()
+    kernel_ring = torch.from_numpy(disk(9)).to(device=I_vi.device).float()
+    kernel_ring_small = torch.from_numpy(disk(1)).to(device=I_vi.device).float()
     for i, (uni, count) in enumerate(zip(*uniques)):
         mask = (labels == uni).float()
-        if i == 0:
+        if uni == 0:
             continue
-        elif not (200 * scale > count > 20):
+        elif count < 10 or count > 250*scale:
             M = M - mask
             continue
-
-        surrounding = dilation(mask, kernel=kernel_ring) - mask
+        mask_ = dilation(mask, kernel=kernel_ring_small)
+        surrounding = dilation(mask_, kernel=kernel_ring) - mask_
         mean_sat = ((C_intensity * surrounding).sum()) / (surrounding.sum() + 1e-6)
-        if mean_sat < C_intensity.std() + C_intensity.std()*5:
+        if mean_sat < criterion:
             M = M - mask
-        else:
-            kernel_process = torch.from_numpy(disk(int(np.sqrt(count.cpu() / np.pi / 4)))).to(
-                device=I_vi.device).float()
-            M = M + closing(mask, kernel=kernel_process)
 
     # ---- Intensity cleaning ----
-    M = M * I_ir.mean(1, keepdim=True) > F.interpolate(nn.AvgPool2d(11, padding=5)(I_ir.mean(1, keepdim=True)),
-                                                       I_ir.shape[-2:])*0.8 # keep only bright areas in IR
+    M = M * IR > F.interpolate(nn.AvgPool2d(11, padding=5)(I_ir.mean(1, keepdim=True)), I_ir.shape[-2:])*0.75 # keep only bright areas in IR
 
     return M
 
@@ -850,7 +873,7 @@ def Red2Green(input_rgb: torch.Tensor, input_mask: torch.Tensor):
     rgb_norm = (input_rgb + 1.0) * 0.5  # (C,H,W)
 
     # apply mask (broadcast)
-    masked_rgb = rgb_norm * input_mask.unsqueeze(0)  # (C,H,W)
+    masked_rgb = rgb_norm * input_mask # (C,H,W)
 
     # convert to HSV (kornia expects (B, C, H, W) and RGB in [0,1])
     hsv = kcolor.rgb_to_hsv(masked_rgb.unsqueeze(0))  # (1,3,H,W) with H in [0,1]
@@ -877,13 +900,9 @@ def Red2Green(input_rgb: torch.Tensor, input_mask: torch.Tensor):
 
     # fused mask and areas
     red_mask_fused = (red1_d + red2_d).clamp(0.0, 1.0)  # (H,W)
-    area1 = red1_d.sum()
-    area2 = red2_d.sum()
-    red_mask_area = area1 + area2
+    red_mask_area = red1_d.sum() + red2_d.sum()
 
     # compute modified hue outputs following original linear transforms
-    # h_r2g_out1 = red_mask1 * ((input_h * 0.12) + 87.0)
-    # h_r2g_out2 = red_mask2 * ((input_h * 0.12) + 64.0)
     h_r2g_out1 = red1_d * (Hchan * 0.12 + 87.0)
     h_r2g_out2 = red2_d * (Hchan * 0.12 + 64.0)
 
@@ -937,8 +956,6 @@ def Green2Red(input_rgb: torch.Tensor, input_mask: torch.Tensor):
     green_mask_area = area1 + area2
 
     # hue transforms as original:
-    # h_g2r_out1 = green_mask1 * ((input_h * 0.5) - 33.5)
-    # h_g2r_out2 = green_mask2 * ((input_h * (-0.5)) + 55.0)
     h_g2r_out1 = green1_d * (Hchan * 0.5 - 33.5)
     h_g2r_out2 = green2_d * (Hchan * -0.5 + 55.0)
 
@@ -962,7 +979,7 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     """
     Torch-only, GPU-friendly reimplementation of the original function.
     Inputs:
-      - temp_connect_mask: (H, W) {0,1} float tensor
+      - temp_connect_mask: (1, H, W) {0,1} float tensor
       - fake_IR_masked: (C, H, W) float tensor
       - real_vis_masked: (C, H, W) float tensor
       - patch_height: int (H)
@@ -974,11 +991,20 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     dev = temp_connect_mask.device
     H, W = temp_connect_mask.shape
 
-    # compute row/col sums for aspect ratio estimate (like original)
-    row_sum = temp_connect_mask.sum(dim=1)  # (H,)
-    col_sum = temp_connect_mask.sum(dim=0)  # (W,)
-    # avoid division-by-zero: add tiny eps
-    region_AspectRatio = (col_sum.max() + 1e-10) / (row_sum.max() + 1e-10)
+    # compute aspect ratio
+    row_sums = temp_connect_mask.sum(dim=1)  # (H,)
+    col_sums = temp_connect_mask.sum(dim=0)  # (W,)
+    row_sums = row_sums[row_sums != 0]
+    col_sums = col_sums[col_sums != 0]
+    if row_sums.min() < row_sums.max() * 0.8 or col_sums.min() < col_sums.max() * 0.8:
+        # irregular shape, ignore this mask, return zeros
+        return (torch.zeros_like(temp_connect_mask, device=temp_connect_mask.device),
+                torch.zeros_like(fake_IR_masked, device=fake_IR_masked.device),
+                torch.zeros_like(real_vis_masked, device=real_vis_masked.device),
+                torch.zeros_like(temp_connect_mask, device=temp_connect_mask.device),
+                torch.zeros_like(temp_connect_mask, device=temp_connect_mask.device),
+                torch.zeros_like(temp_connect_mask, device=temp_connect_mask.device))
+    region_AspectRatio = (col_sums.max() + 1e-10) / (row_sums.max() + 1e-10)
 
     # get red/green original analysis using torch functions
     _, temp_r2g_area_ori, temp_red_mask_ori = Red2Green(real_vis_masked, temp_connect_mask)
@@ -1002,36 +1028,24 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     # if W != H we must tile top_mask to (H,W) properly: make a (H,1) comparison then expand to W
     if top_mask.shape[1] != W:
         top_mask = ((rows >= mask_pos_row_min) & (rows <= mask_mid_row)).float().expand(-1, W)  # (H,W)
-    bottom_mask = 1.0 - top_mask  # (H,W)
+    bottom_mask = 1. - top_mask  # (H,W)
 
     IoU_th = 0.5
 
-    # initialize outputs (defaults)
-    output_FG_Mask = temp_connect_mask
-    output_FG_FakeIR = fake_IR_masked
-    output_FG_RealVis = real_vis_masked
-    output_highlight_mask = temp_red_mask_ori if temp_r2g_area_ori > temp_g2r_area_ori else temp_green_mask_ori
-
     # branch for large aspect ratio (vertical flip + extra synthesis)
-    if (region_AspectRatio > 1.75).item():
-        # random decision whether to vertically flip (tensor rand on device)
-        ver_flip_idx = torch.rand(1, device=dev)
+    if region_AspectRatio > 1.75 and temp_r2g_area_ori * temp_g2r_area_ori > 0:
         temp_VerFlip_mask, temp_VerFlip_fakeIR, temp_VerFlip_realVis = LocalVerticalFlip(
-            temp_connect_mask, fake_IR_masked, real_vis_masked,
-            int(mask_pos_row_min.item()), int(mask_pos_row_max.item())
-        )
-
+         temp_connect_mask, fake_IR_masked, real_vis_masked, int(mask_pos_row_min.item()), int(mask_pos_row_max.item()))
         # compute red/green analysis on flipped VIS
         _, temp_r2g_area, temp_red_mask = Red2Green(temp_VerFlip_realVis, temp_VerFlip_mask)
         _, temp_g2r_area, temp_green_mask = Green2Red(temp_VerFlip_realVis, temp_VerFlip_mask)
 
         DLS_idx = torch.rand(1, device=dev)  # double-light synthesis coin flip
         Decay_factor = 1.0
-
-        if ver_flip_idx.item() > 0.5:
+        # random decision whether to vertically flip (tensor rand on device)
+        if torch.rand(1) > 0.5:
             # flipped case
             if (temp_r2g_area > temp_g2r_area).item():
-                vis_GT_masked = (temp_r2g_vis := None)  # placeholder for clarity (we don't reuse the variable)
                 # produce real-vision output choosing flipped->red2green
                 vis_GT_masked, _, _ = Red2Green(temp_VerFlip_realVis, temp_VerFlip_mask)  # get vis transform
                 output_FG_RealVis = (vis_GT_masked - 0.5) * 2.0
@@ -1128,20 +1142,62 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     return output_FG_Mask, output_FG_FakeIR, output_FG_RealVis, output_highlight_mask, output_FG_top_mask, output_FG_bottom_mask
 
 
+def getLightDarkRegionMean(cls_idx, fake, input_mask, real_T, real_N):
+    """Obtain the mean value of the below-average brightness portion of the traffic light area."
+    "The dark region mask of the traffic light region is first obtained using the reference image, and then "
+    "the mean value of the corresponding region of the input image is calculated."""
+
+    _, _, h, w = fake.shape
+    fake_gray = .299 * fake[:, 0:1, :, :] + .587 * fake[:, 1:2, :, :] + .114 * fake[:, 2:3, :, :]
+    real_img_gray = .299 * real_N[:, 0:1, :, :] + .587 * real_N[:, 1:2, :, :] + .114 * real_N[:, 2:3, :, :]
+    real_img_gray = (real_img_gray - real_img_gray.min()) / (real_img_gray.max() - real_img_gray.min() + 1e-8)
+    ref_img_gray = .299 * real_T[:, 0:1, :, :] + .587 * real_T[:, 1:2, :, :] + .114 * real_T[:, 2:3, :, :]
+    light_mask_ori = (input_mask == cls_idx).float()
+    max_pool_k3 = nn.MaxPool2d(kernel_size=5, stride=1, padding=2)
+    Light_mask = -max_pool_k3(- light_mask_ori)
+    light_region_area = Light_mask.sum(dim=[1, 2, 3])
+    valid_mask = light_region_area > 1
+    if valid_mask.any():
+        "In order to avoid that the bright and dark regions cannot be divided, the threshold is set to 1."
+        Light_region = (ref_img_gray * real_img_gray * Light_mask.detach())[valid_mask]
+        Light_region_mean = Light_region.sum(dim=[1, 2, 3]) / light_region_area[valid_mask]
+
+        Light_region_filling_one = Light_region + 1 - Light_mask[valid_mask]
+        Light_Dark_Region_Mask = Light_region_filling_one < Light_region_mean
+        Light_Dark_Region_Mean = (Light_Dark_Region_Mask * fake_gray[valid_mask]).sum(dim=[1, 2, 3]) / Light_Dark_Region_Mask.sum(dim=[1, 2, 3])
+
+        Light_Bright_Region_Mask = Light_mask[valid_mask] - Light_Dark_Region_Mask
+
+        # Light Bright region min
+        Light_BR_filling_one = Light_Bright_Region_Mask * fake_gray[valid_mask] + 1 - Light_Bright_Region_Mask
+        Light_Bright_Region_Min = Light_BR_filling_one.flatten(1).min(dim=1).values
+        # Compute channel mean.
+        input_img_DR_Masked = fake[valid_mask] * Light_Dark_Region_Mask
+        input_img_DR_mean = torch.mean(input_img_DR_Masked, dim=1, keepdim=True)  #1*h*w
+        input_img_DR_submean = (input_img_DR_Masked - input_img_DR_mean) ** 2
+        input_img_DR_var = (input_img_DR_submean.sum(dim=1, keepdim=True) / 3).flatten(1).max(1).values
+
+    else:
+        Light_Dark_Region_Mean = 0.
+        Light_Bright_Region_Min = 0.
+        input_img_DR_var = 0.
+
+    return Light_Dark_Region_Mean, light_region_area, Light_Bright_Region_Min, input_img_DR_var
+
 # -----------------------------
 # Updated FakeIRFGMergeMaskv4 (GPU-first, Kornia CC)
 # -----------------------------
 def get_FG_MergeMask(vis_gt,
-                     IR_seg_tensor,
-                     real_vis,
-                     fake_tn):
+                     fake_IR_seg_tensor,
+                     real_D,
+                     fake_T):
     """
     Batched GPU-first implementation that uses the torch-based ObtainTLightMixedMask_torch by default.
     Args:
         vis_gt: (B,1,H,W) integer segmentation mask for visible image
-        IR_seg_tensor: (B,C,H,W) logits for IR segmentation
-        real_vis: (B,3,H,W) real visible image
-        fake_tn: (B,3,H,W) fake IR image
+        fake_IR_seg_tensor: (B,C,H,W) logits for IR segmentation
+        real_D: (B,3,H,W) real visible image
+        fake_T: (B,3,H,W) fake IR image
     Returns:
         out_FG_mask: (B,3,H,W) float {0,1}
         out_FG_FakeIR: (B,3,H,W) float
@@ -1152,15 +1208,16 @@ def get_FG_MergeMask(vis_gt,
         out_Light_BottomMask: (B,1,H,W) float {0,1}
     """
 
-    device = IR_seg_tensor.device
-    B, C, H, W = IR_seg_tensor.shape
-    fake_ir, fake_ni = fake_tn.split(3, dim=1)
+    device = fake_IR_seg_tensor.device
+    B, C, H, W = fake_IR_seg_tensor.shape
+    fake_T = fake_T * 0.5 + 0.5
+    real_D = real_D * 0.5 + 0.5
 
     # segmentation argmax on GPU
-    ir_seg = torch.argmax(IR_seg_tensor.detach(), dim=1).float().unsqueeze(1)  # (B,H,W)
+    ir_seg = torch.argmax(fake_IR_seg_tensor.detach(), dim=1).float().unsqueeze(1)  # (B,H,W)
 
-    vis_FG_idx_list = [6, 7, 17]
-    traffic_sign_list = [6, 7]
+    vis_FG_idx_list = [TRAFFICLIGHT, SIGN, MOTORCYCLE]
+    traffic_sign_list = [TRAFFICLIGHT, SIGN]
 
     IR_road_mask = (ir_seg < 2.0).float()
     IR_FG1_mask = (ir_seg > 10.0).float()
@@ -1173,9 +1230,10 @@ def get_FG_MergeMask(vis_gt,
     HL_Mask = torch.zeros((B, 1, H, W), device=device)
     Light_Top = torch.zeros((B, 1, H, W), device=device)
     Light_Bottom = torch.zeros((B, 1, H, W), device=device)
-    FG_FakeTN = torch.zeros((B, 6, H, W), device=device)
-    FG_RealVis = torch.zeros((B, 3, H, W), device=device)
+    FG_Fake_T = torch.zeros((B, 3, H, W), device=device)
+    FG_Real_D = torch.zeros((B, 3, H, W), device=device)
     valid = False
+    dict_res = {}
 
     for i, idx in enumerate(vis_FG_idx_list):
         temp_mask_ori = (vis_gt == idx).float()
@@ -1196,37 +1254,90 @@ def get_FG_MergeMask(vis_gt,
                 if area <= 50:
                     continue
                 valid = True
-                comp_mask = (labels[b] == comp_label).float()  # (1,H,W) Component mask from VIS GT
+                comp_mask = (labels[b] == comp_label).float().squeeze()  # (1,H,W) Component mask from VIS GT
                 if (comp_mask * IR_FG_mask[b]).sum().item() == 0:  # Overlap FG check
-                    fake_TN_masked = comp_mask * fake_tn[b]
-                    real_vis_masked = comp_mask * real_vis[b]
+                    fake_T_masked = comp_mask * fake_T[b]
+                    real_D_masked = comp_mask * real_D[b]
                     if idx in traffic_sign_list:  # traffic sign or light
-                        if idx == 6:  # traffic light
+                        if idx == TRAFFICLIGHT:  # traffic light
                             (temp_FG_Mask,
                              temp_FG_FakeIR,
                              temp_FG_RealVis,
                              temp_highlight_mask,
                              temp_TopMask,
                              temp_BottomMask) = (
-                                ObtainTLightMixedMask(comp_mask, fake_TN_masked, real_vis_masked, H))
+                                ObtainTLightMixedMask(comp_mask, fake_T_masked, real_D_masked, H))
+                            if temp_FG_Mask.sum() == 0:
+                                valid = False
+                                continue
+
                             FG_Mask[b] += temp_FG_Mask
-                            FG_FakeTN[b] += temp_FG_FakeIR
-                            FG_RealVis[b] += temp_FG_RealVis
+                            FG_Fake_T[b] += temp_FG_FakeIR
+                            FG_Real_D[b] += temp_FG_RealVis
                             HL_Mask[b] += temp_highlight_mask
                             Light_Top[b] += temp_TopMask
                             Light_Bottom[b] += temp_BottomMask
                         else:  # sign
                             FG_Mask[b] += comp_mask
-                            FG_FakeTN[b] += fake_TN_masked
-                            FG_RealVis[b] += real_vis_masked
+                            FG_Fake_T[b] += fake_T_masked
+                            FG_Real_D[b] += real_D_masked
                     else:
                         road_mask_prod = comp_mask * IR_road_mask[b]
                         IoU_th = 0.1 * area
                         if road_mask_prod.sum().item() > IoU_th:
                             FG_Mask[b] += comp_mask
-                            FG_FakeTN[b] += fake_TN_masked
-                            FG_RealVis[b] += real_vis_masked
+                            FG_Fake_T[b] += fake_T_masked
+                            FG_Real_D[b] += real_D_masked
 
-    return (valid, FG_Mask.repeat(1, 3, 1, 1), FG_FakeTN, FG_RealVis, HL_Mask.repeat(1, 3, 1, 1),
+    return (valid, FG_Mask.repeat(1, 3, 1, 1), FG_Fake_T * 2 - 1, FG_Real_D * 2 - 1, HL_Mask.repeat(1, 3, 1, 1),
             torch.cat([Light_Top, Light_Bottom], dim=1))
 # endregion -----------------------------------------------------
+
+
+class FG_memory(dict):
+    """
+    A simple dictionary-based memory bank for storing foreground patches.
+    Keys are strings, values are lists of tensors.
+    """
+    def __init__(self, inp: dict = None):
+        super(FG_memory, self).__init__({TRAFFICLIGHT: [], SIGN: [], MOTORCYCLE: []})
+        if inp is not None:
+            for k, v in inp.items():
+                self.add_patch(k, **v)
+
+    def __add__(self, other):
+        """Merge two FG_memory instances by concatenating their patch lists."""
+        result = FG_memory()
+        for key in self.keys():
+            result[key] = self[key] + other.get(key, [])
+        return result
+
+    def add_patch(self, key: int, **patch):
+        """Add a patch tensor to the list under the given key."""
+        if key not in self:
+            raise KeyError(f"Key {key} not in FG_memory.")
+        self[key].append(self.create_sample(key, **patch))
+
+    def get_random_patches(self, key: str):
+        """Retrieve the list of patches for the given key."""
+        return self.get(key, [])[np.random.randint(0, len(self.get(key, [])))] if len(self.get(key, [])) > 0 else None
+
+    def create_sample(self, key: int, T, D, highlight_mask=None, top_mask=None, bottom_mask=None):
+        """return an instance of Patches to be stored in memory."""
+        @dataclass
+        class Patch:
+            def __init__(self, T, D, highlight_mask=None, top_mask=None, bottom_mask=None):
+                self.T = T.detach()
+                self.D = D.detach()
+                self.highlight_mask = highlight_mask.detach() if highlight_mask is not None else None
+                self.top_mask = top_mask.detach() if top_mask is not None else None
+                self.bottom_mask = bottom_mask.detach() if bottom_mask is not None else None
+
+        if key == TRAFFICLIGHT:
+            assert highlight_mask is not None and top_mask is not None and bottom_mask is not None
+            return Patch(T, D, highlight_mask, top_mask, bottom_mask)
+        else:
+            return Patch(T, D)
+
+
+

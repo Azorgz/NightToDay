@@ -25,11 +25,11 @@ class FLIR(TrainDataset):
             if not 'laptop' in gethostname() else '/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/FLIR_datasets/crop.yaml'
         super().__init__(opt)
 
-    def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, **kwargs) -> Tensor:
+    def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, fac=1., **kwargs) -> Tensor:
         """
         Load an image from a given path and return it as a Tensor.
         """
-        image = ImageTensor(path[idx]) * 255 if seg else ImageTensor(path[idx])
+        image = ImageTensor(path[idx])**fac * 255 if seg else ImageTensor(path[idx])
         if crop and self.crop_xxyy:
             crop = self.crop_xxyy[idx]
             crop = crop[0]*500//640, crop[1]*500//640, crop[2]*400//512, crop[3]*400//512

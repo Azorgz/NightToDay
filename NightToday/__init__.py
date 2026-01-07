@@ -46,9 +46,7 @@ class FusConfig:
 
 @dataclass
 class GenConfig:
-    type: Literal['ResNet', 'ViT']
     downscaling: int
-    ViT_model: Literal['dinov3_vits16', 'dinov3_convnext_tiny']
     fus: FusConfig
     input_size: int | Tuple[int, int] = 256
     hidden_dim: int = 256

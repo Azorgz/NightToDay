@@ -98,7 +98,7 @@ class TrainDataset(Dataset):
         return max(len(self.train_D), len(self.train_T))
 
     def __getitem__(self, idx):
-        image_D = self.normalize(self.load_image(self.train_D, idx % len(self.train_D)))
+        image_D = self.normalize(self.load_image(self.train_D, idx % len(self.train_D), fac=1.1))
         image_T = self.normalize(self.load_image(self.train_T, idx % len(self.train_T), True).GRAY().RGB('gray'))
         image_N = self.normalize(self.load_image(self.train_N, idx % len(self.train_N), True))
         image_D_seg = (self.load_image(self.D_seg, idx % (len(self.D_seg) or 1), seg=True).to_tensor()).to(torch.uint8)

@@ -6,7 +6,7 @@ model:
   mode: 'train'  # 'train', 'test'
   build_from_checkpoint: False
   fusion_first: True
-  pedestrian_color: red
+  pedestrian_color: [black, red] # color of pedestrian in fake D images (color, contour)
 
   seg:
     num_classes: 19
@@ -20,10 +20,7 @@ model:
       updateGT_TN_start_epoch: 30
 
   gen:
-    type: ResNet # ViT, ResNet
     downscaling: 2
-    ViT_model: dinov3_vits16  #  dinov3_convnext_tiny, dinov3_vits16
-    # common
     input_size: 256
     hidden_dim: 384
     n_enc_layers: 4
@@ -74,25 +71,24 @@ training:
     D: [0.5, 0.999]
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
-    lambda_color: [[ 0,  ], 2.0]
+    lambda_color: [[ 0,  ], 1.5]
     lambda_id: [[ 0,  ], 1.0]
     lambda_cycle:  [[ 0,  ], 5.]
     lambda_ssim:  [[ 0,  ], 2.5]
     lambda_seg:  [[ 2], 2.5]
     lambda_semEdge:  [[ 0,  ], 1.5]
-    lambda_gan:  [[ 0,  ], 1.0]
+    lambda_gan:  [[ 0,  ], 2.0]
     lambda_tv:  [[ 0,  ], 5.]
     lambda_sga: [[ 40,  ], 0.5]
-    lambda_latent: [[ 0,  ], 2.0]
+    lambda_latent: [[ 0,  ], 0.0]
     lambda_att: [[ 40, ], 2.0]
     lambda_fus: [[ 0,  30], 2.0]
     lambda_acl: [[ 0,  ], 1.0]
     lambda_scale_robustness: [[ 0,  ], 2.5]
     lambda_mean_var: [[ 0,  ], 1.0]
-    lambda_milo: [[ 0,  ], 1.0]
+    lambda_tll: [[ 0,  ], 1.0]
     lambda_thermal: [[ 0,  ], 0.5]
-    lambda_sharpness: [[ 0,  ], 25.0]
-    lambda_scene_id: [[ 30,  ], 5.]
+    lambda_sharpness: [[ 0,  ], 5.0]
     lambda_cgr: [[ 0,  ], 1.0]  # Conditional Gradient Repair
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
 
