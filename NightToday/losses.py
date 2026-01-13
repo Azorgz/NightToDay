@@ -229,7 +229,7 @@ class GANLoss(nn.Module):
 #         MILO_err = ImageTensor(map_visualization(MILO_err))
 #         return MILO_err, MILO_mask
 
-def saturation_loss_color(fake_rgb, real_n, tau=0.05):
+def saturation_loss_color(fake_rgb, real_n, tau=0.1):
     """
     thermal: (B,1,H,W) normalized to [0,1]
     """
@@ -241,22 +241,20 @@ def saturation_loss_color(fake_rgb, real_n, tau=0.05):
     Sat_diff = torch.abs(hsv_real[:, 1] - hsv_fake[:, 1]).squeeze(1)
     S = F.relu(Sat_diff - tau)*1/5
     H = torch.sqrt((hsv_real[:, 0] - hsv_fake[:, 0]) ** 2 + 1e-6).squeeze(1)
-
     return (S * H * weight).sum() / (weight.sum() + 1e-6)
 
 
-def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, weights=None):
+def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, weights=None):
     """
     """
     # Normalize back to [0,1]
-    assert image_fake.shape == image_target.shape, "Input images must have the same dimensions."
-    im_fake = ImageTensor(image_fake * 0.5 + 0.5)
-    im_target = ImageTensor(image_target * 0.5 + 0.5)
+    assert fake_color.shape == real_color.shape, "Input images must have the same dimensions."
+    im_fake = ImageTensor(fake_color * 0.5 + 0.5)
+    im_target = ImageTensor(real_color * 0.5 + 0.5)
     B = im_fake.shape[0]
     # color distance function
     color_dist = im_fake.color_distance(im_target)  # shape (B,1,H,W) or (B,H,W)
     hsv_target = im_target.HSV()
-    hsv_fake = im_fake.HSV()
     color_magn = hsv_target[:, 1:2, :, :] * hsv_target[:, 2:3, :, :]
     target_l, target_ab = rgb_to_lab(im_target).split([1, 2], 1)  # L channel
     low_lum = target_l < th_low * 100
@@ -265,7 +263,7 @@ def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, 
     color_dist = color_dist * valid
     ssim_loss = SSIM_Loss(channel=3)(im_fake, im_target, full=True).mean(dim=1, keepdim=True) * (1 - low_lum * 1.)
     weights = weights[[CAR, TRUCK, BUILDING, MOTORCYCLE, SIGN, ROAD]].to(im_target.device) if weights is not None else \
-        torch.ones(6, device=image_fake.device)
+        torch.ones(6, device=fake_color.device)
     H, W = im_fake.shape[-2:]
     loss = torch.zeros([B, ], device=im_target.device)
 
@@ -276,8 +274,7 @@ def ColorLoss(image_fake, image_target, GT_seg=None, th_high=0.95, th_low=0.15, 
         # build masks in a single vectorized call
         # ------------------------------------------------------------
         # Class masks (exact value matches)
-        classes_eq = torch.tensor([CAR, TRUCK, BUILDING, MOTORCYCLE, SIGN], device=GT_seg.device).view(1, -1, 1,
-                                                                                                       1)  # shape (1,5,1,1)
+        classes_eq = torch.tensor([CAR, TRUCK, BUILDING, MOTORCYCLE, SIGN], device=GT_seg.device).view(1, -1, 1, 1)
 
         # Expand GT_seg to compare against all 5 classes at once
         mask_eq = (GT_seg == classes_eq).float()  # (B,5,H,W)
@@ -351,8 +348,6 @@ def ThermalLoss(image_fused, image_target, night_color, GT_seg, weights=None):
     sky_loss = torch.zeros([B, ], device=image_target.device)
     veg_loss = torch.zeros([B, ], device=image_target.device)
     person_loss = torch.zeros([B, ], device=image_target.device)
-    car_loss = torch.zeros([B, ], device=image_target.device)
-    blobs_loss = torch.zeros([B, ], device=image_target.device)
 
     #  Thermal correction losses
     sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[valid_sky]
@@ -362,8 +357,7 @@ def ThermalLoss(image_fused, image_target, night_color, GT_seg, weights=None):
 
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
-    # blobs_loss = TL_loss(image_target, night_color, image_fused, GT_resized).sum()
-    total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2] + car_loss * weights[3]) /
+    total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2]) /
             (weights * torch.stack([valid_sky, valid_veg, valid_person, valid_car], dim=-1).float()).sum(1)).mean()
 
     thermal_noise_loss = ThermalNoiseLoss()(image_fused).mean() * 2
@@ -402,36 +396,61 @@ def TL_fake_loss(D, f_T, GT_mask_D):
     return loss_tl
 
 
-def TL_color_loss(I_ir, I_vi, I_fused, GT_mask):
-    loss_tl = torch.zeros([I_ir.shape[0], ], device=I_ir.device)
-    mask_trafficlight = (GT_mask == TRAFFICLIGHT).float()
-    area_trafficlight = mask_trafficlight.sum(dim=[1, 2, 3])
-    valid_trafficlight = area_trafficlight > 50
-    if not valid_trafficlight.any():
-        return loss_tl
-    blobs = detect_TL_blobs_mask_free(I_vi*0.5+0.5, I_ir*0.5+0.5)
-    labels = connected_components(mask_trafficlight)
-    fake_TL = torch.zeros_like(GT_mask, device=GT_mask.device).float()
-    for i, val in enumerate(valid_trafficlight):
-        if val:
-            ir = (I_ir[i]*0.5+0.5).mean(0)
-            unique = labels[i].unique(return_counts=True)
-            for label, count in zip(unique[0], unique[1]):
-                if count > 10000 or count < 50:
-                    continue
-                else:
-                    size_scaler = (count // 50)
-                    mask_tl = (labels[i][None] == label).float()
-                    mask_dilated = dilation(mask_tl, torch.ones(5*size_scaler, 3*size_scaler, device=GT_mask.device)).squeeze()
-                    mask_tl = mask_tl.squeeze()
-                    contours = mask_dilated - mask_tl
-                    if (contours * I_ir[i]).mean() > (mask_tl * I_ir[i]).mean():
-                        fake_TL[i] += 1.02 * contours * ir + mask_tl*ir*0.98 - mask_dilated * blobs[i] * 0.9 * ir
-                    else:
-                        fake_TL[i] += 0.98 * contours * ir + mask_tl*ir*1.02 - mask_dilated * blobs[i] * 0.9 * ir
+def TL_color_loss(real_T, real_N, fused_TN, fake_D, GT_seg):
+    mask_tl = (GT_seg == TRAFFICLIGHT).float()
+    mask_tl = F.interpolate(mask_tl, size=real_T.shape[-2:], mode='nearest')
+    area_tl = mask_tl.sum(dim=[1, 2, 3])
+    valid_tl = area_tl > 50
+    if not valid_tl.any():
+        return torch.zeros([real_T.shape[0], ], device=real_T.device)
+    blobs = detect_TL_blobs_mask_free(real_N[valid_tl] * 0.5 + 0.5, real_T[valid_tl] * 0.5 + 0.5)
+    mask = blobs.mean(1, keepdim=True) > 0
+    mask_dilated = mask.clone().float()
+    blobs_labels = connected_components(mask.float())
+    uniques = blobs_labels.unique(return_counts=True)
+    for label, count in zip(uniques[0], uniques[1]):
+        if label == 0:
+            continue
+        if count < 500 or count > 10000:
+            radius = int(torch.sqrt(count / torch.pi)) * 2 + 1
+            mask_dilated += dilation((blobs_labels == label).float(), torch.ones(3*radius, radius, device=real_T.device))
+    mask_dilated = ((mask_dilated > 0) ^ mask).float()
+    loss_tl = ReLU()(mask * torch.sqrt((blobs - fake_D[valid_tl])**2 + 1e-6) - 1e-2).mean(dim=[1, 2, 3])
+    loss_tl += ReLU()(mask * torch.sqrt((mask_dilated*real_T[valid_tl] - mask_dilated*fused_TN[valid_tl])**2 + 1e-6) - 1e-2).mean(dim=[1, 2, 3])
+    loss_tl += TrafLighLumiLoss(fake_D, GT_seg, real_N, real_T)
+    return loss_tl
 
-    # --- Traffic Light reconstitution ---
-    return ReLU()(((fake_TL > 0) * (I_fused*0.5+0.5).mean(dim=1, keepdim=True) - fake_TL.clamp(0, 1)) ** 2).mean(dim=[1, 2, 3]).sum()
+
+# def TL_color_loss(I_ir, I_vi, I_fused, GT_mask):
+#     loss_tl = torch.zeros([I_ir.shape[0], ], device=I_ir.device)
+#     mask_trafficlight = (GT_mask == TRAFFICLIGHT).float()
+#     area_trafficlight = mask_trafficlight.sum(dim=[1, 2, 3])
+#     valid_trafficlight = area_trafficlight > 50
+#     if not valid_trafficlight.any():
+#         return loss_tl
+#     blobs = detect_TL_blobs_mask_free(I_vi*0.5+0.5, I_ir*0.5+0.5)
+#     labels = connected_components(mask_trafficlight)
+#     fake_TL = torch.zeros_like(GT_mask, device=GT_mask.device).float()
+#     for i, val in enumerate(valid_trafficlight):
+#         if val:
+#             ir = (I_ir[i]*0.5+0.5).mean(0)
+#             unique = labels[i].unique(return_counts=True)
+#             for label, count in zip(unique[0], unique[1]):
+#                 if count > 10000 or count < 50:
+#                     continue
+#                 else:
+#                     size_scaler = (count // 50)
+#                     mask_tl = (labels[i][None] == label).float()
+#                     mask_dilated = dilation(mask_tl, torch.ones(5*size_scaler, 3*size_scaler, device=GT_mask.device)).squeeze()
+#                     mask_tl = mask_tl.squeeze()
+#                     contours = mask_dilated - mask_tl
+#                     if (contours * I_ir[i]).mean() > (mask_tl * I_ir[i]).mean():
+#                         fake_TL[i] += 1.02 * contours * ir + mask_tl*ir*0.98 - mask_dilated * blobs[i] * 0.9 * ir
+#                     else:
+#                         fake_TL[i] += 0.98 * contours * ir + mask_tl*ir*1.02 - mask_dilated * blobs[i] * 0.9 * ir
+#
+#     # --- Traffic Light reconstitution ---
+#     return ReLU()(((fake_TL > 0) * (I_fused*0.5+0.5).mean(dim=1, keepdim=True) - fake_TL.clamp(0, 1)) ** 2).mean(dim=[1, 2, 3]).sum()
 
 
 def create_fake_TL(I_ir, I_vis, mask):
@@ -527,7 +546,7 @@ def determine_color(TL_vis):
 
 
 class SharpFusionLoss(torch.nn.Module):
-    def __init__(self, lam_grad=4.5, lam_lap=3.7, lam_contrast=2.5, lam_freq=1.7):
+    def __init__(self, lam_grad=6.0, lam_lap=4.0, lam_contrast=2.0, lam_freq=1.7):
         super().__init__()
         self.lam_grad = lam_grad
         self.lam_lap = lam_lap
@@ -573,7 +592,7 @@ class SharpFusionLoss(torch.nn.Module):
         # -------- Gradient Loss --------
         G_f = sobel(I_f).abs()
         G_vi = sobel(I_vi).abs()
-        G_ir = sobel(I_ir).abs()
+        G_ir = sobel(I_ir).abs() * 1.5
         G_ref = torch.max(G_vi, G_ir)
         L_grad = F.l1_loss(G_f, G_ref)
 

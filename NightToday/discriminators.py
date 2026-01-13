@@ -8,6 +8,17 @@ from .modules import SNConv2d
 from .utilities import gkern_2d
 
 
+class TemporalDiscriminator(nn.Module):
+    def __init__(self, input_nc, base_dim=64, n_layers=3, norm_layer=nn.InstanceNorm2d):
+        super(TemporalDiscriminator, self).__init__()
+        self.model = NLayerDiscriminatorSN(input_nc * 2, base_dim, n_layers, norm_layer)
+
+    def forward(self, x1, x2):
+        x = torch.cat([x1, x2], dim=1)
+        outs = self.model(x)
+        return outs
+
+
 class NLayerDiscriminatorSN(nn.Module):
     def __init__(self, input_nc, base_dim=64, n_layers=3, norm_layer=nn.InstanceNorm2d):
         super(NLayerDiscriminatorSN, self).__init__()

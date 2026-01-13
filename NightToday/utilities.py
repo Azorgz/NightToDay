@@ -13,6 +13,7 @@ from skimage.morphology import disk
 from torch import nn, Tensor
 from torch.nn.functional import conv2d
 from torchvision.transforms.functional import gaussian_blur
+from torchvision.transforms.v2 import GaussianBlur
 
 ROAD = 0
 PAVEMENT = 1
@@ -445,43 +446,65 @@ def center_of_mass(img):
 
 def detect_TL_blobs_mask_free(I_vi, I_ir):
     # ---- Luminance ----
+    colors = {0: torch.tensor([1, 0.1, 0], device=I_vi.device),
+              1: torch.tensor([0., 1, 0.6], device=I_vi.device),
+              2: torch.tensor([1, 0.5, 0], device=I_vi.device)}
     scale = I_ir.shape[-2] / 256
-    R = 1. * I_vi[:, 0:1] - 0.75 * I_vi[:, 1:2] - 0.75 * I_vi[:, 2:3]
-    G = 1. * I_vi[:, 1:2] - 2 * I_vi[:, 0:1] + 0.5 * I_vi[:, 2:]
-    B = -0.75 * I_vi[:, 0:1] + 0.25 * I_vi[:, 1:2] + 1 * I_vi[:, 2:3]
-    IR = I_ir.mean(1, keepdim=True).clamp(0, 0.7) / 0.7
-    C_intensity = torch.max(torch.max(R, G), B)
-    C_intensity = (C_intensity - C_intensity.min()) / (C_intensity.max() - C_intensity.min() + 1e-6)
-    c_maps = I_vi * C_intensity
-    c_maps = (c_maps * c_maps.std(1, keepdim=True)) ** 2
-    C_intensity = (c_maps - c_maps.min()) / (c_maps.max() - c_maps.min() + 1e-6)
-    Y = I_vi.mean(1, keepdim=True) * (I_vi.std(1, keepdim=True) < 0.05)
-    criterion = C_intensity.mean() + C_intensity.std() * 5
+    vi_squared = I_vi ** 2
+    R = 1.25 * vi_squared[:, 0:1] - 1. * vi_squared[:, 1:2] - 0.5 * vi_squared[:, 2:3]
+    G = 0.75 * vi_squared[:, 1:2] - 1.75 * vi_squared[:, 0:1] + 0.75 * vi_squared[:, 2:3]
+    O = 1.1 * vi_squared[:, 0:1] - 0.1 * vi_squared[:, 1:2] - 2. * vi_squared[:, 2:3]
+    C_intensity, color_idx = torch.max(torch.cat([R, G, O], dim=1), dim=1, keepdim=True)
+    C_intensity = C_intensity * (C_intensity > 0.1)
 
+    # C_intensity = I_vi * C_intensity
+    Y = I_vi.mean(1, keepdim=True) * (C_intensity == 0)
+    criterion = C_intensity.mean() + C_intensity.std() * 2 + 0.01
     # ---- Blobs mapping ----
-    M = (Y * IR > min((Y.mean() + 2 * Y.std(), 0.80))).float()
+    #  case where the center of the blob is saturated
+    M = (fill_holes((Y==0).float()) - (Y == 0).float()) * (Y > Y[Y>0].mean())
+    # M = (Y * I_ir.mean(1, keepdim=True) > min((Y.mean(), 0.80))).float()
+    M_color = I_vi * 0
     labels = connected_components(M)
     # ---- Saturation enclosure ----
-    uniques = labels.unique(return_counts=True)
-    kernel_ring = torch.from_numpy(disk(9)).to(device=I_vi.device).float()
-    kernel_ring_small = torch.from_numpy(disk(1)).to(device=I_vi.device).float()
-    for i, (uni, count) in enumerate(zip(*uniques)):
-        mask = (labels == uni).float()
-        if uni == 0:
-            continue
-        elif count < 10 or count > 250*scale:
-            M = M - mask
-            continue
-        mask_ = dilation(mask, kernel=kernel_ring_small)
-        surrounding = dilation(mask_, kernel=kernel_ring) - mask_
-        mean_sat = ((C_intensity * surrounding).sum()) / (surrounding.sum() + 1e-6)
-        if mean_sat < criterion:
-            M = M - mask
+    for B, label in enumerate(labels):
+        label = label.unsqueeze(0)
+        uniques = label.unique(return_counts=True)
+        for i, (uni, count) in enumerate(zip(*uniques)):
+            mask = (label == uni).float()
+            if uni == 0:
+                continue
+            elif count < 10 or count > 500 * scale:
+                M = M - mask
+                continue
+            size = min(int(torch.sqrt(count / np.pi / scale).cpu().numpy()), 11) * 2 + 1
+            kernel_ring = torch.from_numpy(disk(size)).to(device=I_vi.device).float()
+            kernel_ring_small = torch.from_numpy(disk(max(size//4, 1))).to(device=I_vi.device).float()
+            mask_ = dilation(mask, kernel=kernel_ring_small)
+            surrounding = dilation(mask_, kernel=kernel_ring) - mask_
+            mean_sat = ((C_intensity[B][None] * surrounding).sum()) / (surrounding.sum() + 1e-6)
+            if mean_sat < criterion:
+                M = M - mask
+            else:
+                # only keep the disk shaped blobs
+                cx, cy = center_of_mass(mask)
+                radius = torch.sqrt(count / np.pi)
+                grid_y, grid_x = torch.meshgrid(
+                    torch.linspace(0, M.shape[-2] - 1, M.shape[-2], device=I_vi.device),
+                    torch.linspace(0, M.shape[-1] - 1, M.shape[-1], device=I_vi.device),
+                    indexing='ij'
+                )
+                dist_map = torch.sqrt((grid_x - cx) ** 2 + (grid_y - cy) ** 2)
+                disk_mask = dist_map <= radius * 1.5
+                if (mask - mask * disk_mask).sum() != 0:
+                    continue  # not disk enough
+                surroundings_mask = (C_intensity[B][None] * surrounding) > 0
+                color_idx_blob = torch.bincount((surroundings_mask[surroundings_mask] * color_idx[B][None][surroundings_mask]).to(torch.int)).argmax()
+                color = colors[int(color_idx_blob)]
+                M_color[B, :, int(cy), int(cx)] = count * color * 1.4142
 
-    # ---- Intensity cleaning ----
-    M = M * IR > F.interpolate(nn.AvgPool2d(11, padding=5)(I_ir.mean(1, keepdim=True)), I_ir.shape[-2:])*0.75 # keep only bright areas in IR
-
-    return M
+    color_blur = GaussianBlur(kernel_size=25, sigma=1.6)(M_color).clamp(0, 1)
+    return M * color_blur
 
 
 def detect_hotpoint_blob(I_vi, M_tl, contrast_k=0.98, sigma_ratio=0.20):
@@ -1158,15 +1181,14 @@ def getLightDarkRegionMean(cls_idx, fake, input_mask, real_T, real_N):
     light_region_area = Light_mask.sum(dim=[1, 2, 3])
     valid_mask = light_region_area > 1
     if valid_mask.any():
-        "In order to avoid that the bright and dark regions cannot be divided, the threshold is set to 1."
-        Light_region = (ref_img_gray * real_img_gray * Light_mask.detach())[valid_mask]
+        Light_region = (ref_img_gray * Light_mask.detach())[valid_mask]
         Light_region_mean = Light_region.sum(dim=[1, 2, 3]) / light_region_area[valid_mask]
-
-        Light_region_filling_one = Light_region + 1 - Light_mask[valid_mask]
-        Light_Dark_Region_Mask = Light_region_filling_one < Light_region_mean
+        Light_region_color = (real_img_gray * Light_mask.detach())[valid_mask]
+        Light_region_color_mean = Light_region_color.sum(dim=[1, 2, 3]) / light_region_area[valid_mask]
+        # Light_region_filling_one = Light_region + 1 - Light_mask[valid_mask]
+        Light_Bright_Region_Mask = (Light_region >= Light_region_mean) * (Light_region_color >= Light_region_color_mean).float()
+        Light_Dark_Region_Mask = Light_mask[valid_mask] - Light_Bright_Region_Mask
         Light_Dark_Region_Mean = (Light_Dark_Region_Mask * fake_gray[valid_mask]).sum(dim=[1, 2, 3]) / Light_Dark_Region_Mask.sum(dim=[1, 2, 3])
-
-        Light_Bright_Region_Mask = Light_mask[valid_mask] - Light_Dark_Region_Mask
 
         # Light Bright region min
         Light_BR_filling_one = Light_Bright_Region_Mask * fake_gray[valid_mask] + 1 - Light_Bright_Region_Mask

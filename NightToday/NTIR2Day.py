@@ -13,6 +13,7 @@ Image-to-Image Generative Adversarial Transformer (Dual-Stream)
 
 Usage: open this file in the editor and adapt patch sizes / transformer sizes to your input resolution.
 """
+import math
 import os
 from collections import OrderedDict
 from functools import partial
@@ -30,7 +31,7 @@ from . import get_config
 from . import OptImage2ImageGATConfig
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
-    ThermalLoss, SharpFusionLoss, TL_fake_loss
+    ThermalLoss, SharpFusionLoss, TL_fake_loss, TL_color_loss
 from .modules import LossScheduler, Get_gradmag_gray
 from .plexers import G_Plexer, D_Plexer, S_Plexer
 from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_FG_MergeMask
@@ -79,8 +80,11 @@ class Image2ImageGAT_Dual(nn.Module):
         # region Train parameters, criterion and losses
         if self.mode == 'train' and trainable:
             p_color = self.opt.model.pedestrian_color
-            self.pedestrian_color = (Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[0]])) if p_color is not None else None,
-                                     Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[1]])) if p_color is not None else None)
+            if isinstance(p_color, str):
+                self.pedestrian_color = (Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[0]])),
+                                         Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[1]])))
+            else:
+                self.pedestrian_color = (None, None)
             self.checkpoint_dir = self.opt.training.checkpoint_dir
             os.makedirs(self.checkpoint_dir, exist_ok=True)
             self.visualize_dir = self.opt.training.visualize_dir
@@ -126,6 +130,7 @@ class Image2ImageGAT_Dual(nn.Module):
             self.criterion_IRClsDis = FakeIRPersonLoss
             self.criterion_bc = BiasCorrLoss
             self.criterion_tll = TL_fake_loss
+            self.criterion_tlc = TL_color_loss
 
             # Losses storage
             self.initialize_losses()
@@ -280,7 +285,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'loss_milo', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_thermal', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_sharpness', {k: 0. for k in self.names_domains})
-        setattr(self, 'loss_tll', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_trafficlight', {k: 0. for k in self.names_domains})
 
     def set_pedestrians_color(self):
         if self.pedestrian_color[0] is None:
@@ -300,12 +305,58 @@ class Image2ImageGAT_Dual(nn.Module):
     @torch.no_grad()
     def forward(self, thermal, night, return_fused_IR=False, align_first=True):
         thermal, night = thermal * 2 - 1, night * 2 - 1
-        encoded_TN, fused_IR, *_ = self.netG.encode(thermal, night,
-                                                    from_=self.T, align_first=align_first, epoch=self.epoch)
-        fake_D = self.netG.decode(encoded_TN, to_=self.D)
+        split_thermal, masks = self.split(thermal, patch_size=256)
+        split_night, _ = self.split(night, patch_size=256)
+        encoded_TN, fused_IR, *_ = self.netG.encode(split_thermal, split_night, from_=self.T, align_first=align_first)
+        split_fake_D = self.netG.decode(encoded_TN, to_=self.D)
+        fake_D = self.merge(split_fake_D, masks)
         if return_fused_IR:
             return fake_D * 0.5 + 0.5, fused_IR * 0.5 + 0.5
         return fake_D * 0.5 + 0.5
+
+    @torch.no_grad()
+    def split(self, img, patch_size=256):
+        h, w = img.shape[-2:]
+        mask = 0 * img[:, 0, :, :]
+        n_patch_h = h // patch_size + int(h % patch_size != 0)
+        overlap_h = (n_patch_h * patch_size - h) // (n_patch_h - 1)
+        n_patch_w = w // patch_size + int(w % patch_size != 0)
+        overlap_w = (n_patch_w * patch_size - w) // (n_patch_w - 1)
+
+        patch_list = []
+        mask_list = []
+        j_ = 0
+        i_ = 0
+        for j in range(n_patch_h):
+            j0 = j_ * 1.
+            j1 = j0 + patch_size
+            j_ = min(j_ + patch_size - overlap_h, h)
+            j_ = j_ if j_ + patch_size <= h else h - patch_size
+
+            for i in range(n_patch_w):
+                i0 = i_ * 1.
+                i1 = i0 + patch_size
+                i_ = min(i_ + patch_size - overlap_w, w)
+                i_ = i_ if i_ + patch_size <= w else w - patch_size
+                patch_list.append(img[..., j0:j1, i0:i1])
+                m = mask.clone()
+                m[..., j0:j1, i0:i1] = 1.
+                mask_list.append(m)
+        masks = torch.stack(mask_list, dim=1)
+        masks_normed = masks / (masks.sum(dim=1, keepdim=True) + 1e-6)
+
+        return torch.cat(patch_list, dim=0), masks_normed
+
+    @torch.no_grad()
+    def merge(self, patches, masks):
+        b, n, h, w = masks.shape
+        masks = masks[:, :, None].repeat(1, 1, patches.shape[1], 1, 1)
+        output = torch.zeros_like(masks, device=masks.device).repeat(1, patches.shape[1], 1, 1)
+        for i in range(n):
+            valid = masks[:, i] > 0
+            output[valid] = masks[:, i][valid] * patches[i // b, :, :, :][valid]
+
+        return output
 
     # endregion
 
@@ -353,21 +404,13 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region GAN loss
         """D_T(G_T(D))"""
-        self.fake_TN = self.netG.decode(encoded_D, to_=self.T)
-        self.fake_T, self.fake_N = (self.fake_TN[:, :3], self.fake_TN[:, 3:]) if not self.opt.model.fusion_first else (
-            self.fake_TN, None)
-        # self.fake_T = self.netG.fusion.thermal_preprocess(self.fake_T)
+        self.fake_T = self.netG.decode(encoded_D, to_=self.T)
+        self.fake_T = self.netG.fusion.thermal_preprocess(self.fake_T)
         self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.remapped_T,
                                                  self.pred_real_T, self.fake_T, False, loss_name='G')
         """D_N(G_N(T))"""
-        if self.fake_N is not None:
-            self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.N), self.real_N,
-                                                     self.pred_real_N, self.fake_N, False, loss_name='G')
-        else:
-            self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.remapped_T,
-                                                     self.pred_real_T,
-                                                     self.real_TN if self.fake_N is None else self.fake_N
-                                                     , False, loss_name='G')
+        self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.remapped_T,
+                                                     self.pred_real_T, self.real_TN, False, loss_name='G')
         """D_D(G_D(T))"""
         self.fake_D = self.netG.decode(encoded_TN, to_=self.D)
         self.loss_G[self.D] += self.compute_loss('gan', partial(self.netD, from_=self.D), self.real_D,
@@ -376,20 +419,14 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Cycle loss
         #  Forward
-        if self.fake_N is not None:
-            rec_encoded_D, *_ = self.netG.encode(self.fake_T, self.fake_N, from_=self.T)
-        else:
-            rec_encoded_D = self.netG.encode(self.fake_T, from_=self.T)
+        rec_encoded_D = self.netG.encode(self.fake_T, from_=self.T)
         self.rec_D = self.netG.decode(rec_encoded_D, self.D)
         self.loss_cycle[self.D] += self.compute_loss('cycle', self.rec_D, self.real_D)
         # Backward
         rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
         self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
-        self.rec_T, self.rec_N = (self.rec_TN[:, :3], self.rec_TN[:, 3:]) if self.rec_TN.shape[1] == 6 else (
-            self.rec_TN, None)
+        self.rec_T = self.rec_TN
         self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.real_TN, loss_name='cycle')
-        if self.rec_N is not None:
-            self.loss_cycle[self.N] += self.compute_loss('cycle', self.rec_N, self.real_N, loss_name='cycle')
         # endregion
 
         # region Fusion Loss
@@ -409,8 +446,7 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Total Variation loss
         self.loss_tv[self.T] += self.compute_loss('tv', self.fake_T)
-        self.loss_tv[self.N] += self.compute_loss('tv', self.real_TN) if self.fake_N is None else (
-            self.compute_loss('tv', self.fake_N))
+        self.loss_tv[self.N] += self.compute_loss('tv', self.real_TN)
         self.loss_tv[self.D] += self.compute_loss('tv', self.fake_D)
         # endregion
 
@@ -425,7 +461,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                    criterion_lambda='ssim', loss_name='sga')
         self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, self.fake_T, self.real_D,
                                                    self.rec_D, self.edges_D, self.get_gradmag(self.fake_T),
-                                                   criterion_lambda='ssim', loss_name='sga')
+                                                   criterion_lambda='bc', loss_name='sga')
         self.loss_sga[self.T] += self.compute_loss('sga', self.get_gradmag(self.real_TN), self.get_gradmag(self.fake_D))
         self.loss_sga[self.T] += self.compute_loss('IRClsDis', self.segMask_TN_update if
         self.segMask_TN_update is not None else self.segMask_TN,
@@ -477,7 +513,11 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region ACL
-        # self.loss_tll[self.T] = self.compute_loss('tll', self.real_D, self.fake_T, self.segMask_D)
+        # self.loss_trafficlight[self.D] = self.compute_loss('tll', self.real_D, self.fake_T, self.segMask_D,
+        #                                           loss_name='trafficlight', criterion_lambda='trafficlight')
+        self.loss_trafficlight[self.T] = self.compute_loss('tlc', self.real_T, self.real_N,
+                                                           self.real_TN, self.fake_D, self.segMask_TN_update,
+                                                  loss_name='trafficlight', criterion_lambda='trafficlight')
 
         # if self.netS.stage in ['update_TN', 'trained']: #'update_TN',
         #     fake_D_Mask = interpolate(self.segMask_D_update.float(), size=self.input_size, mode='bilinear')
@@ -535,15 +575,9 @@ class Image2ImageGAT_Dual(nn.Module):
                                                      weights=self.class_weight)
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
+
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
-        # endregion
-
-        # region Perception Loss (MILO)
-        # mask_wo_sign_wo_road = (self.segMask_TN_update!=0) * (self.segMask_TN_update!=7) \
-        #     if self.segMask_TN_update is not None else None
-        # self.loss_milo[self.T] += self.compute_loss('milo', self.real_TN, self.real_T, mask_wo_sign_wo_road)
-        # self.loss_milo[self.D] += self.compute_loss('milo', self.rec_D, self.real_D)
         # endregion
 
         # combined loss
@@ -576,7 +610,7 @@ class Image2ImageGAT_Dual(nn.Module):
             real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
             # real_T_s = interpolate(self.remapped_T, size=rand_size, mode='bilinear', align_corners=False)
             real_TN_s = interpolate(self.real_TN, size=rand_size, mode='bilinear', align_corners=False)
-            fake_TN_s = interpolate(self.fake_TN, size=rand_size, mode='bilinear', align_corners=False)
+            fake_TN_s = interpolate(self.fake_T, size=rand_size, mode='bilinear', align_corners=False)
             fake_D_s = interpolate(self.fake_D, size=rand_size, mode='bilinear', align_corners=False)
 
             if stage == 'train':

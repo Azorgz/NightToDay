@@ -4,27 +4,27 @@ model:
   name: 'NightToday'
   names_domains: ['Day', 'Thermal', 'Night']
   mode: 'train'  # 'train', 'test'
-  build_from_checkpoint: False
+  build_from_checkpoint: True
   fusion_first: True
-  pedestrian_color: [black, red] # color of pedestrian in fake D images (color, contour)
+  pedestrian_color: null #[black, red] # color of pedestrian in fake D images (color, contour)
 
   seg:
     num_classes: 19
-    type: 'LETNet'  # 'Segmentor'
+    type: 'Segmentor'#  'LETNet'  # 'Segmentor'
     base_dim: 64
     n_layers: 4
     training_schedule:
-      start_epoch: 5
+      start_epoch: 0
       end_epoch: 75
-      updateGT_D_start_epoch: 20
-      updateGT_TN_start_epoch: 30
+      updateGT_D_start_epoch: 5
+      updateGT_TN_start_epoch: 15
 
   gen:
     downscaling: 2
     input_size: 256
-    hidden_dim: 384
+    hidden_dim: 256
     n_enc_layers: 4
-    n_shared_layers: 2
+    n_shared_layers: 0
     n_dec_layers: 5
     dropout: 0.0
     fus:
@@ -49,7 +49,7 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 50
+  start_epoch: 75
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -71,25 +71,25 @@ training:
     D: [0.5, 0.999]
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
-    lambda_color: [[ 0,  ], 1.5]
-    lambda_id: [[ 0,  ], 1.0]
+    lambda_color: [[ 2,  ], 3.5]
+    lambda_id: [[ 0, 10  ], 1.0]
     lambda_cycle:  [[ 0,  ], 5.]
-    lambda_ssim:  [[ 0,  ], 2.5]
-    lambda_seg:  [[ 2], 2.5]
-    lambda_semEdge:  [[ 0,  ], 1.5]
-    lambda_gan:  [[ 0,  ], 2.0]
+    lambda_ssim:  [[ 2,  ], 2.5]
+    lambda_seg:  [[ 0, ], 2.5]
+    lambda_semEdge:  [[ 0,  ], 10.5]
+    lambda_gan:  [[ 0,  ], 2.5]
     lambda_tv:  [[ 0,  ], 5.]
     lambda_sga: [[ 40,  ], 0.5]
-    lambda_latent: [[ 0,  ], 0.0]
-    lambda_att: [[ 40, ], 2.0]
-    lambda_fus: [[ 0,  30], 2.0]
+    lambda_latent: [[ 0, 10  ], 0.0]
+    lambda_att: [[ 40, ], 1.0]
+    lambda_fus: [[ 0,  2], 0.2]
     lambda_acl: [[ 0,  ], 1.0]
-    lambda_scale_robustness: [[ 0,  ], 2.5]
-    lambda_mean_var: [[ 0,  ], 1.0]
-    lambda_tll: [[ 0,  ], 1.0]
-    lambda_thermal: [[ 0,  ], 0.5]
-    lambda_sharpness: [[ 0,  ], 5.0]
-    lambda_cgr: [[ 0,  ], 1.0]  # Conditional Gradient Repair
+    lambda_scale_robustness: [[ 20,  ], 2.5]
+    lambda_trafficlight: [[ 0,  ], 0.2]
+    lambda_thermal: [[ 1,  ], 2.5]
+    lambda_sharpness: [[ 0,  ], 20.0]
+    lambda_cgr: [[ 5,  ], 2.0]  # Conditional Gradient Repair
+    lambda_bc: [[ 5,  ], 2.0]  # Bias correction Loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
 
 data:
@@ -103,12 +103,8 @@ data:
       sampling: 1
       augmentations:
         hflip: True
-    - name: 'LYNRED'
-      sampling: 1
-      augmentations:
-        hflip: True
-#    - name: 'Lynred_reg'
-#      sampling: 0.5
+#    - name: 'LYNRED'
+#      sampling: 1
 #      augmentations:
 #        hflip: True
   test_datasets:

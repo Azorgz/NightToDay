@@ -5,8 +5,8 @@ from kornia.color import rgb_to_lab, lab_to_rgb
 from torch import nn
 import torch.nn.functional as F
 
-from NightToday import SchedulerConfig
-from NightToday.utilities import power_iteration, get_norm_layer
+from . import SchedulerConfig
+from .utilities import power_iteration
 
 
 # ------------------------ Modules ------------------------ #

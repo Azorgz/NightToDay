@@ -9,10 +9,9 @@ Includes:
 import torch
 from torch import nn
 
-from NightToday.Fusion import SimpleCondViT
-from NightToday.modules import LABToRGB_dEmbed, TransformerDecoderBlock, CrossAttentionFusion, TransformerEncoderBlock, \
+from .modules import LABToRGB_dEmbed, TransformerDecoderBlock, CrossAttentionFusion, TransformerEncoderBlock, \
     RGBToLAB_Embed, PatchEmbed, ResnetBlock, FeaturesFusionModule, Upsample, SmoothLayer
-from NightToday.utilities import get_norm_layer
+from .utilities import get_norm_layer
 
 
 class TransformerEncoderDual(nn.Module):

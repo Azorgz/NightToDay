@@ -305,7 +305,6 @@ class SimpleCondViT(nn.Module):
 #
 #         return x
 
-
 class U_ResNetFusion(nn.Module):
     """
     Simple ResNet-based fusion module to combine two feature maps.

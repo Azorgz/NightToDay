@@ -1,4 +1,5 @@
 #### PLEXERS
+import os
 from os.path import isfile
 from typing import Literal
 
@@ -60,11 +61,7 @@ class Plexer(nn.Module):
 
     def apply(self, func):
         for net in self.networks:
-            if hasattr(net, 'patch_encoder'):
-                patch_encoder = net.patch_encoder
             net.apply(func)
-            if hasattr(net, 'patch_encoder'):
-                net.patch_encoder = patch_encoder
 
     def init_optimizers(self, opt, lr, betas):
         if self.split_optimizers:
@@ -254,7 +251,8 @@ class S_Plexer(Plexer):
 
         self.networks = [model(*model_arg) for model_arg in model_args]
         self.names = [f'S_{dom}' for dom in self.names_domains]
-        self.apply(weights_init)
+        for net, name in zip(self.networks, self.names):
+            net.load_state_dict(torch.load(os.getcwd() + f'/checkpoints/{name}.pth'), strict=False)
         self.to(self.device)
         self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_S, betas=training_cfg.betas_D)
         self.freeze = True
