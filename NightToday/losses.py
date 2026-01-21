@@ -271,21 +271,20 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
 
         # average batch
         loss += sum_losses
-        # sky blueness constraint
-        fake_sky_region = fake_color * (GT_seg == SKY)
-        area_sky = fake_sky_region.sum(dim=[1, 2, 3])
-        sky_color_mean = fake_sky_region.sum(dim=[-1, -2]) / (area_sky + 1e-6)
-        loss += (torch.relu(sky_color_mean[:, 1] - sky_color_mean[:, 2] + 0.1)
-                            + torch.relu(sky_color_mean[:, 0] - sky_color_mean[:, 2] + 0.1))
-        # vegetation greenness constraint
-        veg_region = fake_color * (GT_seg == VEG)
-        area_veg = veg_region.sum(dim=[1, 2, 3])
-        veg_color_mean = veg_region.sum(dim=[-1, -2]) / (area_veg + 1e-6)
-        loss += (torch.relu(veg_color_mean[:, 0] - veg_color_mean[:, 1] + 0.3)
-                 + torch.relu(veg_color_mean[:, 2] - veg_color_mean[:, 1] + 0.1))
-        # sky highluminance constraint
-        loss += torch.relu(veg_region.mean(dim=[1, 2, 3])[0] -
-                           (fake_sky_region + 1 - (GT_seg == SKY).float()).mean(dim=1).flatten(1).min(dim=1)[0])
+        # # sky blueness constraint
+        # fake_sky_region = fake_color * (GT_seg == SKY)
+        # area_sky = fake_sky_region.sum(dim=[1, 2, 3])
+        # sky_color_mean = fake_sky_region.sum(dim=[-1, -2]) / (area_sky + 1e-6)
+        # loss += torch.relu(sky_color_mean[:, 0] - sky_color_mean[:, 2] + 0.1) * 0.2
+        # # vegetation greenness constraint
+        # veg_region = fake_color * (GT_seg == VEG)
+        # area_veg = veg_region.sum(dim=[1, 2, 3])
+        # veg_color_mean = veg_region.sum(dim=[-1, -2]) / (area_veg + 1e-6)
+        # loss += (torch.relu(veg_color_mean[:, 0] - veg_color_mean[:, 1] + 0.1)
+        #          + torch.relu(veg_color_mean[:, 2] - veg_color_mean[:, 1])) * 0.2
+        # # sky highluminance constraint
+        # loss += torch.relu(veg_region.mean(dim=[1, 2, 3])[0] -
+        #                    (fake_sky_region + 1 - (GT_seg == SKY).float()).mean(dim=1).flatten(1).min(dim=1)[0]) * 0.2
     else:
         loss = (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
     loss += saturation_loss_color(im_fake * high_color_mask, im_target * high_color_mask) * 0.5

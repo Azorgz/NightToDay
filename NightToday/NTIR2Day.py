@@ -858,28 +858,29 @@ class Image2ImageGAT_Dual(nn.Module):
 
             TL_D_ = TL_D_ ** (torch.rand(1).item() * 0.4 + 0.8)
             T[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_T_
+            N[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_N_
             D[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_D_
             segMask_TN[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 6
 
-            y1_N = y + TL_N_.shape[-2] // 2
-            x1_N = x + TL_N_.shape[-1] // 2
-            x0_N = x1_N - TL_N_.shape[-1]
-            y0_N = y1_N - TL_N_.shape[-2]
-            real = N[:, :, y0_N:y1_N, x0_N:x1_N]
-            if TL_T.shape[-1] != TL_N_.shape[-1]:
-                mask_ori = torch.zeros_like(TL_N_[:, :1])
-                mask_ori[:, :, TL_N_.shape[-2] // 2 - TL_T_.shape[-2] // 2:TL_N_.shape[-2] // 2 + TL_T_.shape[-2] // 2,
-                TL_N_.shape[-1] // 2 - TL_T_.shape[-1] // 2:TL_N_.shape[-1] // 2 + TL_T_.shape[-1] // 2] = 1.0
-            else:
-                mask_ori = torch.ones_like(TL_N_[:, :1])
-            TL_N_mean = (TL_N_.mean(1, keepdim=True) * mask_ori).sum(dim=[1, 2, 3]) / mask_ori.sum()
-            C_intensity = TL_N_.max(1, keepdim=True)[0] - TL_N_.min(1, keepdim=True)[0]
-            mask = (TL_N_.mean(1, keepdim=True) + mask_ori + C_intensity).max(1, keepdim=True)[0].clamp(0, 1)
-            N[:, :, y0_N:y1_N, x0_N:x1_N] = TL_N_ * mask + real * (1 - mask)
-            contour_mask[:, :, y0_N:y1_N, x0_N:x1_N] = 1
+            # y1_N = y + TL_N_.shape[-2] // 2
+            # x1_N = x + TL_N_.shape[-1] // 2
+            # x0_N = x1_N - TL_N_.shape[-1]
+            # y0_N = y1_N - TL_N_.shape[-2]
+            # real = N[:, :, y0_N:y1_N, x0_N:x1_N]
+            # if TL_T.shape[-1] != TL_N_.shape[-1]:
+            #     mask_ori = torch.zeros_like(TL_N_[:, :1])
+            #     mask_ori[:, :, TL_N_.shape[-2] // 2 - TL_T_.shape[-2] // 2:TL_N_.shape[-2] // 2 + TL_T_.shape[-2] // 2,
+            #     TL_N_.shape[-1] // 2 - TL_T_.shape[-1] // 2:TL_N_.shape[-1] // 2 + TL_T_.shape[-1] // 2] = 1.0
+            # else:
+            #     mask_ori = torch.ones_like(TL_N_[:, :1])
+            # TL_N_mean = (TL_N_.mean(1, keepdim=True) * mask_ori).sum(dim=[1, 2, 3]) / mask_ori.sum()
+            # C_intensity = TL_N_.max(1, keepdim=True)[0] - TL_N_.min(1, keepdim=True)[0]
+            # mask = (TL_N_.mean(1, keepdim=True) + mask_ori + C_intensity).max(1, keepdim=True)[0].clamp(0, 1)
+            # N[:, :, y0_N:y1_N, x0_N:x1_N] = TL_N_ * mask + real * (1 - mask)
+            contour_mask[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 1
 
-        contour_mask = dilation(contour_mask - (segMask_TN == 6).float(),
-                                get_disk_kernel(2, contour_mask.device)).bool()
+        contour_mask = (dilation(contour_mask.float(),
+                                get_disk_kernel(3, contour_mask.device)) - (segMask_TN == 6).float()).bool()
 
         return (D * 2 - 1).detach(), (T * 2 - 1).detach(), (N * 2 - 1).detach(), (segMask_TN == 6).detach(), contour_mask.detach()
 
