@@ -31,13 +31,15 @@ def collate_ImageTensor_train(batch):
     image_TN_seg = [item[4] for item in batch]
     image_D_edges = [item[5] for item in batch]
     image_TN_edges = [item[6] for item in batch]
+    TL_collection = batch[0][7]
     return {'D': torch.cat(image_D),
             'T': torch.cat(image_T),
             'N': torch.cat(image_N),
             'seg_D': torch.cat(image_D_seg),
             'seg_TN': torch.cat(image_TN_seg),
             'edges_D': torch.cat(image_D_edges),
-            'edges_TN': torch.cat(image_TN_edges)}
+            'edges_TN': torch.cat(image_TN_edges),
+            'TL_collection': TL_collection}
 
 
 def collate_ImageTensor_test(batch):
@@ -83,6 +85,8 @@ def get_dataloaders(opt):
         test_datasets = [test_datasets]
     datasets_loaded = []
     for dataset_opt in test_datasets:
+        if dataset_opt is None:
+            continue
         if dataset_opt.name in DATASETS:
 
             datasets_loaded.append(DATASETS[dataset_opt.name](dataset_opt))

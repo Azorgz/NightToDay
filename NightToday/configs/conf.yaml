@@ -49,7 +49,7 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 75
+  start_epoch: 40
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -71,23 +71,23 @@ training:
     D: [0.5, 0.999]
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
-    lambda_color: [[ 2,  ], 3.5]
+    lambda_color: [[ 2,  ], 1.0]
     lambda_id: [[ 0, 10  ], 1.0]
     lambda_cycle:  [[ 0,  ], 5.]
     lambda_ssim:  [[ 2,  ], 2.5]
     lambda_seg:  [[ 0, ], 2.5]
-    lambda_semEdge:  [[ 0,  ], 10.5]
+    lambda_semEdge:  [[ 0,  ], 2.5]
     lambda_gan:  [[ 0,  ], 2.5]
     lambda_tv:  [[ 0,  ], 5.]
     lambda_sga: [[ 40,  ], 0.5]
-    lambda_latent: [[ 0, 10  ], 0.0]
-    lambda_att: [[ 40, ], 1.0]
+    lambda_latent: [[ 0, 10  ], .5]
+    lambda_att: [[ 40, ], 0.0]
     lambda_fus: [[ 0,  2], 0.2]
-    lambda_acl: [[ 0,  ], 1.0]
-    lambda_scale_robustness: [[ 20,  ], 2.5]
-    lambda_trafficlight: [[ 0,  ], 0.2]
+    lambda_scale_robustness: [[ 60,  ], 2.5]
+    lambda_trafficlight_l: [[ 0,  ], 1.0]
+    lambda_trafficlight_f: [[ 0,  ], 2.5]
     lambda_thermal: [[ 1,  ], 2.5]
-    lambda_sharpness: [[ 0,  ], 20.0]
+    lambda_sharpness: [[ 0,  ], 2.5]
     lambda_cgr: [[ 5,  ], 2.0]  # Conditional Gradient Repair
     lambda_bc: [[ 5,  ], 2.0]  # Bias correction Loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
@@ -107,14 +107,14 @@ data:
 #      sampling: 1
 #      augmentations:
 #        hflip: True
-  test_datasets:
+#  test_datasets:
 #      - name: 'LYNRED_DAY_SAMPLES'
 #        sampling: 1
 #        augmentations:
 #          hflip: False
-      - name: 'LYNRED_NIGHT_SAMPLES'
-        sampling: 1
-        augmentations:
-          hflip: False
+#      - name: 'LYNRED_NIGHT_SAMPLES'
+#        sampling: 1
+#        augmentations:
+#          hflip: False
 
 

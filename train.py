@@ -10,6 +10,8 @@ from NightToday.NTIR2Day import Image2ImageGAT_Dual
 
 if __name__ == "__main__":
 
+    displayed_errors = ['trafficlight', 'color']
+
     # Build model from config  (Default: NightToday/NightToday.yaml)
     model = Image2ImageGAT_Dual(trainable=True)
     train_dataloaders, test_dataloaders, opt = build_train_data_from_config()
@@ -29,8 +31,8 @@ if __name__ == "__main__":
 
             total_steps += batch_size
             epoch_iter += batch_size
-
-            bar.set_description(f"epoch : {e}, loss_G : {errors['G']}, loss_D : {errors['D']}")
+            list_errors = [f'{key}: {errors[key]}' for key in displayed_errors]
+            bar.set_description(f"epoch : {e}, {', '.join(list_errors)}")
             torch.cuda.empty_cache()
 
             if i % opt.training.checkpoint_save_latest < batch_size and i != 0:

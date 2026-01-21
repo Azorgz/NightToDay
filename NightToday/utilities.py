@@ -444,7 +444,7 @@ def center_of_mass(img):
     return cx, cy
 
 
-def detect_TL_blobs_mask_free(I_vi, I_ir):
+def detect_TL_colorblobs_mask_free(I_vi, I_ir):
     # ---- Luminance ----
     colors = {0: torch.tensor([1, 0.1, 0], device=I_vi.device),
               1: torch.tensor([0., 1, 0.6], device=I_vi.device),
@@ -478,8 +478,8 @@ def detect_TL_blobs_mask_free(I_vi, I_ir):
                 M = M - mask
                 continue
             size = min(int(torch.sqrt(count / np.pi / scale).cpu().numpy()), 11) * 2 + 1
-            kernel_ring = torch.from_numpy(disk(size)).to(device=I_vi.device).float()
-            kernel_ring_small = torch.from_numpy(disk(max(size//4, 1))).to(device=I_vi.device).float()
+            kernel_ring = get_disk_kernel(size, I_vi.device)
+            kernel_ring_small = get_disk_kernel(max(size//4, 1), I_vi.device)
             mask_ = dilation(mask, kernel=kernel_ring_small)
             surrounding = dilation(mask_, kernel=kernel_ring) - mask_
             mean_sat = ((C_intensity[B][None] * surrounding).sum()) / (surrounding.sum() + 1e-6)
@@ -507,62 +507,46 @@ def detect_TL_blobs_mask_free(I_vi, I_ir):
     return M * color_blur
 
 
-def detect_hotpoint_blob(I_vi, M_tl, contrast_k=0.98, sigma_ratio=0.20):
-    """
-    Detect hot-point inside TL mask based on brightness blob + COM.
-    Inputs:
-        I_vi: Bx3xHxW (visible night RGB)
-        M_tl: Bx1xHxW (traffic light mask)
-    Output:
-        M_hot: Bx1xHxW (Gaussian hot-point mask)
-    """
-
-    # --- 1. Convert to grayscale ---
-    Gray = I_vi.mean(1, keepdim=True)
-    masked_gray = Gray * M_tl
-
-    # --- 2. Adaptive brightness threshold ---
-    max_v = masked_gray.flatten(1).max(dim=-1)[0]
-    T = contrast_k * max_v
-
-    # --- 3. Bright region mask ---
-    M_blob = ((Gray > T.view(-1, 1, 1, 1)).float()) * M_tl
-
-    # --- 4. Morphological cleaning ---
-    kernel = torch.ones(3, 3, device=I_vi.device)
-    M_blob = closing(M_blob, kernel)
-    M_blob = dilation(M_blob, kernel)
-
-    area_blob = M_blob.sum(dim=[1, 2, 3])
-    valid_blob = area_blob > 0
-    ret = torch.zeros_like(Gray, device=Gray.device)
-    if not valid_blob.any():
-        return ret
-
-    # --- 5. Compute center of mass of the blob ---
-    B, _, H, W = M_blob.shape
-    grid_y, grid_x = torch.meshgrid(
-        torch.arange(H, device=I_vi.device),
-        torch.arange(W, device=I_vi.device),
-        indexing='ij'
-    )
-    grid_y, grid_x = grid_y[None].repeat(B, 1, 1)[valid_blob], grid_x[None].repeat(B, 1, 1)[valid_blob]
-    cx = (M_tl[valid_blob] * grid_x).sum((1, 2, 3)) / M_tl.sum(dim=[1, 2, 3])[valid_blob]
-    cy = (M_blob[valid_blob] * grid_y).sum((1, 2, 3)) / area_blob[valid_blob]
-
-    # --- 6. Generate Gaussian hot-point mask ---
-    # sigma proportional to TL size
-    tl_size = torch.sqrt(M_tl.sum((1, 2, 3)))  # ~diameter of TL region
-    sigma = sigma_ratio * tl_size
-
-    # Build gaussian for each batch
-    M_hot = torch.exp(-((grid_x - cx) ** 2 + (grid_y - cy) ** 2) / (2 * sigma ** 2 + 1e-6))
-
-    M_hot = M_hot.unsqueeze(1)  # Bx1xHxW
-    M_hot = M_hot / (M_hot.flatten(2).max(dim=-1, keepdim=True)[0] + 1e-6)  # normalize
-    M_hot = M_hot * M_tl[valid_blob]  # mask outside TL region
-    ret[valid_blob] = M_hot / 2
-    return ret
+def detect_TL_blobs_mask_free(I_vi):
+    # ---- Luminance ----
+    scale = I_vi.shape[-2] / 256
+    vi_squared = I_vi ** 2
+    R = 1.25 * vi_squared[:, 0:1] - 1. * vi_squared[:, 1:2] - 0.5 * vi_squared[:, 2:3]
+    G = 0.75 * vi_squared[:, 1:2] - 1.75 * vi_squared[:, 0:1] + 0.75 * vi_squared[:, 2:3]
+    O = 1.1 * vi_squared[:, 0:1] - 0.1 * vi_squared[:, 1:2] - 2. * vi_squared[:, 2:3]
+    C_intensity, color_idx = torch.max(torch.cat([R, G, O], dim=1), dim=1, keepdim=True)
+    Y = I_vi.mean(1, keepdim=True) * (C_intensity <= 0.1)
+    # ---- Blobs mapping ----
+    Y_filled = fill_holes((Y == 0).float()) - (Y == 0).float()
+    if Y_filled.sum() == 0:
+        M = (Y > Y[Y > 0].mean()).float()
+    else:
+        M = Y_filled * (Y > Y[Y > 0].mean())
+    labels = connected_components(M)
+    # ---- Saturation enclosure ----
+    for B, label in enumerate(labels):
+        label = label.unsqueeze(0)
+        uniques = label.unique(return_counts=True)
+        for i, (uni, count) in enumerate(zip(*uniques)):
+            mask = (label == uni).float()
+            if uni == 0:
+                continue
+            elif count < 10 or count > 500 * scale:
+                M = M - mask
+                continue
+            # only keep the disk shaped blobs
+            cx, cy = center_of_mass(mask)
+            radius = torch.sqrt(count / np.pi)
+            grid_y, grid_x = torch.meshgrid(
+                torch.linspace(0, M.shape[-2] - 1, M.shape[-2], device=I_vi.device),
+                torch.linspace(0, M.shape[-1] - 1, M.shape[-1], device=I_vi.device),
+                indexing='ij'
+            )
+            dist_map = torch.sqrt((grid_x - cx) ** 2 + (grid_y - cy) ** 2)
+            disk_mask = dist_map <= radius * 1.5
+            if (mask - mask * disk_mask).sum() != 0:
+                M = M - mask
+    return M
 
 
 def create_fake_Light(img, mask_p):
@@ -595,6 +579,10 @@ def create_fake_Light(img, mask_p):
                 fake += gaussian_blur(Light_region, kernel_size, sigma)
         img_processed.append((fake / fake.max() + img * mask_p).clamp(0, 1))
     return torch.cat(img_processed)
+
+
+def get_disk_kernel(radius, device):
+    return torch.from_numpy(disk(radius)).to(device=device).float()
 
 
 # endregion ----------------------------
@@ -1165,46 +1153,107 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     return output_FG_Mask, output_FG_FakeIR, output_FG_RealVis, output_highlight_mask, output_FG_top_mask, output_FG_bottom_mask
 
 
-def getLightDarkRegionMean(cls_idx, fake, input_mask, real_T, real_N):
+# def determine_color_N(TL_N):
+#     R = TL_N[0].mean()
+#     G = TL_N[1].mean()
+#     B = TL_N[2].mean()
+#     C = R - B - G
+#     if C > 0.1:
+#         return 'red'
+#     elif C < -0.1:
+#         return 'green'
+#     else:
+#         return 'yellow'
+
+
+def determine_color_N(TL_D):
+    top_third = TL_D[:, :TL_D.shape[1]//3, :]
+    R = top_third[0].mean()
+    mid_third = TL_D[:, TL_D.shape[1]//3:2*TL_D.shape[1]//3, :]
+    Y = (mid_third[1] + mid_third[0]).mean()/2
+    bottom_third = TL_D[:, 2*TL_D.shape[1]//3:, :]
+    G = bottom_third[1].mean()
+    if R > Y and R > G:
+        return 'red'
+    elif G > Y and G > R:
+        return 'green'
+    else:
+        return 'orange'
+
+# def getLightDarkRegionMean(cls_idx, fake, input_mask, real_T, real_N):
+#     """Obtain the mean value of the below-average brightness portion of the traffic light area."
+#     "The dark region mask of the traffic light region is first obtained using the reference image, and then "
+#     "the mean value of the corresponding region of the input image is calculated."""
+#
+#     _, _, h, w = fake.shape
+#     fake_gray = .299 * fake[:, 0:1, :, :] + .587 * fake[:, 1:2, :, :] + .114 * fake[:, 2:3, :, :]
+#     real_img_gray = .299 * real_N[:, 0:1, :, :] + .587 * real_N[:, 1:2, :, :] + .114 * real_N[:, 2:3, :, :]
+#     real_img_gray = (real_img_gray - real_img_gray.min()) / (real_img_gray.max() - real_img_gray.min() + 1e-8)
+#     ref_img_gray = .299 * real_T[:, 0:1, :, :] + .587 * real_T[:, 1:2, :, :] + .114 * real_T[:, 2:3, :, :]
+#     light_mask_ori = (input_mask == cls_idx).float()
+#     max_pool_k3 = nn.MaxPool2d(kernel_size=5, stride=1, padding=2)
+#     Light_mask = -max_pool_k3(- light_mask_ori)
+#     light_region_area = Light_mask.sum(dim=[1, 2, 3])
+#     valid_mask = light_region_area > 1
+#     if valid_mask.any():
+#         Light_region = (ref_img_gray * Light_mask.detach())[valid_mask]
+#         Light_region_mean = Light_region.sum(dim=[1, 2, 3]) / light_region_area[valid_mask]
+#         Light_region_color = (real_img_gray * Light_mask.detach())[valid_mask]
+#         Light_region_color_mean = Light_region_color.sum(dim=[1, 2, 3]) / light_region_area[valid_mask]
+#         # Light_region_filling_one = Light_region + 1 - Light_mask[valid_mask]
+#         Light_Bright_Region_Mask = (Light_region >= Light_region_mean) * (Light_region_color >= Light_region_color_mean).float()
+#         Light_Dark_Region_Mask = Light_mask[valid_mask] - Light_Bright_Region_Mask
+#         Light_Dark_Region_Mean = (Light_Dark_Region_Mask * fake_gray[valid_mask]).sum(dim=[1, 2, 3]) / Light_Dark_Region_Mask.sum(dim=[1, 2, 3])
+#
+#         # Light Bright region min
+#         Light_BR_filling_one = Light_Bright_Region_Mask * fake_gray[valid_mask] + 1 - Light_Bright_Region_Mask
+#         Light_Bright_Region_Min = Light_BR_filling_one.flatten(1).min(dim=1).values
+#         # Compute channel mean.
+#         input_img_DR_Masked = fake[valid_mask] * Light_Dark_Region_Mask
+#         input_img_DR_mean = torch.mean(input_img_DR_Masked, dim=1, keepdim=True)  #1*h*w
+#         input_img_DR_submean = (input_img_DR_Masked - input_img_DR_mean) ** 2
+#         input_img_DR_var = (input_img_DR_submean.sum(dim=1, keepdim=True) / 3).flatten(1).max(1).values
+#
+#     else:
+#         Light_Dark_Region_Mean = 0.
+#         Light_Bright_Region_Min = 0.
+#         input_img_DR_var = 0.
+#
+#     return Light_Dark_Region_Mean, light_region_area, Light_Bright_Region_Min, input_img_DR_var
+
+def getLightDarkRegionMean(real, input_mask, fake):
     """Obtain the mean value of the below-average brightness portion of the traffic light area."
     "The dark region mask of the traffic light region is first obtained using the reference image, and then "
     "the mean value of the corresponding region of the input image is calculated."""
 
-    _, _, h, w = fake.shape
+    B, _, h, w = real.shape
+    real_gray = .299 * real[:, 0:1, :, :] + .587 * real[:, 1:2, :, :] + .114 * real[:, 2:3, :, :]
     fake_gray = .299 * fake[:, 0:1, :, :] + .587 * fake[:, 1:2, :, :] + .114 * fake[:, 2:3, :, :]
-    real_img_gray = .299 * real_N[:, 0:1, :, :] + .587 * real_N[:, 1:2, :, :] + .114 * real_N[:, 2:3, :, :]
-    real_img_gray = (real_img_gray - real_img_gray.min()) / (real_img_gray.max() - real_img_gray.min() + 1e-8)
-    ref_img_gray = .299 * real_T[:, 0:1, :, :] + .587 * real_T[:, 1:2, :, :] + .114 * real_T[:, 2:3, :, :]
-    light_mask_ori = (input_mask == cls_idx).float()
     max_pool_k3 = nn.MaxPool2d(kernel_size=5, stride=1, padding=2)
-    Light_mask = -max_pool_k3(- light_mask_ori)
+    Light_mask = -max_pool_k3(- input_mask)
     light_region_area = Light_mask.sum(dim=[1, 2, 3])
     valid_mask = light_region_area > 1
+    Light_Dark_Region_Mean = torch.zeros([B, 1], device=real.device)
+    Light_Bright_Region_Min = torch.zeros([B, 1], device=real.device)
+    Light_region_max = torch.zeros([B, 1], device=real.device)
+    Light_region_min = torch.zeros([B, 1], device=real.device)
     if valid_mask.any():
-        Light_region = (ref_img_gray * Light_mask.detach())[valid_mask]
+        Light_region = (real_gray * Light_mask.detach())[valid_mask]
         Light_region_mean = Light_region.sum(dim=[1, 2, 3]) / light_region_area[valid_mask]
-        Light_region_color = (real_img_gray * Light_mask.detach())[valid_mask]
-        Light_region_color_mean = Light_region_color.sum(dim=[1, 2, 3]) / light_region_area[valid_mask]
-        # Light_region_filling_one = Light_region + 1 - Light_mask[valid_mask]
-        Light_Bright_Region_Mask = (Light_region >= Light_region_mean) * (Light_region_color >= Light_region_color_mean).float()
+        Light_region_max[valid_mask] += Light_region.flatten(1).max(dim=1).values
+        Light_region_filling_one = Light_region + 1 - Light_mask[valid_mask]
+        Light_region_min[valid_mask] += Light_region_filling_one.flatten(1).min(dim=1).values
+        Light_Bright_Region_Mask = (Light_region >= Light_region_mean).float()
         Light_Dark_Region_Mask = Light_mask[valid_mask] - Light_Bright_Region_Mask
-        Light_Dark_Region_Mean = (Light_Dark_Region_Mask * fake_gray[valid_mask]).sum(dim=[1, 2, 3]) / Light_Dark_Region_Mask.sum(dim=[1, 2, 3])
+        Light_Dark_Region_Mean[valid_mask] += ((Light_Dark_Region_Mask * fake_gray[valid_mask]).sum(dim=[1, 2, 3])
+                                               / Light_Dark_Region_Mask.sum(dim=[1, 2, 3]))
 
         # Light Bright region min
         Light_BR_filling_one = Light_Bright_Region_Mask * fake_gray[valid_mask] + 1 - Light_Bright_Region_Mask
-        Light_Bright_Region_Min = Light_BR_filling_one.flatten(1).min(dim=1).values
-        # Compute channel mean.
-        input_img_DR_Masked = fake[valid_mask] * Light_Dark_Region_Mask
-        input_img_DR_mean = torch.mean(input_img_DR_Masked, dim=1, keepdim=True)  #1*h*w
-        input_img_DR_submean = (input_img_DR_Masked - input_img_DR_mean) ** 2
-        input_img_DR_var = (input_img_DR_submean.sum(dim=1, keepdim=True) / 3).flatten(1).max(1).values
+        Light_Bright_Region_Min[valid_mask] += Light_BR_filling_one.flatten(1).min(dim=1).values
 
-    else:
-        Light_Dark_Region_Mean = 0.
-        Light_Bright_Region_Min = 0.
-        input_img_DR_var = 0.
+    return Light_Dark_Region_Mean, light_region_area, Light_Bright_Region_Min, Light_region_max, Light_region_min
 
-    return Light_Dark_Region_Mean, light_region_area, Light_Bright_Region_Min, input_img_DR_var
 
 # -----------------------------
 # Updated FakeIRFGMergeMaskv4 (GPU-first, Kornia CC)

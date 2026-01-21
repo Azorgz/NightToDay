@@ -378,7 +378,7 @@ class U_ResNetFusion(nn.Module):
         return tanh_n(n1, n2 or n1)
 
     def forward(self, ir, vis_night, align_first=True, **kwargs):
-        ir = self.thermal_preprocess(ir, vis_night, **kwargs)
+        ir = self.thermal_preprocess(ir, **kwargs)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
@@ -390,7 +390,8 @@ class U_ResNetFusion(nn.Module):
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
             x_feat = layer(x_feat)
         out = self.final_conv(x_feat)
-        return self.tanh_n(1)(out).repeat(1, vis_night.shape[1], 1, 1), ir, vis_night  # match input channels
+        # return self.tanh_n(1)(out).repeat(1, 3, 1, 1), ir, vis_night  # match input channels
+        return self.thermal_preprocess(self.tanh_n(1)(out), p_low=0, p_high=100), ir, vis_night  # match input channels
 
     def train(self, mode: bool = True) -> None:
         super().train(mode)
@@ -420,7 +421,7 @@ class MonotonicThermalLUT(nn.Module):
         self.scene_selection = SceneSelector()
         self.scene_idx = None
 
-    def forward(self, x, *args, epoch=0):
+    def forward(self, x, *args, p_low=2., p_high=99.5, epoch=0):
         """
         x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
            assumed normalized to [0,1]
@@ -429,7 +430,7 @@ class MonotonicThermalLUT(nn.Module):
         if x.shape[1] == 3:
             x = x.mean(dim=1, keepdim=True)  # convert to grayscale
         # Robust normalization to [0,1]
-        x = self.robust_norm(x, p_low=2., p_high=99.5, eps=self.eps)
+        x = self.robust_norm(x, p_low=p_low, p_high=p_high, eps=self.eps)
         self.scene_idx = self.naive_scene_selection(x)
         # Build monotonic LUT
         increments = F.softplus(torch.mm(self.scene_idx, self.delta)) + self.eps

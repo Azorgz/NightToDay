@@ -20,8 +20,8 @@ class TestDataset(Dataset):
     test_T = ''
     test_N = ''
 
-    def __init__(self, opt):
-        self.load_size = opt.load_size
+    def __init__(self, opt=None):
+        # self.load_size = opt.load_size
         self.test_T = [os.path.join(self.test_T, f) for f in sorted(os.listdir(self.test_T))]
         self.test_N = [os.path.join(self.test_N, f) for f in sorted(os.listdir(self.test_N))]
         assert len(self.test_T) == len(self.test_N), "Number of thermal and night images must be equal."
@@ -31,8 +31,9 @@ class TestDataset(Dataset):
 
     def __getitem__(self, idx):
         image_T = self.load_image(self.test_T, idx % len(self.test_T)).GRAY().RGB('gray')
-        image_N = self.normalize(self.load_image(self.test_N, idx % len(self.test_N)).match_shape(image_T))
-        return image_T, image_N
+        image_N = self.load_image(self.test_N, idx % len(self.test_N)).match_shape(image_T)
+        image_D = self.load_image(self.test_D, idx % len(self.test_D))
+        return image_T, image_N, image_D
 
     def load_image(self, path: list[str], idx: int, **kwargs) -> Tensor:
         """
@@ -55,6 +56,9 @@ class TrainDataset(Dataset):
     D_seg = ''
     TN_seg = ''
     crop_path = ''
+    TL_D = []
+    TL_T = []
+    TL_N = []
 
     def __init__(self, opt):
         self.num_classes = opt.num_classes
@@ -69,12 +73,6 @@ class TrainDataset(Dataset):
                         in enumerate(sorted(os.listdir(self.train_T))) if idx % opt.sampling == 0]
         self.train_N = [os.path.join(self.train_N, f) for idx, f
                         in enumerate(sorted(os.listdir(self.train_N))) if idx % opt.sampling == 0]
-        # self.test_D = [os.path.join(self.test_D, f) for idx, f
-        #                in enumerate(sorted(os.listdir(self.test_D))) if idx % opt.sampling == 0]
-        # self.test_T = [os.path.join(self.test_T, f) for idx, f
-        #                in enumerate(sorted(os.listdir(self.test_T))) if idx % opt.sampling == 0]
-        # self.test_N = [os.path.join(self.test_N, f) for idx, f
-        #                in enumerate(sorted(os.listdir(self.test_N))) if idx % opt.sampling == 0]
         self.TN_edges = [os.path.join(self.TN_edges, f) for idx, f
                          in enumerate(sorted(os.listdir(self.TN_edges))) if idx % opt.sampling == 0]if self.TN_edges else []
         self.D_edges = [os.path.join(self.D_edges, f) for idx, f
@@ -83,6 +81,15 @@ class TrainDataset(Dataset):
                       in enumerate(sorted(os.listdir(self.D_seg))) if idx % opt.sampling == 0] if self.D_seg else []
         self.TN_seg = [os.path.join(self.TN_seg, f) for idx, f
                       in enumerate(sorted(os.listdir(self.TN_seg))) if idx % opt.sampling == 0] if self.TN_seg else []
+        self.TL_collection = {'green': {'T': [ImageTensor(p).RGB('gray') for p in self.TL_T if 'green' in p],
+                                        'N': [ImageTensor(p) for p in self.TL_N if 'green' in p],
+                                        'D': [ImageTensor(p) for p in self.TL_D if 'green' in p]},
+                              'orange': {'T': [ImageTensor(p).RGB('gray') for p in self.TL_T if 'orange' in p],
+                                         'N': [ImageTensor(p) for p in self.TL_N if 'orange' in p],
+                                         'D': [ImageTensor(p) for p in self.TL_D if 'orange' in p]},
+                              'red': {'T': [ImageTensor(p).RGB('gray') for p in self.TL_T if 'red' in p],
+                                      'N': [ImageTensor(p) for p in self.TL_N if 'red' in p],
+                                      'D': [ImageTensor(p) for p in self.TL_D if 'red' in p]}}
 
         assert len(self.train_T) == len(self.train_N), "Number of thermal and night images must be equal."
         assert len(self.train_D) == len(self.D_seg), "Number of day images and segmentation masks must be equal."
@@ -105,10 +112,10 @@ class TrainDataset(Dataset):
         image_TN_seg = (self.load_image(self.TN_seg, idx % (len(self.TN_seg) or 1), seg=True, crop=True).to_tensor()).to(torch.uint8)
         image_D_edges = self.load_image(self.D_edges, idx % (len(self.D_edges) or 1)).to_tensor()
         image_TN_edges = self.load_image(self.TN_edges, idx % (len(self.TN_edges) or 1), True).to_tensor()
-        if torch.rand(1) < 0.5:
-            image_D, image_D_seg, image_D_edges = self.augmentations(torch.cat([image_D, image_D_seg, image_D_edges], dim=1)).split([3, 1, 1], 1)
-            image_T, image_N, image_TN_edges, image_TN_seg = self.augmentations(torch.cat([image_T, image_N, image_TN_edges, image_TN_seg], dim=1)).split([3, 3, 1, 1], 1)
-        return image_D, image_T, image_N, image_D_seg, image_TN_seg, image_D_edges, image_TN_edges
+        # if torch.rand(1) < 0.5:
+        #     image_D, image_D_seg, image_D_edges = self.augmentations(torch.cat([image_D, image_D_seg, image_D_edges], dim=1)).split([3, 1, 1], 1)
+        #     image_T, image_N, image_TN_edges, image_TN_seg = self.augmentations(torch.cat([image_T, image_N, image_TN_edges, image_TN_seg], dim=1)).split([3, 3, 1, 1], 1)
+        return image_D, image_T, image_N, image_D_seg, image_TN_seg, image_D_edges, image_TN_edges, self.TL_collection
 
     def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, **kwargs) -> Tensor:
         """

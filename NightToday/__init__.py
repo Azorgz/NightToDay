@@ -267,16 +267,16 @@ def validate_epoch_load(epoch_load: Union[str, dict, int], n_domains: int, split
         assert isinstance(epoch_load, (str, int)), "epoch_load must be 'latest', or an integer."
         return epoch_load
     if isinstance(epoch_load, str):
-        if epoch_load.lower() in ['latest', 'last']:
-            return ({f'G{i}': 'latest' for i in range(n_domains * 2 + 1)} |
-                    {f'D{j}': 'latest' for j in range(n_domains)} |
-                    {f'S{k}': 'latest' for k in range(n_domains)})
-        elif epoch_load.isdigit():
+        if epoch_load.isdigit():
             return {f'G{i}': int(epoch_load) for i in range(n_domains * 2 + 1)} | \
                 {f'D{j}': int(epoch_load) for j in range(n_domains)} | \
                 {f'S{k}': int(epoch_load) for k in range(n_domains)}
+        elif epoch_load.lower() in ['latest', 'last']:
+            return ({f'G{i}': epoch_load.lower() for i in range(n_domains * 2 + 1)} |
+                    {f'D{j}': epoch_load.lower() for j in range(n_domains)} |
+                    {f'S{k}': epoch_load.lower() for k in range(n_domains)})
         else:
-            raise ValueError("epoch_load must be 'latest', or an integer as str.")
+            raise ValueError("epoch_load must be a string, or an integer as str.")
     elif isinstance(epoch_load, int):
         return {f'G{i}': int(epoch_load) for i in range(n_domains * 2 + 1)} | \
             {f'D{j}': int(epoch_load) for j in range(n_domains)} | \

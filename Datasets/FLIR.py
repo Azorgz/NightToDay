@@ -1,6 +1,8 @@
+import os
 from _socket import gethostname
 
 from ImagesCameras import ImageTensor
+from datasets import Dataset
 from torch import Tensor
 
 from .DatasetBase import TrainDataset, TestDataset
@@ -21,7 +23,14 @@ class FLIR(TrainDataset):
         self.D_edges = self.root + "FLIR_datasets/FLIR_Vis_edge_map"
         self.D_seg = self.root + "FLIR_datasets/FLIR_Vis_seg_mask"
         self.TN_seg = self.root + "FLIR_datasets/FLIR_IR_seg_mask"
-        self.crop_path = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/FLIR/FLIR_datasets/crop.yaml'\
+        self.TL_D = self.root + "FLIR_datasets/FG_sample_D_TN/"
+        self.TL_D = [self.TL_D + f for f in sorted(os.listdir(self.TL_D))]
+        self.TL_T = self.root + "FLIR_datasets/FG_sample_T/"
+        self.TL_T = [self.TL_T + f for f in sorted(os.listdir(self.TL_T))]
+        self.TL_N = self.root + "FLIR_datasets/FG_sample_N/"
+        self.TL_N = [self.TL_N + f for f in sorted(os.listdir(self.TL_N))]
+
+        self.crop_path = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/FLIR/FLIR_datasets/crop.yaml' \
             if not 'laptop' in gethostname() else '/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/FLIR_datasets/crop.yaml'
         super().__init__(opt)
 
@@ -29,7 +38,7 @@ class FLIR(TrainDataset):
         """
         Load an image from a given path and return it as a Tensor.
         """
-        image = ImageTensor(path[idx])**fac * 255 if seg else ImageTensor(path[idx])
+        image = ImageTensor(path[idx]) ** fac * 255 if seg else ImageTensor(path[idx])
         if crop and self.crop_xxyy:
             crop = self.crop_xxyy[idx]
             crop = crop[0]*500//640, crop[1]*500//640, crop[2]*400//512, crop[3]*400//512

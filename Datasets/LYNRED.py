@@ -16,6 +16,10 @@ class LYNRED(TrainDataset):
         self.TN_seg = self.root + "LYNRED_datasets/LYNRED_IR_seg_mask"
         self.D_edges = self.root + "LYNRED_datasets/LYNRED_Vis_edge_map"
         self.D_seg = self.root + "LYNRED_datasets/LYNRED_Vis_seg_mask"
+        self.TL_D = None
+        self.TL_T = self.root + "FLIR_datasets/FG_sample_T/"
+        self.TL_N = self.root + "FLIR_datasets/FG_sample_N/"
+
         super().__init__(opt)
 
 

@@ -3,6 +3,7 @@ from typing import Literal
 
 import torch
 from torch import nn
+from torch.nn.functional import interpolate
 
 from .models.basic_blocks import back_warp
 from .models.cross_raft import CrossRAFT
@@ -29,7 +30,11 @@ def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
                 img_tgt, img_src = img_vis, img_ir
             else:
                 img_tgt, img_src = img_ir, img_vis
-            flow = self.model(img_tgt*0.5+0.5, img_src*0.5+0.5)['flow']
+            shape = img_tgt.shape[-2:]
+            # img_tgt_ = interpolate(img_tgt, (256, 256)).to(torch.float32)
+            # img_src_ = interpolate(img_src, (256, 256)).to(torch.float32)
+            flow = self.model(img_tgt, img_src)['flow']
+            # flow = interpolate(flow, size=shape, mode='bilinear', align_corners=True)
             image_proj = self.ST(img_src, flow)
             return image_proj
 
