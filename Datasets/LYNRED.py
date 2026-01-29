@@ -1,3 +1,6 @@
+import os
+from _socket import gethostname
+
 from .DatasetBase import TrainDataset, TestDataset
 
 
@@ -16,10 +19,12 @@ class LYNRED(TrainDataset):
         self.TN_seg = self.root + "LYNRED_datasets/LYNRED_IR_seg_mask"
         self.D_edges = self.root + "LYNRED_datasets/LYNRED_Vis_edge_map"
         self.D_seg = self.root + "LYNRED_datasets/LYNRED_Vis_seg_mask"
-        self.TL_D = None
-        self.TL_T = self.root + "FLIR_datasets/FG_sample_T/"
-        self.TL_N = self.root + "FLIR_datasets/FG_sample_N/"
-
+        self.TL_D = self.root + "LYNRED_datasets/FG_sample_D_TN/"
+        self.TL_D = [self.TL_D + f for f in sorted(os.listdir(self.TL_D))]
+        self.TL_T = self.root + "LYNRED_datasets/FG_sample_T/"
+        self.TL_T = [self.TL_T + f for f in sorted(os.listdir(self.TL_T))]
+        self.TL_N = self.root + "LYNRED_datasets/FG_sample_N/"
+        self.TL_N = [self.TL_N + f for f in sorted(os.listdir(self.TL_N))]
         super().__init__(opt)
 
 

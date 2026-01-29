@@ -31,10 +31,10 @@ def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
             else:
                 img_tgt, img_src = img_ir, img_vis
             shape = img_tgt.shape[-2:]
-            # img_tgt_ = interpolate(img_tgt, (256, 256)).to(torch.float32)
-            # img_src_ = interpolate(img_src, (256, 256)).to(torch.float32)
-            flow = self.model(img_tgt, img_src)['flow']
-            # flow = interpolate(flow, size=shape, mode='bilinear', align_corners=True)
+            img_tgt_ = interpolate(img_tgt, (256, 256)).to(torch.float32)
+            img_src_ = interpolate(img_src, (256, 256)).to(torch.float32)
+            flow = self.model(img_tgt_, img_src_)['flow']
+            flow = interpolate(flow, size=shape, mode='bilinear', align_corners=True)
             image_proj = self.ST(img_src, flow)
             return image_proj
 

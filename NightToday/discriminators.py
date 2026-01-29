@@ -76,8 +76,8 @@ class NLayerDiscriminatorSN(nn.Module):
         if self.input_nc == 1:
             gray = blurred
         elif self.input_nc == 3:
-            gray = x.mean(dim=1, keepdim=True)
-            gray = (.299 * x[:, 0, :, :] + .587 * x[:, 1, :, :] + .114 * x[:, 2, :, :]).unsqueeze_(1)
+            gray = x.mean(1, keepdim=True)
+            # gray = (.299 * x[:, 0, :, :] + .587 * x[:, 1, :, :] + .114 * x[:, 2, :, :]).unsqueeze_(1)
         else:
             gray = (.299 * x[:, 0, :, :] + .587 * x[:, 1, :, :] + .114 * x[:, 2, :, :]).unsqueeze_(1)
 

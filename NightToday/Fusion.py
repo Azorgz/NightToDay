@@ -3,7 +3,9 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from kornia.filters import median_blur, bilateral_blur
 from torch import conv2d
+from torchvision.transforms.functional import gaussian_blur
 
 from . import ThermalPreprocessConfig
 from .CrossRAFT import get_wrapper
@@ -354,6 +356,7 @@ class U_ResNetFusion(nn.Module):
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
+        self.thermal_postprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins, 1)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -390,8 +393,11 @@ class U_ResNetFusion(nn.Module):
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
             x_feat = layer(x_feat)
         out = self.final_conv(x_feat)
+        # filtered_ir = torch.sqrt(bilateral_blur(ir*0.5+0.5, (3, 3), 0.1, (1.5, 1.5)) + 1e-6)
+        # out = torch.sqrt((self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)*0.5+0.5) * filtered_ir + 1e-6) * 2 - 1
+        out = self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)
+        return out, ir, vis_night  # match input channels
         # return self.tanh_n(1)(out).repeat(1, 3, 1, 1), ir, vis_night  # match input channels
-        return self.thermal_preprocess(self.tanh_n(1)(out), p_low=0, p_high=100), ir, vis_night  # match input channels
 
     def train(self, mode: bool = True) -> None:
         super().train(mode)
@@ -421,7 +427,7 @@ class MonotonicThermalLUT(nn.Module):
         self.scene_selection = SceneSelector()
         self.scene_idx = None
 
-    def forward(self, x, *args, p_low=2., p_high=99.5, epoch=0):
+    def forward(self, x, *args, p_low=2., p_high=100, epoch=0):
         """
         x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
            assumed normalized to [0,1]
@@ -431,7 +437,8 @@ class MonotonicThermalLUT(nn.Module):
             x = x.mean(dim=1, keepdim=True)  # convert to grayscale
         # Robust normalization to [0,1]
         x = self.robust_norm(x, p_low=p_low, p_high=p_high, eps=self.eps)
-        self.scene_idx = self.naive_scene_selection(x)
+        self.scene_idx = torch.ones([x.shape[0], self.scene], device=x.device) / self.scene
+        # self.scene_idx = self.naive_scene_selection(x)
         # Build monotonic LUT
         increments = F.softplus(torch.mm(self.scene_idx, self.delta)) + self.eps
         luts = torch.cumsum(increments, dim=1)

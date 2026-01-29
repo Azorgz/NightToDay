@@ -24,10 +24,13 @@ import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
 import matplotlib.colors as mcolors
+from kornia.color import rgb_to_hsv, hsv_to_rgb
 from kornia.contrib import connected_components
 from kornia.morphology import dilation, erosion, closing, opening
 from torch import Tensor
 from torch.nn.functional import interpolate, relu, normalize
+from torchvision.transforms.functional import gaussian_blur
+
 from . import get_config
 from . import OptImage2ImageGATConfig
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
@@ -59,6 +62,10 @@ class Image2ImageGAT_Dual(nn.Module):
         checkpoint = self.initialization(opt, *args, **kwargs)
         self.names_domains = self.opt.model.names_domains
         self.mode = self.opt.model.mode if trainable else 'test'
+        self.opt.model.gen.fusion_first = self.opt.model.fusion_first
+        self.opt.model.discr.fusion_first = self.opt.model.fusion_first
+        self.opt.model.seg.fusion_first = self.opt.model.fusion_first
+
         if self.mode == 'test':
             self.opt.model.gen.input_size = -1
             self.input_size = -1
@@ -103,10 +110,7 @@ class Image2ImageGAT_Dual(nn.Module):
 
             self.criterion_gan = lambda d, r, p_r, f, v: self.GANLoss(d, r, p_r, f, v)
             self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
-            self.criterion_cycle = lambda rec, real: nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec,
-                                                                                                                real) / self.lambda_cycle
-            self.criterion_mean_var = lambda f_tn, r_t: relu(torch.abs(f_tn.mean() - r_t.mean() - 0.1)) + relu(
-                torch.abs(f_tn.std() - r_t.std()) - 0.05)
+            self.criterion_cycle = lambda rec, real: nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec, real) / self.lambda_cycle
             self.criterion_latent = lambda y, t: self.L1(y, t.detach())
             self.criterion_ssim = lambda x, y: SSIM_Loss()((x + 1) / 2, (y + 1) / 2) * self.lambda_ssim
             self.criterion_tv = TVLoss(TVLoss_weight=1)
@@ -268,6 +272,17 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'fake_T', None)
         setattr(self, 'rec_D', None)
         setattr(self, 'rec_T', None)
+        setattr(self, 'D_com', None)
+        setattr(self, 'T_com', None)
+        setattr(self, 'N_com', None)
+        setattr(self, 'remapped_T_com', None)
+        setattr(self, 'fake_T_com', None)
+        setattr(self, 'TN_com', None)
+        setattr(self, 'rec_D_com', None)
+        setattr(self, 'fake_T_com', None)
+        setattr(self, 'fake_D_com', None)
+        setattr(self, 'fake_TN_com', None)
+        setattr(self, 'rec_TN_com', None)
 
     def initialize_losses(self):
         setattr(self, 'loss_D', {k: 0. for k in self.names_domains})
@@ -414,7 +429,7 @@ class Image2ImageGAT_Dual(nn.Module):
         # region GAN loss
         """D_T(G_T(D))"""
         self.fake_T = self.netG.decode(encoded_D, to_=self.T)
-        self.fake_T = self.netG.fusion.thermal_preprocess(self.fake_T)
+        self.fake_T = self.netG.fusion.thermal_postprocess(self.fake_T)
         self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.remapped_T,
                                                  self.pred_real_T, self.fake_T, False, loss_name='G')
         """D_N(G_N(T))"""
@@ -438,19 +453,19 @@ class Image2ImageGAT_Dual(nn.Module):
         self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.real_TN, loss_name='cycle')
         # endregion
 
-        # region Fusion Loss
-        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
-        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN,
-                                                   -self.real_N.mean(dim=1, keepdim=True).repeat(1, 3, 1, 1),
-                                                   loss_name='fus', criterion_lambda='fus')
-        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, self.remapped_T,
-                                                   loss_name='fus', criterion_lambda='fus')
-        # endregion
-
         # region Cycle loss on Latent Space
         if self.lambda_latent > 0:
             self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
             self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_TN)
+        # endregion
+
+        # region Fusion Loss
+        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
+        gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, -gray_N.detach(),
+                                                   loss_name='fus', criterion_lambda='fus')
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, self.remapped_T.detach(),
+                                                   loss_name='fus', criterion_lambda='fus')
         # endregion
 
         # region Total Variation loss
@@ -465,28 +480,27 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region ACL
         # First step : Learning to translate Day color traffic lights to Thermal traffic lights
-        self.D_com, self.T_com, self.N_com, segMask_com, contourMask = self.merge_TL()
-        total_mask = segMask_com | contourMask
-        fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
-        encoded_TN, self.TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
-                                                             from_=self.T, align_first=False)
-        self.fake_T_com = fake_T_com * ~segMask_com + self.TN_com * segMask_com
-        # self.TN_com = TN_com * ~segMask_com + fake_T_com * segMask_com
-
-        self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
-        self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
-        self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
-        self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_D_com * total_mask,
-                                                            self.D_com * total_mask,
-                                                            loss_name='trafficlight', criterion_lambda='trafficlight_l')
-        self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
-                                                            self.real_TN * contourMask + fake_T_com * segMask_com,
-                                                            loss_name='trafficlight', criterion_lambda='trafficlight_l')
-        self.loss_trafficlight[self.N] += self.compute_loss('tll', segMask_com, self.fake_D_com,
-                                                            self.rec_D_com, self.D_com, fake_T_com, self.TN_com,
-                                                            loss_name='trafficlight', criterion_lambda='trafficlight_f')
+        if self.lambda_trafficlight_l > 0.0:
+            self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
+            total_mask = segMask_com | contourMask
+            fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
+            encoded_TN, TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
+                                                                 from_=self.T, align_first=False)
+            self.fake_T_com = fake_T_com * ~segMask_com + TN_com * segMask_com
+            self.TN_com = TN_com * ~segMask_com + fake_T_com * segMask_com
+            self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
+            self.fake_D_com = self.netG.decode(self.netG.encode(self.TN_com, from_=self.T), to_=self.D)
+            self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
+            self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_D_com,
+                                                                self.D_com,
+                                                                loss_name='trafficlight', criterion_lambda='trafficlight_l')
+            self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
+                                                                self.real_TN * contourMask + fake_T_com * segMask_com,
+                                                                loss_name='trafficlight', criterion_lambda='trafficlight_l')
+            self.loss_trafficlight[self.N] += self.compute_loss('tll', segMask_com, self.fake_D_com,
+                                                                self.rec_D_com, self.D_com, fake_T_com, TN_com, weights,
+                                                                loss_name='trafficlight', criterion_lambda='trafficlight_f')
         # endregion
-
 
         # region Structure-Gradient Alignment loss
         self.loss_sga[self.D] += self.compute_loss('sga', self.edges_D, self.get_gradmag(self.fake_T))
@@ -602,7 +616,7 @@ class Image2ImageGAT_Dual(nn.Module):
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
 
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T, self.real_N,
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T.detach(),
                                                        self.segMask_TN_update, weights=self.class_weight)
         # endregion
 
@@ -789,7 +803,9 @@ class Image2ImageGAT_Dual(nn.Module):
         T, N = self.real_T * 0.5 + 0.5, self.real_N * 0.5 + 0.5
         segMask_TN = interpolate(self.segMask_TN_update.clone().float(), size=T.shape[-2:], mode='nearest')
         already_present_TL = (segMask_TN == 6).float()
-        if already_present_TL.sum() > 100:
+        contour_mask = torch.zeros_like(segMask_TN)
+        weights = torch.zeros_like(segMask_TN)
+        if already_present_TL.sum() > 0:
             # check the rectangle shape of the mask
             labels = connected_components(already_present_TL.float())
 
@@ -798,105 +814,117 @@ class Image2ImageGAT_Dual(nn.Module):
                 for i, (label, count) in enumerate(zip(uniques[0], uniques[1])):
                     if i == 0:
                         continue
-                    if count < 100:
-                        segMask_TN[b][labels[b] == label] = 255
+                    mask_ = labels[b] == label
+                    if count < 75:
+                        segMask_TN[b][mask_] = 255
                     else:
-                        ys, xs = (labels[b, 0] == label).nonzero().permute(1, 0)
+                        ys, xs = (mask_[0]).nonzero().permute(1, 0)
                         y0, y1 = ys.min(), ys.max()
                         x0, x1 = xs.min(), xs.max()
                         rect_area = (y1 - y0 + 1) * (x1 - x0 + 1)
                         ratio_xy = (y1 - y0 + 1) / (x1 - x0 + 1)
-                        if rect_area/count > 0.95 and 2. < ratio_xy < 3.5:
+                        if rect_area/count > 0.95 and 1.2 < ratio_xy < 5.:
                             color = determine_color_N(self.real_N[b, :, y0:y1+1, x0:x1+1])
                             TL = self.TL_collection[color]
                             fake_light = TL['D'][torch.randint(0, len(TL['D']), [1])].to(D.device)
+                            if count < 150:
+                                fake_light = dilation(fake_light, torch.ones((3, 3), device=fake_light.device))
                             fake_light = interpolate(fake_light, (y1 - y0 + 1, x1 - x0 + 1))
+                            mean_TN = 1-T[b][mask_.repeat(3, 1, 1)].mean()
+                            fake_light = (fake_light / fake_light.mean() * mean_TN).clamp(0, 1)
                             D[b:b+1, :, y0:y1+1, x0:x1+1] = fake_light
+                            nb -= 1
+                            contour_mask += dilation(mask_[None].float(), torch.ones((min(mask_.shape[-1]//2, 5),
+                                                                                      min(mask_.shape[-1]//2, 5)),
+                                                                               device=mask_.device)) - mask_.float()
+                            weights += mask_[None].float() * 5.
                         else:
                             segMask_TN[b][labels[b] == label] = 255
-        contour_mask = torch.zeros_like(segMask_TN)
-        for i in range(nb):
-            rand_idx = torch.rand(1)
-            if rand_idx < 0.48:
-                color = 'green'
-            elif rand_idx > 0.52:
-                color = 'red'
-            else:
-                color = 'orange'
-            TL = self.TL_collection[color]
-            TL_D = TL['D'][torch.randint(0, len(TL['D']), [1])].to(D.device)
-            idx = torch.randint(0, len(TL['T']), [1])
-            TL_T = TL['T'][idx].to(T.device)
-            TL_N = TL['N'][idx].to(T.device)
-            min_scale = 9 / TL_T.shape[-1]
-            scale_size = max(torch.randint(35, 100, (1,)).item() / 100, min_scale)
-            TL_T_ = interpolate(TL_T, scale_factor=scale_size, mode='bilinear', align_corners=False)
-            TL_N_ = interpolate(TL_N, scale_factor=scale_size, mode='bilinear', align_corners=False)
-            TL_D_ = TL_D.match_shape(TL_T_)
-            valid_pos_TN = (segMask_TN < 2).float() + (segMask_TN == 8).float() + (segMask_TN == 10).float()
-            valid_pos_D = (segMask_D < 2).float() + (segMask_D == 8).float() + (segMask_D == 10).float()
-            valid_pos = valid_pos_TN * valid_pos_D
-            valid_pos[..., :TL_N_.shape[-2], :], valid_pos[..., -TL_N_.shape[-2]:, :] = 0, 0
-            valid_pos[..., -TL_N_.shape[-1]:], valid_pos[..., :TL_N_.shape[-1]] = 0, 0
-            if valid_pos.sum() == 0:
-                y_idxs, x_idxs = torch.randint(0, T.shape[-2] - TL_N_.shape[-2], (1,)), torch.randint(0, T.shape[-1] -
-                                                                                                      TL_N_.shape[-1],
-                                                                                                      (1,))
-                y = y_idxs.item()
-                x = x_idxs.item()
-            else:
-                y_idxs, x_idxs = valid_pos.nonzero()[:, 2:].permute(1, 0)
-                idx = torch.randint(0, len(y_idxs), (1,))
-                y = y_idxs[idx].item()
-                x = x_idxs[idx].item()
-            y = max(min(N.shape[-2] - TL_N_.shape[-2] // 2 - 1, y), TL_N_.shape[-2] // 2 + 1)
-            x = max(min(N.shape[-1] - TL_N_.shape[-1] // 2 - 1, x), TL_N_.shape[-1] // 2 + 1)
-            y1_TD = y + TL_T_.shape[-2] // 2
-            x1_TD = x + TL_T_.shape[-1] // 2
-            x0_TD = x1_TD - TL_T_.shape[-1]
-            y0_TD = y1_TD - TL_T_.shape[-2]
+        if nb > 0:
+            for i in range(nb):
+                rand_idx = torch.rand(1)
+                if rand_idx < 0.56:
+                    color = 'green'
+                elif rand_idx > 0.60:
+                    color = 'red'
+                else:
+                    color = 'orange'
+                TL = self.TL_collection[color]
+                TL_D = TL['D'][torch.randint(0, len(TL['D']), [1])].to(D.device)
+                idx = torch.randint(0, len(TL['T']), [1])
+                TL_T = TL['T'][idx].to(T.device)
+                TL_N = TL['N'][idx].to(T.device)
+                min_scale = 9 / TL_T.shape[-1]
+                scale_size = max(torch.randint(25, 100, (1,)).item() / 100, min_scale)
+                TL_T_ = interpolate(TL_T, scale_factor=scale_size, mode='bilinear', align_corners=False)
+                TL_N_ = interpolate(TL_N, scale_factor=scale_size, mode='bilinear', align_corners=False)
+                TL_D_ = TL_D.match_shape(TL_T_)
+                valid_pos_TN = (segMask_TN < 2).float() + (segMask_TN == 8).float() + (segMask_TN == 10).float()
+                valid_pos_D = (segMask_D < 2).float() + (segMask_D == 8).float() + (segMask_D == 10).float()
+                valid_pos = valid_pos_TN * valid_pos_D
+                valid_pos[..., :TL_N_.shape[-2], :], valid_pos[..., -TL_N_.shape[-2]:, :] = 0, 0
+                valid_pos[..., -TL_N_.shape[-1]:], valid_pos[..., :TL_N_.shape[-1]] = 0, 0
+                if valid_pos.sum() == 0:
+                    y_idxs, x_idxs = torch.randint(0, T.shape[-2] - TL_N_.shape[-2], (1,)), torch.randint(0, T.shape[-1] -
+                                                                                                          TL_N_.shape[-1],
+                                                                                                          (1,))
+                    y = y_idxs.item()
+                    x = x_idxs.item()
+                else:
+                    y_idxs, x_idxs = valid_pos.nonzero()[:, 2:].permute(1, 0)
+                    idx = torch.randint(0, len(y_idxs), (1,))
+                    y = y_idxs[idx].item()
+                    x = x_idxs[idx].item()
+                y = max(min(N.shape[-2] - TL_N_.shape[-2] // 2 - 1, y), TL_N_.shape[-2] // 2 + 1)
+                x = max(min(N.shape[-1] - TL_N_.shape[-1] // 2 - 1, x), TL_N_.shape[-1] // 2 + 1)
+                y1_TD = y + TL_T_.shape[-2] // 2
+                x1_TD = x + TL_T_.shape[-1] // 2
+                x0_TD = x1_TD - TL_T_.shape[-1]
+                y0_TD = y1_TD - TL_T_.shape[-2]
 
-            TL_D_ = TL_D_ ** (torch.rand(1).item() * 0.4 + 0.8)
-            T[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_T_
-            N[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_N_
-            D[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_D_
-            segMask_TN[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 6
+                TL_D_ = TL_D_ ** (torch.rand(1).item() * 0.4 + 0.8)
+                T[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_T_
+                N[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_N_
+                D[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_D_
+                segMask_TN[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 6
 
-            # y1_N = y + TL_N_.shape[-2] // 2
-            # x1_N = x + TL_N_.shape[-1] // 2
-            # x0_N = x1_N - TL_N_.shape[-1]
-            # y0_N = y1_N - TL_N_.shape[-2]
-            # real = N[:, :, y0_N:y1_N, x0_N:x1_N]
-            # if TL_T.shape[-1] != TL_N_.shape[-1]:
-            #     mask_ori = torch.zeros_like(TL_N_[:, :1])
-            #     mask_ori[:, :, TL_N_.shape[-2] // 2 - TL_T_.shape[-2] // 2:TL_N_.shape[-2] // 2 + TL_T_.shape[-2] // 2,
-            #     TL_N_.shape[-1] // 2 - TL_T_.shape[-1] // 2:TL_N_.shape[-1] // 2 + TL_T_.shape[-1] // 2] = 1.0
-            # else:
-            #     mask_ori = torch.ones_like(TL_N_[:, :1])
-            # TL_N_mean = (TL_N_.mean(1, keepdim=True) * mask_ori).sum(dim=[1, 2, 3]) / mask_ori.sum()
-            # C_intensity = TL_N_.max(1, keepdim=True)[0] - TL_N_.min(1, keepdim=True)[0]
-            # mask = (TL_N_.mean(1, keepdim=True) + mask_ori + C_intensity).max(1, keepdim=True)[0].clamp(0, 1)
-            # N[:, :, y0_N:y1_N, x0_N:x1_N] = TL_N_ * mask + real * (1 - mask)
-            contour_mask[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 1
+                # y1_N = y + TL_N_.shape[-2] // 2
+                # x1_N = x + TL_N_.shape[-1] // 2
+                # x0_N = x1_N - TL_N_.shape[-1]
+                # y0_N = y1_N - TL_N_.shape[-2]
+                # real = N[:, :, y0_N:y1_N, x0_N:x1_N]
+                # if TL_T.shape[-1] != TL_N_.shape[-1]:
+                #     mask_ori = torch.zeros_like(TL_N_[:, :1])
+                #     mask_ori[:, :, TL_N_.shape[-2] // 2 - TL_T_.shape[-2] // 2:TL_N_.shape[-2] // 2 + TL_T_.shape[-2] // 2,
+                #     TL_N_.shape[-1] // 2 - TL_T_.shape[-1] // 2:TL_N_.shape[-1] // 2 + TL_T_.shape[-1] // 2] = 1.0
+                # else:
+                #     mask_ori = torch.ones_like(TL_N_[:, :1])
+                # TL_N_mean = (TL_N_.mean(1, keepdim=True) * mask_ori).sum(dim=[1, 2, 3]) / mask_ori.sum()
+                # C_intensity = TL_N_.max(1, keepdim=True)[0] - TL_N_.min(1, keepdim=True)[0]
+                # mask = (TL_N_.mean(1, keepdim=True) + mask_ori + C_intensity).max(1, keepdim=True)[0].clamp(0, 1)
+                # N[:, :, y0_N:y1_N, x0_N:x1_N] = TL_N_ * mask + real * (1 - mask)
+                contour_mask[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 1
+                weights[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 0.5
 
         contour_mask = (dilation(contour_mask.float(),
-                                get_disk_kernel(3, contour_mask.device)) - (segMask_TN == 6).float()).bool()
+                                 get_disk_kernel(3, contour_mask.device)) - (segMask_TN == 6).float()).bool()
 
-        return (D * 2 - 1).detach(), (T * 2 - 1).detach(), (N * 2 - 1).detach(), (segMask_TN == 6).detach(), contour_mask.detach()
+        return ((D * 2 - 1).detach(), (T * 2 - 1).detach(), (N * 2 - 1).detach(), (segMask_TN == 6).detach(),
+                contour_mask.detach(), weights.detach())
 
     # endregion
 
     # region ------------------------ Training Helpers ----------------------- #
     def visualize_current_results(self, save=False):
-        visuals = {'real_D': (self.D_com * 0.5 + 0.5 if self.D_com is not None else None),
-                   'real_T': (self.T_com * 0.5 + 0.5 if self.T_com is not None else None),
-                   'real_N': (self.N_com * 0.5 + 0.5 if self.N_com is not None else None),
-                   'fake_T': (self.fake_T_com * 0.5 + 0.5 if self.fake_T_com is not None else None),
-                   'remapped_T': (self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else None),
-                   'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else None),
-                   'rec_D': (self.rec_D_com * 0.5 + 0.5 if self.rec_D_com is not None else None),
-                   'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else None),
-                   'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else None)}
+        visuals = {'real_D': (self.D_com * 0.5 + 0.5 if self.D_com is not None else self.real_D * 0.5+0.5),
+                   'real_T': (self.T_com * 0.5 + 0.5 if self.T_com is not None else self.real_T * 0.5+0.5),
+                   'real_N': (self.N_com * 0.5 + 0.5 if self.N_com is not None else self.real_N * 0.5+0.5),
+                   'fake_T': (self.fake_T_com * 0.5 + 0.5 if self.fake_T_com is not None else self.fake_T * 0.5+0.5),
+                   'remapped_T': (self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5+0.5),
+                   'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.real_TN * 0.5+0.5),
+                   'rec_D': (self.rec_D_com * 0.5 + 0.5 if self.rec_D_com is not None else self.rec_D * 0.5+0.5),
+                   'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_T * 0.5+0.5),
+                   'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5+0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         self.visualizer.display_current_results(out)
         if save:

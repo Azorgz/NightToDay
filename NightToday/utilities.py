@@ -6,7 +6,7 @@ import numpy as np
 from kmeans_pytorch import kmeans
 from kornia.color import rgb_to_lab, lab_to_rgb
 from kornia.contrib import connected_components
-from kornia.morphology import closing, dilation, opening
+from kornia.morphology import closing, dilation, opening, erosion
 from scipy.ndimage import gaussian_filter
 from skimage import measure
 from skimage.morphology import disk
@@ -515,13 +515,11 @@ def detect_TL_blobs_mask_free(I_vi):
     G = 0.75 * vi_squared[:, 1:2] - 1.75 * vi_squared[:, 0:1] + 0.75 * vi_squared[:, 2:3]
     O = 1.1 * vi_squared[:, 0:1] - 0.1 * vi_squared[:, 1:2] - 2. * vi_squared[:, 2:3]
     C_intensity, color_idx = torch.max(torch.cat([R, G, O], dim=1), dim=1, keepdim=True)
-    Y = I_vi.mean(1, keepdim=True) * (C_intensity <= 0.1)
+    Y = I_vi.mean(1, keepdim=True) * (C_intensity <= 0.0)
     # ---- Blobs mapping ----
-    Y_filled = fill_holes((Y == 0).float()) - (Y == 0).float()
-    if Y_filled.sum() == 0:
-        M = (Y > Y[Y > 0].mean()).float()
-    else:
-        M = Y_filled * (Y > Y[Y > 0].mean())
+    M = (Y > Y[Y > 0].mean() + Y[Y > 0].std()).float()
+    M = opening(M, get_disk_kernel(1, I_vi.device))
+    M = dilation(M, get_disk_kernel(1, I_vi.device))
     labels = connected_components(M)
     # ---- Saturation enclosure ----
     for B, label in enumerate(labels):
@@ -699,8 +697,8 @@ def UpdateVisGT(fake_IR, Seg_mask, dis_th):
         Seg_mask = F.interpolate(Seg_mask.unsqueeze(1).float(), size=(H, W), mode='nearest').squeeze(1)
 
     # Create veg and sky masks
-    veg_mask = (Seg_mask == 8).float()
-    sky_mask = (Seg_mask == 10).float()
+    veg_mask = (Seg_mask == VEG).float()
+    sky_mask = (Seg_mask == SKY).float()
 
     # Convert IR to [0,1] and grayscale
     fake_IR_norm = (fake_IR + 1.0) * 0.5
@@ -1153,26 +1151,26 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     return output_FG_Mask, output_FG_FakeIR, output_FG_RealVis, output_highlight_mask, output_FG_top_mask, output_FG_bottom_mask
 
 
-# def determine_color_N(TL_N):
-#     R = TL_N[0].mean()
-#     G = TL_N[1].mean()
-#     B = TL_N[2].mean()
-#     C = R - B - G
-#     if C > 0.1:
-#         return 'red'
-#     elif C < -0.1:
-#         return 'green'
-#     else:
-#         return 'yellow'
+def determine_color_N(TL_N):
+    R = TL_N[0].mean()
+    G = TL_N[1].mean()
+    B = TL_N[2].mean()
+    C = R - B - G
+    if C > 0.1:
+        return 'red'
+    elif C < -0.1:
+        return 'green'
+    else:
+        return 'yellow'
 
 
 def determine_color_N(TL_D):
-    top_third = TL_D[:, :TL_D.shape[1]//3, :]
-    R = top_third[0].mean()
-    mid_third = TL_D[:, TL_D.shape[1]//3:2*TL_D.shape[1]//3, :]
-    Y = (mid_third[1] + mid_third[0]).mean()/2
-    bottom_third = TL_D[:, 2*TL_D.shape[1]//3:, :]
-    G = bottom_third[1].mean()
+    top_half = TL_D[:, :TL_D.shape[1]//2, :]
+    R = (top_half[0] - top_half[2]).mean() + top_half.mean()*3/4
+    mid_half = TL_D[:, TL_D.shape[1]//4:3*TL_D.shape[1]//4, :]
+    Y = (mid_half[1]/2 + mid_half[0]/2 - mid_half[2]).mean() + mid_half.mean()/2
+    bottom_half = TL_D[:, TL_D.shape[1]//2:, :]
+    G = (bottom_half[1] - bottom_half[0]).mean() + bottom_half.mean()*3/4
     if R > Y and R > G:
         return 'red'
     elif G > Y and G > R:

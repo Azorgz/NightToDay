@@ -106,15 +106,15 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         image_D = self.normalize(self.load_image(self.train_D, idx % len(self.train_D), fac=1.1))
-        image_T = self.normalize(self.load_image(self.train_T, idx % len(self.train_T), True).GRAY().RGB('gray'))
+        image_T = self.normalize(self.load_image(self.train_T, idx % len(self.train_T), False).GRAY().RGB('gray'))
         image_N = self.normalize(self.load_image(self.train_N, idx % len(self.train_N), True))
         image_D_seg = (self.load_image(self.D_seg, idx % (len(self.D_seg) or 1), seg=True).to_tensor()).to(torch.uint8)
-        image_TN_seg = (self.load_image(self.TN_seg, idx % (len(self.TN_seg) or 1), seg=True, crop=True).to_tensor()).to(torch.uint8)
+        image_TN_seg = (self.load_image(self.TN_seg, idx % (len(self.TN_seg) or 1), seg=True, crop=False).to_tensor()).to(torch.uint8)
         image_D_edges = self.load_image(self.D_edges, idx % (len(self.D_edges) or 1)).to_tensor()
-        image_TN_edges = self.load_image(self.TN_edges, idx % (len(self.TN_edges) or 1), True).to_tensor()
-        # if torch.rand(1) < 0.5:
-        #     image_D, image_D_seg, image_D_edges = self.augmentations(torch.cat([image_D, image_D_seg, image_D_edges], dim=1)).split([3, 1, 1], 1)
-        #     image_T, image_N, image_TN_edges, image_TN_seg = self.augmentations(torch.cat([image_T, image_N, image_TN_edges, image_TN_seg], dim=1)).split([3, 3, 1, 1], 1)
+        image_TN_edges = self.load_image(self.TN_edges, idx % (len(self.TN_edges) or 1), False).to_tensor()
+        if torch.rand(1) < 0.5:
+            image_D, image_D_seg, image_D_edges = self.augmentations(torch.cat([image_D, image_D_seg, image_D_edges], dim=1)).split([3, 1, 1], 1)
+            image_T, image_N, image_TN_edges, image_TN_seg = self.augmentations(torch.cat([image_T, image_N, image_TN_edges, image_TN_seg], dim=1)).split([3, 3, 1, 1], 1)
         return image_D, image_T, image_N, image_D_seg, image_TN_seg, image_D_edges, image_TN_edges, self.TL_collection
 
     def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, **kwargs) -> Tensor:
