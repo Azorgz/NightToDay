@@ -15,7 +15,7 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
     model = CrossRAFT(adapter=True)
-    path = os.getcwd() + '/NightToday/CrossRAFT/' if 'laptop' not in socket.gethostname() else './NightToday/CrossRAFT/'
+    path = os.getcwd() + '/NightToday/CrossRAFT/' if 'laptop' in socket.gethostname() else './NightToday/CrossRAFT/'
     state_dict = torch.load(path + 'checkpoints/checkpoint-10000.ckpt', weights_only=True)['state_dict']
     model.load_state_dict(state_dict)
 
