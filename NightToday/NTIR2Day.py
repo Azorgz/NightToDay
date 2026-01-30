@@ -114,8 +114,8 @@ class Image2ImageGAT_Dual(nn.Module):
             self.criterion_tv = TVLoss(TVLoss_weight=1)
             self.criterion_color = ColorLoss
             self.criterion_thermal = ThermalLoss
-            self.criterion_att = lambda rec, fake: self.criterion_cycle(rec, self.real_TN) + self.criterion_cycle(fake,
-                                                                                                                  self.fake_D.detach())
+            self.criterion_att = lambda rec, fake: (self.criterion_cycle(rec, self.real_TN) +
+                                                    self.criterion_cycle(fake, self.fake_D.detach()))
             self.criterion_semEdge = partial(SemEdgeLoss, num_classes=self.netS.num_classes)
             self.criterion_sharpness = SharpFusionLoss()
             self.criterion_scene_id = nn.CrossEntropyLoss()
