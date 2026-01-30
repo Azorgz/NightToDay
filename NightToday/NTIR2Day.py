@@ -429,7 +429,7 @@ class Image2ImageGAT_Dual(nn.Module):
         # region GAN loss
         """D_T(G_T(D))"""
         self.fake_T = self.netG.decode(encoded_D, to_=self.T)
-        self.fake_T = self.netG.fusion.thermal_postprocess(self.fake_T)
+        # self.fake_T = self.netG.fusion.thermal_postprocess(self.fake_T)
         self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T), self.remapped_T,
                                                  self.pred_real_T, self.fake_T, False, loss_name='G')
         """D_N(G_N(T))"""

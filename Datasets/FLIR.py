@@ -39,14 +39,22 @@ class FLIR(TrainDataset):
         Load an image from a given path and return it as a Tensor.
         """
         image = ImageTensor(path[idx]) ** fac * 255 if seg else ImageTensor(path[idx])
-        if crop and self.crop_xxyy:
-            crop = self.crop_xxyy[idx]
-            crop = crop[0]*500//640, crop[1]*500//640, crop[2]*400//512, crop[3]*400//512
-            crop = (max(crop[0]-120//2, 0), max(crop[1]-120//2, 0), max(crop[2] - 112//2, 0), max(crop[3] - 112//2, 0))
-        else:
-            crop = (0, 0, 0, 0)
-        image = (image.crop(crop, mode='lrtb') if seg else
-                 image.resize((400, 500)).crop((200, 250, 288, 360), mode='uvhw', center=True).crop(crop, mode='lrtb'))
+        # if crop and self.crop_xxyy:
+            # crop = self.crop_xxyy[idx]
+            # crop = crop[0]*500//640, crop[1]*500//640, crop[2]*400//512, crop[3]*400//512
+            # crop = (max(crop[0]-120//2, 0), max(crop[1]-120//2, 0), max(crop[2] - 112//2, 0), max(crop[3] - 112//2, 0))
+        # else:
+        #     crop = (0, 0, 0, 0)
+        # image = (image.crop(crop, mode='lrtb') if seg else
+        if not seg:
+            crop_ratio_w = 1/((500 - 360) / 2 / 500)
+            crop_ratio_h = 1/((400 - 288) / 2 / 400)
+            x = int(image.shape[3]//crop_ratio_w)
+            y = int(image.shape[2]//crop_ratio_h)
+            image = image.crop((x, x, y, y), mode='lrtb')
+            # image = image.resize((400, 500)).crop((200, 250, 288, 360), mode='uvhw', center=True)
+            if crop:
+                image[(image.sum(1, keepdim=True) == 0).repeat(1, 3, 1, 1)] = 0.5
         h, w = image.shape[-2:]
         if self.resize_and_crop:
             min_scale = min(h / self.load_size[0], w / self.load_size[1])
