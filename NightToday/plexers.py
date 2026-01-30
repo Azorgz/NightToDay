@@ -1,5 +1,6 @@
 #### PLEXERS
 import os
+import socket
 from os.path import isfile
 from typing import Literal
 
@@ -252,7 +253,9 @@ class S_Plexer(Plexer):
         self.networks = [model(*model_arg) for model_arg in model_args]
         self.names = [f'S_{dom}' for dom in self.names_domains]
         for net, name in zip(self.networks, self.names):
-            net.load_state_dict(torch.load(os.getcwd() + f'/checkpoints/{name}.pth'), strict=False)
+            path = os.getcwd() + f'/checkpoints/{name}' if 'laptop' in socket.gethostname() else \
+                f'/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/{name}.pth'
+            net.load_state_dict(torch.load(path), strict=False)
         self.to(self.device)
         self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_S, betas=training_cfg.betas_D)
         self.freeze = True
