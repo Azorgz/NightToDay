@@ -213,7 +213,9 @@ class Image2ImageGAT_Dual(nn.Module):
                 if checkpoint is None:
                     assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
                     save_filename = f'{epoch}_net_{self.model_name}'
-                    save_path = os.path.join(self.opt.training.checkpoint_dir, save_filename)
+                    path = os.getcwd() + '/NightToday/CrossRAFT/checkpoints/' if 'laptop' in socket.gethostname() else \
+                        '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
+                    save_path = os.path.join(path, save_filename)
                     checkpoint = torch.load(save_path, weights_only=False, map_location='cpu')
                     if return_checkpoint:
                         return checkpoint
