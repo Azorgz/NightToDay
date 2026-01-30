@@ -6,7 +6,8 @@ from . import TrainConfig
 
 class Visualizer:
     def __init__(self, opt: TrainConfig):
-        self.save_dir = opt.visualize_dir if 'laptop' in socket.gethostname() else '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/training_visuals/'
+        self.display = 'laptop' in socket.gethostname()
+        self.save_dir = opt.visualize_dir if self.display else '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/training_visuals/'
         self.display_freq = opt.visualize_freq
         self.size = opt.input_size
         self.screen = None
@@ -35,9 +36,9 @@ class Visualizer:
                 else:
                     composition = composition.vstack(row)
                 row = None
-        if self.screen is not None:
+        if self.screen is not None and self.display:
             self.screen.update(composition)
-        else:
+        elif self.display:
             self.screen = composition.show(name=f'Learning on going...', opencv=True, asyncr=True)
         return composition
 
