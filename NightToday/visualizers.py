@@ -37,5 +37,6 @@ class Visualizer:
             self.screen.update(composition)
         else:
             self.screen = composition.show(name=f'Learning on going...', opencv=True, asyncr=True)
+        return composition
 
 

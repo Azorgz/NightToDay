@@ -15,6 +15,7 @@ Usage: open this file in the editor and adapt patch sizes / transformer sizes to
 """
 import math
 import os
+import socket
 from collections import OrderedDict
 from functools import partial
 from pathlib import Path
@@ -92,7 +93,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                          Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[1]])))
             else:
                 self.pedestrian_color = (None, None)
-            self.checkpoint_dir = self.opt.training.checkpoint_dir
+            self.checkpoint_dir = self.opt.training.checkpoint_dir if 'laptop' in socket.gethostname() else '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
             os.makedirs(self.checkpoint_dir, exist_ok=True)
             self.visualize_dir = self.opt.training.visualize_dir
             os.makedirs(self.visualize_dir, exist_ok=True)
@@ -926,9 +927,9 @@ class Image2ImageGAT_Dual(nn.Module):
                    'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_T * 0.5+0.5),
                    'fake_D': (self.fake_D * 0.5 + 0.5 if self.fake_D is not None else self.fake_D * 0.5+0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
-        self.visualizer.display_current_results(out)
+        out = self.visualizer.display_current_results(out)
         if save:
-            self.visualizer.save_current_results(out, self.epoch)
+            self.visualizer.save_current_results({'Training': out}, self.epoch)
 
     def get_current_errors(self):
         return OrderedDict(
