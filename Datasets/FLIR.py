@@ -10,7 +10,7 @@ class FLIR(TrainDataset):
     Dataset class for the FLIR dataset.
     """
     name = 'FLIR'
-    root = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/FLIR/' \
+    root = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/datasets/FLIR/' \
         if not 'laptop'in socket.gethostname() else \
         '/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/'
 
