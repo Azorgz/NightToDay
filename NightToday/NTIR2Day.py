@@ -484,22 +484,20 @@ class Image2ImageGAT_Dual(nn.Module):
         if self.lambda_trafficlight_l > 0.0:
             self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
             total_mask = segMask_com | contourMask
-            fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
-            encoded_TN, TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
+            self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
+            encoded_TN, self.TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
                                                                  from_=self.T, align_first=False)
-            self.fake_T_com = fake_T_com * ~segMask_com + TN_com * segMask_com
-            self.TN_com = TN_com * ~segMask_com + fake_T_com * segMask_com
             self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
-            self.fake_D_com = self.netG.decode(self.netG.encode(self.TN_com, from_=self.T), to_=self.D)
+            self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
             self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
             self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_D_com,
                                                                 self.D_com,
                                                                 loss_name='trafficlight', criterion_lambda='trafficlight_l')
             self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
-                                                                self.real_TN * contourMask + fake_T_com * segMask_com,
+                                                                self.real_TN * contourMask + self.fake_T_com * segMask_com,
                                                                 loss_name='trafficlight', criterion_lambda='trafficlight_l')
             self.loss_trafficlight[self.N] += self.compute_loss('tll', segMask_com, self.fake_D_com,
-                                                                self.rec_D_com, self.D_com, fake_T_com, TN_com, weights,
+                                                                self.rec_D_com, self.D_com, self.fake_T_com, self.TN_com, weights,
                                                                 loss_name='trafficlight', criterion_lambda='trafficlight_f')
         # endregion
 
@@ -925,7 +923,7 @@ class Image2ImageGAT_Dual(nn.Module):
                    'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.real_TN * 0.5+0.5),
                    'rec_D': (self.rec_D_com * 0.5 + 0.5 if self.rec_D_com is not None else self.rec_D * 0.5+0.5),
                    'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_T * 0.5+0.5),
-                   'fake_D': (self.fake_D * 0.5 + 0.5 if self.fake_D is not None else self.fake_D * 0.5+0.5)}
+                   'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D is not None else self.fake_D * 0.5+0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
         if save:

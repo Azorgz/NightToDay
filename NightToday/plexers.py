@@ -174,7 +174,8 @@ class G_Plexer(Plexer):
             return_im = True
         self.ori_shape = x.shape
         scale = 2**self.opt.downscaling
-        input_size = self.input_size if isinstance(self.input_size, (list, tuple)) else (self.input_size, self.input_size)
+        input_size = (512, 512)
+        # input_size = self.input_size if isinstance(self.input_size, (list, tuple)) else (self.input_size, self.input_size)
         if input_size[0] < 0:
             input_size = self.ori_shape[-2]//scale*scale, self.ori_shape[-1]//scale*scale
         else:
