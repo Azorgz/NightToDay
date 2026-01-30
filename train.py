@@ -10,7 +10,7 @@ from NightToday.NTIR2Day import Image2ImageGAT_Dual
 
 if __name__ == "__main__":
 
-    displayed_errors = ['G', 'D']
+    displayed_errors = ['sharpness', 'fus']
 
     # Build model from config  (Default: NightToday/NightToday.yaml)
     model = Image2ImageGAT_Dual(trainable=True)
