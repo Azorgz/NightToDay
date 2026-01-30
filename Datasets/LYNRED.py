@@ -1,7 +1,5 @@
 import os
 import socket
-from _socket import gethostname
-
 from .DatasetBase import TrainDataset, TestDataset
 
 
