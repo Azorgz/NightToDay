@@ -462,7 +462,7 @@ class Image2ImageGAT_Dual(nn.Module):
         gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
         self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, -gray_N.repeat(1, 3, 1, 1).detach(),
                                                    loss_name='fus', criterion_lambda='fus')
-        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, self.remapped_T.detach(),
+        self.loss_fus[self.T] += self.compute_loss('cycle', self.real_TN, self.remapped_T.detach(),
                                                    loss_name='fus', criterion_lambda='fus')
         # endregion
 
