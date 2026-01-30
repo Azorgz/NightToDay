@@ -626,6 +626,7 @@ class SharpFusionLoss(torch.nn.Module):
         return X * mask
 
     def forward(self, I_f, I_vi, I_ir):
+        size = I_f.shape[-1] // 256 * 2 + 1
         # Convert to grayscale if needed
         I_f = (0.299 * I_f[:, 0:1] + 0.587 * I_f[:, 1:2] + 0.114 * I_f[:, 2:3]) * 0.5 + 0.5 if I_f.shape[1] == 3 else I_f * 0.5 + 0.5
         I_vi = (0.299 * I_vi[:, 0:1] + 0.587 * I_vi[:, 1:2] + 0.114 * I_vi[:, 2:3]) * 0.5 + 0.5 if I_vi.shape[1] == 3 else I_vi * 0.5 + 0.5
@@ -638,9 +639,9 @@ class SharpFusionLoss(torch.nn.Module):
         L_grad = F.l1_loss(G_f, G_ref)
 
         # -------- Laplacian Loss --------
-        L_f = laplacian(I_f, 3).abs()
-        L_vi = laplacian(I_vi, 3).abs()
-        L_ir = laplacian(I_ir, 3).abs()
+        L_f = laplacian(I_f, size).abs()
+        L_vi = laplacian(I_vi, size).abs()
+        L_ir = laplacian(I_ir, size).abs()
         L_ref = torch.max(L_vi, L_ir)
         L_lap = F.l1_loss(L_f, L_ref)
 
