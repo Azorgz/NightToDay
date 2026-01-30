@@ -664,7 +664,7 @@ class SharpFusionLoss(torch.nn.Module):
              self.lam_contrast * L_contrast +
              self.lam_freq * L_freq)
 
-        return L.sum()
+        return L.mean()
 
 
 class ThermalNoiseLoss(nn.Module):
