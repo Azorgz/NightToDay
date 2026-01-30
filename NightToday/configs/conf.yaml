@@ -34,7 +34,7 @@ model:
       hidden_dim: 256
       n_enc_layers: 4
       dropout: 0.25
-      n_downscaling: 3
+      n_downscaling: 2
 
   discr:
     base_dim: 64
