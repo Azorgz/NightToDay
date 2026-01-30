@@ -71,7 +71,7 @@ training:
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
     lambda_color: [[ 2,  ], 1.5]
-    lambda_id: [[ 0, 10 ], 0.5]
+    lambda_id: [[ 0, 10 ], 0.1]
     lambda_cycle:  [[ 0,  ], 5.0]
     lambda_ssim:  [[ 2,  ], 2.5]
     lambda_seg:  [[ 0, ], 1.0]
@@ -79,7 +79,7 @@ training:
     lambda_gan:  [[ 0,  ], 2.0]
     lambda_tv:  [[ 1,  ], 5.0]
     lambda_sga: [[ 40,  ], 1.0]
-    lambda_latent: [[ 0, 10], 0.5]
+    lambda_latent: [[ 0, 10], 0.1]
     lambda_att: [[ 40, ], 0.0]
     lambda_fus: [[ 0,  2], 2.0]
     lambda_scale_robustness: [[ 75,  ], 0.5]
@@ -93,7 +93,7 @@ training:
 
 data:
   loader:
-    batch_size: 1
+    batch_size: 2
     num_workers: 1
     shuffle: True
     resize_and_crop: True
