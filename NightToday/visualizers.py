@@ -1,10 +1,12 @@
+import socket
+
 from ImagesCameras import ImageTensor
 from . import TrainConfig
 
 
 class Visualizer:
     def __init__(self, opt: TrainConfig):
-        self.save_dir = opt.visualize_dir
+        self.save_dir = opt.visualize_dir if 'laptop' in socket.gethostname() else '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/training_visuals/'
         self.display_freq = opt.visualize_freq
         self.size = opt.input_size
         self.screen = None

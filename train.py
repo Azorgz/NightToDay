@@ -32,7 +32,7 @@ if __name__ == "__main__":
             total_steps += batch_size
             epoch_iter += batch_size
             list_errors = [f'{key}: {errors[key]}' for key in displayed_errors]
-            bar.set_description(f"epoch : {e}, {', '.join(list_errors)}")
+            bar.set_description(f"epoch : {e}, iter: {epoch_iter}, {', '.join(list_errors)}")
             torch.cuda.empty_cache()
 
             if i % opt.training.checkpoint_save_latest < batch_size and i != 0:
