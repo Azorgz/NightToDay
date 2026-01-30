@@ -1,4 +1,5 @@
 import os
+import socket
 from _socket import gethostname
 
 from ImagesCameras import ImageTensor
@@ -13,7 +14,10 @@ class FLIR(TrainDataset):
     Dataset class for the FLIR dataset.
     """
     name = 'FLIR'
-    root = "/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/"
+    root = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/FLIR/' \
+        if not 'laptop'in socket.gethostname() else \
+        '/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/'
+
 
     def __init__(self, opt):
         self.train_D = self.root + "FLIR_datasets/trainA"
@@ -29,9 +33,7 @@ class FLIR(TrainDataset):
         self.TL_T = [self.TL_T + f for f in sorted(os.listdir(self.TL_T))]
         self.TL_N = self.root + "FLIR_datasets/FG_sample_N/"
         self.TL_N = [self.TL_N + f for f in sorted(os.listdir(self.TL_N))]
-
-        self.crop_path = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/FLIR/FLIR_datasets/crop.yaml' \
-            if not 'laptop' in gethostname() else '/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/FLIR_datasets/crop.yaml'
+        self.crop_path = self.root + '/FLIR_datasets/crop.yaml'
         super().__init__(opt)
 
     def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, fac=1., **kwargs) -> Tensor:

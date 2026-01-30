@@ -1,4 +1,5 @@
 import os
+import socket
 from _socket import gethostname
 
 from .DatasetBase import TrainDataset, TestDataset
@@ -9,7 +10,8 @@ class LYNRED(TrainDataset):
     Dataset class for the LYNRED night dataset.
     """
     name = 'LYNRED'
-    root = "/home/godeta/PycharmProjects/TIR2VIS/datasets/LYNRED/"
+    root = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/datasets/LYNRED/' \
+        if 'laptop' not in socket.gethostname() else "/home/godeta/PycharmProjects/TIR2VIS/datasets/LYNRED/"
 
     def __init__(self, opt):
         self.train_D = self.root + "LYNRED_datasets/trainA"

@@ -1151,17 +1151,17 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
     return output_FG_Mask, output_FG_FakeIR, output_FG_RealVis, output_highlight_mask, output_FG_top_mask, output_FG_bottom_mask
 
 
-def determine_color_N(TL_N):
-    R = TL_N[0].mean()
-    G = TL_N[1].mean()
-    B = TL_N[2].mean()
-    C = R - B - G
-    if C > 0.1:
-        return 'red'
-    elif C < -0.1:
-        return 'green'
-    else:
-        return 'yellow'
+# def determine_color_N(TL_N):
+#     R = TL_N[0].mean()
+#     G = TL_N[1].mean()
+#     B = TL_N[2].mean()
+#     C = R - B - G
+#     if C > 0.1:
+#         return 'red'
+#     elif C < -0.1:
+#         return 'green'
+#     else:
+#         return 'yellow'
 
 
 def determine_color_N(TL_D):

@@ -303,8 +303,6 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
     high_color_mask = (color_mask > color_mask.mean()) * valid
     weights = weights[[CAR, TRUCK, BUILDING, MOTORCYCLE, SIGN, ROAD]].to(im_target.device) if weights is not None else \
         torch.ones(6, device=fake_color.device)
-    weights[0] *= 2  # car
-    # weights[2] /= 2  # building
     H, W = im_fake.shape[-2:]
     loss = torch.zeros([B, ], device=im_target.device)
 
@@ -363,7 +361,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
         #                    (fake_sky_region + 1 - (GT_seg == SKY).float()).mean(dim=1).flatten(1).min(dim=1)[0]) * 0.2
     else:
         loss += (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
-    loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), high_color_mask) * 0.25
+    loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), high_color_mask) * 0.2
 
     return loss.mean()
 
