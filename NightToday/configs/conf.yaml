@@ -93,7 +93,7 @@ training:
 
 data:
   loader:
-    batch_size: 1
+    batch_size: 4
     num_workers: 1
     shuffle: True
     resize_and_crop: True
