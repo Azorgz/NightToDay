@@ -74,9 +74,9 @@ training:
     lambda_id: [[ 0, 10 ], 0.1]
     lambda_cycle:  [[ 0,  ], 5.0]
     lambda_ssim:  [[ 0,  ], 2.5]
-    lambda_seg:  [[ 0, ], 1.0]
-    lambda_semEdge:  [[ 0,  ], .5]
-    lambda_gan:  [[ 0,  ], 2.0]
+    lambda_seg:  [[ 1, ], 1.0]
+    lambda_semEdge:  [[ 1,  ], .5]
+    lambda_gan:  [[ 0,  ], 1.0]
     lambda_tv:  [[ 1,  ], 5.0]
     lambda_sga: [[ 40,  ], 1.0]
     lambda_latent: [[ 0, 10], 0.1]
@@ -93,7 +93,7 @@ training:
 
 data:
   loader:
-    batch_size: 1
+    batch_size: 4
     num_workers: 1
     shuffle: True
     resize_and_crop: True
