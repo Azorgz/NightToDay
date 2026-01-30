@@ -13,34 +13,31 @@ Image-to-Image Generative Adversarial Transformer (Dual-Stream)
 
 Usage: open this file in the editor and adapt patch sizes / transformer sizes to your input resolution.
 """
-import math
 import os
 import socket
 from collections import OrderedDict
 from functools import partial
 from pathlib import Path
 
+import matplotlib.colors as mcolors
 import numpy as np
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
-import matplotlib.colors as mcolors
-from kornia.color import rgb_to_hsv, hsv_to_rgb
 from kornia.contrib import connected_components
-from kornia.morphology import dilation, erosion, closing, opening
+from kornia.morphology import dilation
 from torch import Tensor
-from torch.nn.functional import interpolate, relu, normalize
-from torchvision.transforms.functional import gaussian_blur
+from torch.nn.functional import interpolate, normalize
 
-from . import get_config
 from . import OptImage2ImageGATConfig
+from . import get_config
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
-    ThermalLoss, SharpFusionLoss, TL_fake_loss, TL_color_loss, TrafLighLumiLoss, PixelConsistencyLoss, \
+    ThermalLoss, SharpFusionLoss, TrafLighLumiLoss, PixelConsistencyLoss, \
     TrafLighLumiLoss_TN
 from .modules import LossScheduler, Get_gradmag_gray
 from .plexers import G_Plexer, D_Plexer, S_Plexer
-from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_FG_MergeMask, get_disk_kernel, \
+from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_disk_kernel, \
     determine_color_N
 from .visualizers import Visualizer
 
@@ -463,7 +460,7 @@ class Image2ImageGAT_Dual(nn.Module):
         # region Fusion Loss
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
         gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
-        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, -gray_N.detach(),
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, -gray_N.repeat(1, 3, 1, 1).detach(),
                                                    loss_name='fus', criterion_lambda='fus')
         self.loss_fus[self.N] += self.compute_loss('cycle', self.real_TN, self.remapped_T.detach(),
                                                    loss_name='fus', criterion_lambda='fus')
@@ -519,22 +516,23 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region Scale Robustness Loss
-        scale = float(np.random.randint(0, 4, 1))
-        real_T_s = interpolate(self.real_T, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
-        real_N_s = interpolate(self.real_N, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
-        fake_TN_encoded, fake_fused_IR_s, *_ = self.netG.encode(real_T_s, real_N_s,
-                                                                from_=self.T, align_first=False)
-        fake_D_s = interpolate(self.netG.decode(fake_TN_encoded, to_=self.D),
-                               size=self.input_size, mode='bilinear', align_corners=False)
-        fake_D = self.fake_D.detach()
-        fake_fused_IR_s = interpolate(fake_fused_IR_s, size=self.input_size, mode='bilinear', align_corners=False)
-        fake_fused_IR = self.real_TN.detach()
-        self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D_s, fake_D,
-                                                                loss_name='scale_robustness',
-                                                                criterion_lambda='scale_robustness')
-        self.loss_scale_robustness[self.N] += self.compute_loss('cycle', fake_fused_IR_s, fake_fused_IR,
-                                                                loss_name='scale_robustness',
-                                                                criterion_lambda='scale_robustness')
+        if self.lambda_scale_robustness > 0.0:
+            scale = float(np.random.randint(0, 4, 1))
+            real_T_s = interpolate(self.real_T, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
+            real_N_s = interpolate(self.real_N, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
+            fake_TN_encoded, fake_fused_IR_s, *_ = self.netG.encode(real_T_s, real_N_s,
+                                                                    from_=self.T, align_first=False)
+            fake_D_s = interpolate(self.netG.decode(fake_TN_encoded, to_=self.D),
+                                   size=self.input_size, mode='bilinear', align_corners=False)
+            fake_D = self.fake_D.detach()
+            fake_fused_IR_s = interpolate(fake_fused_IR_s, size=self.input_size, mode='bilinear', align_corners=False)
+            fake_fused_IR = self.real_TN.detach()
+            self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D_s, fake_D,
+                                                                    loss_name='scale_robustness',
+                                                                    criterion_lambda='scale_robustness')
+            self.loss_scale_robustness[self.N] += self.compute_loss('cycle', fake_fused_IR_s, fake_fused_IR,
+                                                                    loss_name='scale_robustness',
+                                                                    criterion_lambda='scale_robustness')
         # endregion
 
         # region Domain-specific losses include CGR loss and ACA loss.
@@ -616,7 +614,6 @@ class Image2ImageGAT_Dual(nn.Module):
                                                      weights=self.class_weight)
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
-
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T.detach(),
                                                        self.segMask_TN_update, weights=self.class_weight)
         # endregion

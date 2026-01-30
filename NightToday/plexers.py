@@ -253,7 +253,7 @@ class S_Plexer(Plexer):
         self.networks = [model(*model_arg) for model_arg in model_args]
         self.names = [f'S_{dom}' for dom in self.names_domains]
         for net, name in zip(self.networks, self.names):
-            path = os.getcwd() + f'/checkpoints/{name}' if 'laptop' in socket.gethostname() else \
+            path = os.getcwd() + f'/checkpoints/{name}.pth' if 'laptop' in socket.gethostname() else \
                 f'/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/{name}.pth'
             net.load_state_dict(torch.load(path), strict=False)
         self.to(self.device)
