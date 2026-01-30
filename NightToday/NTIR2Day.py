@@ -646,7 +646,7 @@ class Image2ImageGAT_Dual(nn.Module):
             return rand_size, self.segMask_TN
         else:
             rand_scale = torch.randint(8, 20, (1, 1))
-            rand_size = int(rand_scale.item() * self.input_size/16)
+            rand_size = int(rand_scale.item() * self.input_size[0]/16)
 
             real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
             real_TN_s = interpolate(self.real_TN, size=rand_size, mode='bilinear', align_corners=False)
