@@ -43,10 +43,10 @@ model:
 training:
   checkpoint_dir: '/checkpoints'
   checkpoint_freq: 1  # epochs
-  checkpoint_save_latest: 800  # steps
+  checkpoint_save_latest: 500  # steps
   split_optimizers: False
   split_weights: False
-  visualize_freq: 200  # steps
+  visualize_freq: 100  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
   start_epoch: 0
