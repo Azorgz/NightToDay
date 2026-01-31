@@ -496,8 +496,9 @@ class Image2ImageGAT_Dual(nn.Module):
             self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
                                                                 self.real_TN * contourMask + self.fake_T_com * segMask_com,
                                                                 loss_name='trafficlight', criterion_lambda='trafficlight_l')
-            self.loss_trafficlight[self.N] += self.compute_loss('tll', segMask_com, self.fake_D_com,
-                                                                self.rec_D_com, self.D_com, self.fake_T_com, self.TN_com, weights,
+            self.loss_trafficlight[self.N] += self.compute_loss('tll', segMask_com, contourMask, self.fake_D_com,
+                                                                self.rec_D_com, self.D_com, self.fake_T_com, self.TN_com,
+                                                                self.remapped_T, weights,
                                                                 loss_name='trafficlight', criterion_lambda='trafficlight_f')
         # endregion
 

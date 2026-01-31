@@ -310,6 +310,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
         if color_dist.shape[-2:] != GT_seg.shape[-2:]:
             GT_seg = F.interpolate(GT_seg.float(), size=(H, W), mode='nearest').long()
         high_color_mask = high_color_mask * (GT_seg != SKY)
+        valid = valid * (GT_seg != SKY)
 
         # build masks in a single vectorized call
         # ------------------------------------------------------------
@@ -1025,13 +1026,14 @@ def TrafLighLumiLoss_TN(real_N, fake_T, mask):
     return losses
 
 
-def TrafLighLumiLoss(mask, fake_D, rec_D, real_D, fake_T, fused_TN, weights):
+def TrafLighLumiLoss(mask, contour, fake_D, rec_D, real_D, fake_T, fused_TN, real_T, weights):
     "Traffic Light Luminance Loss. fake_img: fake vis image. fake_mask: IR seg mask. real_mask: Vis seg mask."
     B, _, h, w = rec_D.shape
     _, _, seg_h, seg_w = mask.shape
     if (h != seg_h) or (w != seg_w):
         mask = F.interpolate(mask.float(), size=[h, w], mode='nearest')
-    labels = connected_components(mask.float())
+    mask_total = mask | contour
+    labels = connected_components(mask_total.float())
     uniques, counts = labels.unique(return_counts=True)
     losses = torch.zeros([B], device=rec_D.device)
 
@@ -1039,7 +1041,9 @@ def TrafLighLumiLoss(mask, fake_D, rec_D, real_D, fake_T, fused_TN, weights):
         for label, count in zip(uniques, counts):
             if label == 0:
                 continue
-            mask_ = (labels[b:b+1] == label).float()
+            mask_ = (labels[b:b+1] == label).float() * mask[b:b+1]
+            contour_ = (labels[b:b+1] == label).float() * contour[b:b+1]
+            mask_total_ = mask_ | contour_
             weight = (weights[b:b+1] * mask_).sum() / (mask_.sum() + 1e-6)
             losses[b] += PixelConsistencyLoss(rec_D[b:b+1], real_D[b:b+1], mask_) * weight
             losses[b] += PixelConsistencyLoss(fake_D[b:b+1], real_D[b:b+1], mask_) * weight
