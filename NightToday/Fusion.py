@@ -395,9 +395,9 @@ class U_ResNetFusion(nn.Module):
         out = self.final_conv(x_feat)
         # filtered_ir = torch.sqrt(bilateral_blur(ir*0.5+0.5, (3, 3), 0.1, (1.5, 1.5)) + 1e-6)
         # out = torch.sqrt((self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)*0.5+0.5) * filtered_ir + 1e-6) * 2 - 1
-        out = self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)
-        return out, ir, vis_night  # match input channels
-        # return self.tanh_n(1)(out).repeat(1, 3, 1, 1), ir, vis_night  # match input channels
+        # out = self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)
+        # return out, ir, vis_night  # match input channels
+        return self.tanh_n(1)(out).repeat(1, 3, 1, 1), ir, vis_night  # match input channels
 
     def train(self, mode: bool = True) -> None:
         super().train(mode)
