@@ -1043,7 +1043,7 @@ def TrafLighLumiLoss(mask, contour, fake_D, rec_D, real_D, fake_T, fused_TN, rea
                 continue
             mask_ = (labels[b:b+1] == label).float() * mask[b:b+1]
             contour_ = (labels[b:b+1] == label).float() * contour[b:b+1]
-            mask_total_ = mask_ | contour_
+            mask_total_ = mask_ * contour_
             weight = (weights[b:b+1] * mask_).sum() / (mask_.sum() + 1e-6)
             losses[b] += PixelConsistencyLoss(rec_D[b:b+1], real_D[b:b+1], mask_) * weight
             losses[b] += PixelConsistencyLoss(fake_D[b:b+1], real_D[b:b+1], mask_) * weight
