@@ -195,11 +195,11 @@ class ColorConsistencyLoss(nn.Module):
 
     def __init__(self):
         super(ColorConsistencyLoss, self).__init__()
-        self.lambda_saturation = 0.8
-        self.lambda_lab_edge = 0.05
+        self.lambda_saturation = 1.0
+        self.lambda_lab_edge = 0.1
         self.lambda_l1 = 0.1
-        self.lambda_contrast = 5.
-        self.saturation_gated = 0.02
+        self.lambda_contrast = 1.
+        self.saturation_gated = 0.01
 
     def forward(self, fake_color: torch.Tensor, real_color: torch.Tensor, mask_high_color) -> torch.Tensor:
         """
