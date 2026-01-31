@@ -82,10 +82,10 @@ training:
     lambda_latent: [[ 0, 10], 0.1]
     lambda_att: [[ 40, ], 0.0]
     lambda_fus: [[ 0,  2], 5.0]
-    lambda_scale_robustness: [[ 75,  ], 0.0]
+    lambda_scale_robustness: [[ 75,  ], 0.5]
     lambda_trafficlight_l: [[ 10,  ], 0.01]
     lambda_trafficlight_f: [[ 10,  ], 0.05]
-    lambda_thermal: [[ 1,  ], 3.5]
+    lambda_thermal: [[ 1,  ], 2.5]
     lambda_sharpness: [[ 0,  ], 5.0]
     lambda_cgr: [[ 5, ], 1.0]  # Conditional Gradient Repair
     lambda_bc: [[ 5, ], 2.0]  # Bias correction Loss
