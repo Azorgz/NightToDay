@@ -195,11 +195,11 @@ class ColorConsistencyLoss(nn.Module):
 
     def __init__(self):
         super(ColorConsistencyLoss, self).__init__()
-        self.lambda_saturation = 0.5
+        self.lambda_saturation = 0.8
         self.lambda_lab_edge = 0.05
-        self.lambda_l1 = 0.05
+        self.lambda_l1 = 0.1
         self.lambda_contrast = 5.
-        self.saturation_gated = 0.05
+        self.saturation_gated = 0.02
 
     def forward(self, fake_color: torch.Tensor, real_color: torch.Tensor, mask_high_color) -> torch.Tensor:
         """
@@ -256,7 +256,7 @@ class ColorConsistencyLoss(nn.Module):
         Sat_diff = torch.relu(hsv_real[:, 1] - hsv_fake[:, 1] + tau).squeeze(1)
         S = Sat_diff
         H = torch.sqrt((hsv_real[:, 0] - hsv_fake[:, 0]) ** 2 + 1e-6).squeeze(1)
-        loss = (S * H * weight).sum() / (weight.sum() + 1e-6) + torch.relu(real_n*V_mask - fake_rgb*V_mask).sum() / (V_mask.sum() + 1e-6)
+        loss = (S * H * weight).sum() / (weight.sum() + 1e-6)
         return loss * self.lambda_saturation
 
     def lab_edge_sharpness_loss(self, fake):
