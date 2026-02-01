@@ -200,6 +200,7 @@ class ColorConsistencyLoss(nn.Module):
         self.lambda_l1 = 0.5
         self.lambda_contrast = 0.2
         self.saturation_gated = 0.001
+        self.lambda_gray_balance = 0.1
 
     def forward(self, fake_color: torch.Tensor, real_color: torch.Tensor, mask_high_color) -> torch.Tensor:
         """
@@ -215,6 +216,14 @@ class ColorConsistencyLoss(nn.Module):
         contrast_loss = self.contrast_loss(fake_color)
         sat_gated_loss = self.sat_loss_gated(fake_color)
         return self_saturation_loss + l1_loss + contrast_loss + self_lab_edge_loss + sat_gated_loss
+
+    def gray_balance_loss(self, fake, real):
+        if not self.lambda_gray_balance:
+            return 0.0
+        real_gray_mask = (real.std(1, keepdim=True) < 0.02) & (real.mean(1, keepdim=True) > 0.3) & (real.mean(1, keepdim=True) < 0.8)
+        real_gray = real.mean(dim=1, keepdim=True)
+        loss = (torch.relu(fake.std(1) - real_gray.std(1))*real_gray_mask).sum(dim=[1,2,3]) / (real_gray_mask.sum(dim=[1,2,3]) + 1e-6)
+        return loss.mean() * self.lambda_gray_balance
 
     def sat_loss_gated(self, fake, v_thresh=0.33):
         if not self.lambda_contrast:
