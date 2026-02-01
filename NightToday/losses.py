@@ -214,7 +214,7 @@ class ColorConsistencyLoss(nn.Module):
                                                           (real_color*mask_high_color))
         l1_loss = self.l1_loss_color(fake_color, real_color, mask_high_color)
         contrast_loss = self.contrast_loss(fake_color)
-        sat_gated_loss = self.sat_loss_gated(fake_color)
+        sat_gated_loss = self.sat_loss_gated(fake_color, real_color)
         gray_balance_loss = self.gray_balance_loss(fake_color, real_color)
         return self_saturation_loss + l1_loss + contrast_loss + self_lab_edge_loss + sat_gated_loss + gray_balance_loss
 
