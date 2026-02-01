@@ -225,15 +225,16 @@ class ColorConsistencyLoss(nn.Module):
         loss = (torch.relu(fake.std(1) - real_gray.std(1))*real_gray_mask).sum(dim=[1,2,3]) / (real_gray_mask.sum(dim=[1,2,3]) + 1e-6)
         return loss.mean() * self.lambda_gray_balance
 
-    def sat_loss_gated(self, fake, v_thresh=0.33):
+    def sat_loss_gated(self, fake, real, v_thresh=0.33):
         if not self.lambda_contrast:
             return 0.0
         maxc, _ = fake.max(dim=1)
         minc, _ = fake.min(dim=1)
+        gray_mask_real = (fake.std(1) < 0.05) & (fake.mean(1) > 0.3) & (fake.mean(1) < 0.8)
         v = maxc
         s = (maxc - minc) / (maxc + 1e-6)
         th = torch.max(torch.stack([v.mean(dim=[-1, -2]), torch.ones(fake.shape[0], device=fake.device) * v_thresh], 1), dim=1)[0]
-        w = (v > th.view(fake.shape[0], 1, 1)).float() * (v < 0.98)
+        w = (v > th.view(fake.shape[0], 1, 1)).float() * (v < 0.98) * (~gray_mask_real)
         return torch.relu(0.6 -(s * w).sum() / (w.sum() + 1e-6))
 
     def contrast_loss(self, x, k=7):
