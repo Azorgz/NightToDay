@@ -21,7 +21,7 @@ model:
 
   gen:
     downscaling: 2
-    input_size: 256
+    input_size: 512
     hidden_dim: 384
     n_enc_layers: 4
     n_shared_layers: 2
@@ -49,7 +49,7 @@ training:
   visualize_freq: 50  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 40
+  start_epoch: 75
   total_epochs: 100
   resume: True
   resume_epoch: best

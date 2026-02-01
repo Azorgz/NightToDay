@@ -1,8 +1,8 @@
 #!/bin/bash
 
-REMOTE_PATH="$HOME/godeta/Bureau/weight_new/"
+REMOTE_PATH="$HOME/Bureau/weight_new/"
 #LOCAL_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/FoalGAN_FLIR/"
-LOCAL_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/CrossRAFT/"
+LOCAL_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/"
 
 rsync -avxH "$REMOTE_PATH" "$LOCAL_PATH"
 
