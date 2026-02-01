@@ -211,11 +211,12 @@ class ColorConsistencyLoss(nn.Module):
         """
         self_lab_edge_loss = self.lab_edge_sharpness_loss(fake_color)
         self_saturation_loss = self.saturation_loss_color(fake_color*mask_high_color,
-                                                          (real_color*mask_high_color).detach())
-        l1_loss = self.l1_loss_color(fake_color, real_color.detach(), mask_high_color)
+                                                          (real_color*mask_high_color))
+        l1_loss = self.l1_loss_color(fake_color, real_color, mask_high_color)
         contrast_loss = self.contrast_loss(fake_color)
         sat_gated_loss = self.sat_loss_gated(fake_color)
-        return self_saturation_loss + l1_loss + contrast_loss + self_lab_edge_loss + sat_gated_loss
+        gray_balance_loss = self.gray_balance_loss(fake_color, real_color)
+        return self_saturation_loss + l1_loss + contrast_loss + self_lab_edge_loss + sat_gated_loss + gray_balance_loss
 
     def gray_balance_loss(self, fake, real):
         if not self.lambda_gray_balance:
