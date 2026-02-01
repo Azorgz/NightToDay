@@ -87,7 +87,7 @@ training:
     lambda_trafficlight_f: [[ 10,  ], 0.05]
     lambda_thermal: [[ 1,  ], 2.0]
     lambda_sharpness: [[ 0,  ], 25.0]
-    lambda_cgr: [[ 5, ], 1.0]  # Conditional Gradient Repair
+    lambda_cgr: [[ 5, ], 2.5]  # Conditional Gradient Repair
     lambda_bc: [[ 5, ], 2.0]  # Bias correction Loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
 
