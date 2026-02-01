@@ -1,8 +1,8 @@
 #!/bin/bash
 
-#REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/latest_net_ResNet"
-#LOCAL_PATH="/home/godeta/PycharmProjects/MyTransform/checkpoints/download/"
-REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/training_visuals/"
-LOCAL_PATH="/home/godeta/PycharmProjects/MyTransform/training_visuals/"
+REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/"
+LOCAL_PATH="/home/godeta/PycharmProjects/MyTransform/checkpoints/download/"
+#REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/training_visuals/"
+#LOCAL_PATH="/home/godeta/PycharmProjects/MyTransform/training_visuals/"
 
 rsync -avxH -c "$REMOTE_PATH" "$LOCAL_PATH"

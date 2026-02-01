@@ -13,6 +13,7 @@ Image-to-Image Generative Adversarial Transformer (Dual-Stream)
 
 Usage: open this file in the editor and adapt patch sizes / transformer sizes to your input resolution.
 """
+import math
 import os
 import socket
 from collections import OrderedDict
@@ -834,9 +835,25 @@ class Image2ImageGAT_Dual(nn.Module):
                             fake_light = (fake_light / fake_light.mean() * mean_TN).clamp(0, 1)
                             D[b:b+1, :, y0:y1+1, x0:x1+1] = fake_light
                             nb -= 1
-                            contour_mask += dilation(mask_[None].float(), torch.ones((min(mask_.shape[-1]//2, 5),
-                                                                                      min(mask_.shape[-1]//2, 5)),
-                                                                               device=mask_.device)) - mask_.float()
+                            disk = get_disk_kernel(radius=max(int(math.sqrt(rect_area)), 3), device=fake_light.device)
+                            x0 = (x1+x0)//2 - disk.shape[-1]//2
+                            x1 = x0 + disk.shape[-1]
+                            y0 = (y1+y0)//2 - disk.shape[-2]//2
+                            y1 = y0 + disk.shape[-2]
+                            if x0 < 0:
+                                disk = disk[:, -x0:]
+                                x0 = 0
+                            if y0 < 0:
+                                disk = disk[-y0:, :]
+                                y0 = 0
+                            if x1 > W:
+                                disk = disk[:, :W - x1 + disk.shape[-1]]
+                                x1 = W
+                            if y1 > H:
+                                disk = disk[:H - y1 + disk.shape[-2], :]
+                                y1 = H
+                            contour_mask[b:b+1, :, y0:y1, x0:x1] = disk
+                            contour_mask -= mask_.float()
                             weights += mask_[None].float() * 5.
                         else:
                             segMask_TN[b][labels[b] == label] = 255
