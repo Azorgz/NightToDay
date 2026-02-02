@@ -495,7 +495,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                                 self.D_com,
                                                                 loss_name='trafficlight', criterion_lambda='trafficlight_l')
             self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
-                                                                self.real_TN * contourMask + self.fake_T_com * segMask_com,
+                                                                self.remapped_T * contourMask + self.fake_T_com * segMask_com,
                                                                 loss_name='trafficlight', criterion_lambda='trafficlight_l')
             self.loss_trafficlight[self.N] += self.compute_loss('tll', segMask_com, contourMask, self.fake_D_com,
                                                                 self.rec_D_com, self.D_com, self.fake_T_com, self.TN_com,
@@ -832,7 +832,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                 fake_light = dilation(fake_light, torch.ones((3, 3), device=fake_light.device))
                             fake_light = interpolate(fake_light, (y1 - y0 + 1, x1 - x0 + 1))
                             mean_TN = 1-T[b][mask_.repeat(3, 1, 1)].mean()
-                            fake_light = (fake_light / fake_light.mean() * mean_TN).clamp(0, 1)
+                            fake_light = ((fake_light - mean_TN) / (1 - mean_TN + 1e-5) * (1 + 0.2 * (torch.rand(1).item()-0.5))).clamp(0, 1)
                             D[b:b+1, :, y0:y1+1, x0:x1+1] = fake_light
                             nb -= 1
                             disk = get_disk_kernel(radius=max(int(math.sqrt(rect_area)), 3), device=fake_light.device)
