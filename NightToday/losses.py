@@ -966,10 +966,10 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
     if valid_veg.any():
         veg_min = (veg_mask * fake_ir_gray)[valid_veg].flatten(1).min(dim=1)[0]
         sky_region = (sky_mask * fake_ir_gray)[valid_veg]
-        upper_sky_mask = sky_region[:, :, :H // 3]
-        lower_sky_mask = sky_region[:, :, H // 3:2*H // 3]
+        upper_sky_mask = sky_region[:, :, :H // 4]
+        lower_sky_mask = sky_region[:, :, H // 4:H // 2]
         sky_loss[valid_veg] += F.relu(upper_sky_mask - veg_min.view(-1, 1, 1, 1)).sum(dim=[1, 2, 3]) / (upper_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
-        sky_loss[valid_veg] += F.relu(veg_min.view(-1, 1, 1, 1) - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
+        sky_loss[valid_veg] += F.relu(veg_min.view(-1, 1, 1, 1) + 0.05 - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6)
     # endregion
 
     ########### Light region SGA loss
