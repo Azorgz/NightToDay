@@ -98,14 +98,14 @@ data:
     shuffle: True
     resize_and_crop: True
   train_datasets:
-#    - name: 'FLIR'
-#      sampling: 1
-#      augmentations:
-#        hflip: True
-    - name: 'LYNRED'
+    - name: 'FLIR'
       sampling: 1
       augmentations:
         hflip: True
+#    - name: 'LYNRED'
+#      sampling: 1
+#      augmentations:
+#        hflip: True
 #  test_datasets:
 #      - name: 'LYNRED_DAY_SAMPLES'
 #        sampling: 1
