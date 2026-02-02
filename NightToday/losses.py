@@ -922,6 +922,7 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
     road_mask = (GT_mask == ROAD).float()
     SLight_mask_ori = (GT_mask == STREETLIGHT).float()
     motorcycle_mask = (GT_mask == MOTORCYCLE).float()
+    sky_mask = (GT_mask == SKY).float()
 
     # Normalize images
     fake_ir_norm = (fake_IR + 1.0) * 0.5
@@ -937,7 +938,7 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
     real_lab[:, :1, :, :] = real_lab[:, :1, :, :] / 100 + 1e-6  # [1e-6 1]
     real_lab[:, 1:, :, :] = real_lab[:, 1:, :, :] / 128  # [-1 1]
 
-    ########### Artifact Bias Correction
+    # region Artifact Bias Correction
     max_pool = nn.MaxPool2d(3, stride=1, padding=1)
     SLight_mask = -max_pool(-SLight_mask_ori)  # morphological dilation
     SLight_area = SLight_mask_ori.sum(dim=[1, 2, 3])  # per batch
@@ -957,6 +958,19 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
             SLight_loss[veg_valid] += F.relu(veg_mean.detach() + 0.25 - fake_region_high[veg_valid[SLight_valid]].flatten(1).min(1).values)
         else:
             SLight_loss[SLight_valid] += F.relu(0.7 - fake_region_high.flatten(1).min(1).values)
+    # endregion
+
+    # region Cloud Artifact Correction, force the upper part to be black, and the second quarter next the horizon to be a bit lighter
+    valid_veg = veg_mask.sum(dim=[1, 2, 3]) > 0
+    if valid_veg.any():
+        veg_min = (veg_mask * fake_ir_gray)[valid_veg].flatten(1).min(dim=1)[0]
+        sky_region = (sky_mask * fake_ir_gray)[valid_veg]
+        upper_sky_mask = sky_region[:, :, :H // 4]
+        lower_sky_mask = sky_region[:, :, H // 4:H // 2]
+        sky_loss = torch.zeros_like(veg_min, device=device)
+        sky_loss += F.relu(upper_sky_mask - veg_min.view(-1, 1, 1, 1)).sum(dim=[1, 2, 3]) / (upper_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
+        sky_loss += F.relu(veg_min.view(-1, 1, 1, 1) + 0.05 - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
+    # endregion
 
     ########### Light region SGA loss
     light_mask_all = light_mask_ori + SLight_mask_ori
@@ -970,28 +984,6 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
                 GM_masked[valid_idx].amax(dim=[1, 2, 3], keepdim=True) + 1e-4)
         loss_sga_light[valid_idx] = 0.5 * (
                 F.relu(0.8 * EM_masked[valid_idx] - fake_grad_norm).sum(dim=[1, 2, 3]) / edge_sum[valid_idx])
-
-    ########### Traffic Light luminance adjustment
-    # TLight_mask = RefineLightMask(GT_mask, real_vis_norm)
-    # TLight_area = TLight_mask.sum(dim=[1, 2, 3])
-    # TLight_loss = torch.zeros(B, device=device)
-    # valid_idx = TLight_area > 100
-    # if valid_idx.any():
-    #     real_vis_light_region = (real_gray * TLight_mask)[valid_idx]  # [B,1,H,W]
-    #     real_vis_light_mean = (real_vis_light_region.sum(dim=[1, 2, 3]) / TLight_area[valid_idx]).view(-1, 1, 1, 1)  # [B,]
-    #     real_vis_light_region_submean = (real_vis_light_region - real_vis_light_mean) * TLight_mask[valid_idx]
-    #     real_vis_light_region_norm2 = torch.sqrt((real_vis_light_region_submean ** 2).sum(dim=[1, 2, 3]) + 1e-6).view(-1, 1, 1, 1)
-    #     real_vis_light_norm = real_vis_light_region_submean / (real_vis_light_region_norm2 + 1e-4)
-    #     light_high_mask = real_vis_light_region > real_vis_light_mean
-    #
-    #     high_area_ratio = (light_high_mask.sum(dim=[1, 2, 3]) / TLight_area[valid_idx] > 0.1)
-    #     if high_area_ratio.any():
-    #         fake_IR_light_region = (TLight_mask * fake_ir_gray)[valid_idx][high_area_ratio]
-    #         fake_IR_light_mean = (fake_IR_light_region.sum(dim=[1, 2, 3]) / TLight_area[valid_idx][high_area_ratio]).view(-1, 1, 1, 1)
-    #         fake_IR_light_region_submean = (fake_IR_light_region - fake_IR_light_mean) * TLight_mask[valid_idx][high_area_ratio]
-    #         fake_IR_light_region_norm2 = torch.sqrt((fake_IR_light_region_submean ** 2).sum(dim=[1, 2, 3]) + 1e-6).view(-1, 1, 1, 1)
-    #         fake_IR_light_norm = fake_IR_light_region_submean / (fake_IR_light_region_norm2 + 1e-4)
-    #         TLight_loss[valid_idx][high_area_ratio] += F.relu(0.8 + torch.sum(fake_IR_light_norm * real_vis_light_norm.detach()[high_area_ratio], dim=[1, 2, 3]))
 
     ABC_losses = SLight_loss.sum() + loss_sga_light.sum() #+ TLight_loss.sum() * 5
 
