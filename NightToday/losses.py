@@ -408,7 +408,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     valid_car = area_car > 50
     thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
     thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
-    min_values = torch.min(torch.cat([T, -N], dim=1), dim=1, keepdim=True)[0]
+    min_values = torch.min(torch.cat([T.mean(1, keepdim=True), -N.mean(1, keepdim=True)], dim=1), dim=1, keepdim=True)[0]
 
     # losses init
     sky_loss = torch.zeros([B, ], device=device)
@@ -418,7 +418,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
 
     #  Thermal correction losses per classes
     sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[valid_sky] * 2
-    veg_loss[valid_veg] += torch.relu((min_values[valid_veg] - T[valid_veg]) * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
+    veg_loss[valid_veg] += torch.relu((min_values[valid_veg] - TN[valid_veg]) * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
     veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
     veg_loss[valid_sky*valid_veg] += ReLU()((TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
                                             (TN*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
@@ -962,14 +962,14 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
 
     # region Cloud Artifact Correction, force the upper part to be black, and the second quarter next the horizon to be a bit lighter
     valid_veg = veg_mask.sum(dim=[1, 2, 3]) > 0
+    sky_loss = torch.zeros(B, device=device)
     if valid_veg.any():
         veg_min = (veg_mask * fake_ir_gray)[valid_veg].flatten(1).min(dim=1)[0]
         sky_region = (sky_mask * fake_ir_gray)[valid_veg]
         upper_sky_mask = sky_region[:, :, :H // 4]
         lower_sky_mask = sky_region[:, :, H // 4:H // 2]
-        sky_loss = torch.zeros_like(veg_min, device=device)
-        sky_loss += F.relu(upper_sky_mask - veg_min.view(-1, 1, 1, 1)).sum(dim=[1, 2, 3]) / (upper_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
-        sky_loss += F.relu(veg_min.view(-1, 1, 1, 1) + 0.05 - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
+        sky_loss[valid_veg] += F.relu(upper_sky_mask - veg_min.view(-1, 1, 1, 1)).sum(dim=[1, 2, 3]) / (upper_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
+        sky_loss[valid_veg] += F.relu(veg_min.view(-1, 1, 1, 1) + 0.05 - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.5
     # endregion
 
     ########### Light region SGA loss
@@ -1000,7 +1000,7 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
     ############ Thermal Channel equality loss
     thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
 
-    total_loss = ABC_losses + CBC_losses + thermal_eq_loss
+    total_loss = ABC_losses + CBC_losses + thermal_eq_loss + sky_loss.sum()
     return total_loss
 
 

@@ -122,24 +122,24 @@ count_red_D = 0
 count_green_D = 0
 count_red_N = 0
 count_green_N = 0
-dataset_path = "/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/FLIR_datasets/"
+dataset_name = "LYNRED"
+dataset_path = f"/home/godeta/PycharmProjects/TIR2VIS/datasets/{dataset_name}/{dataset_name}_datasets/"
 for data in tqdm(dataset):
-    # TF_D = data['seg_D'] == 6
-    # if TF_D.sum() > 0:
-    #     FG = manual_keypoints_selection(ImageTensor(data['D']))
-    #     # FG = find_RoI(TF_D, data['D'])[0]
-    #     if len(FG) > 0:
-    #         for fg in FG:
-    #             surface = fg.shape[-2] * fg.shape[-1]
-    #             color = determine_color(fg)
-    #             if color == 'red':
-    #                 count_red_D += 1
-    #             elif color == 'green':
-    #                 count_green_D += 1
-    #             else:
-    #                 continue
-    #             fg.save(dataset_path + "FG_sample_D/",
-    #                     name=f"{color}_{count_red_D if color=='red' else count_green_D}_{surface}")
+    TF_D = data['seg_D'] == 6
+    if TF_D.sum() > 0:
+        FG = manual_keypoints_selection(ImageTensor(data['D']))
+        if len(FG) > 0:
+            for fg in FG:
+                surface = fg.shape[-2] * fg.shape[-1]
+                color = determine_color(fg)
+                if color == 'red':
+                    count_red_D += 1
+                elif color == 'green':
+                    count_green_D += 1
+                else:
+                    continue
+                fg.save(dataset_path + "FG_sample_D/",
+                        name=f"{color}_{surface}_{count_red_D if color == 'red' else count_green_D}")
     TF_N = data['seg_TN'] == 6
     if TF_N.sum() > 0:
         data['N'], data['T'] = data['N'].to('cuda')*0.5+0.5, data['T'].to('cuda')*0.5+0.5
