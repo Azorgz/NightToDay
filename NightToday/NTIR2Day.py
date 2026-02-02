@@ -832,7 +832,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                 fake_light = dilation(fake_light, torch.ones((3, 3), device=fake_light.device))
                             fake_light = interpolate(fake_light, (y1 - y0 + 1, x1 - x0 + 1))
                             mask_road = (interpolate(self.segMask_TN_update[b:b+1], self.fake_D.shape[-2:], mode='nearest') == 0).float()
-                            road_mean = (self.fake_D[b:b+1] * mask_road).mean()
+                            road_mean = ((self.fake_D[b:b+1] * 0.5 + 0.5) * mask_road).mean()
                             fake_light_norm = (fake_light - fake_light.min()) / (fake_light.max() - fake_light.min() + 1e-6)
                             fake_light = (fake_light_norm * (1 - road_mean + 1e-5) + road_mean).clamp(0, 1)
                             D[b:b+1, :, y0:y1+1, x0:x1+1] = fake_light
