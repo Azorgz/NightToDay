@@ -378,46 +378,49 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
     return loss.mean()
 
 
-def ThermalLoss(image_fused, image_target, GT_seg, weights=None):
+def ThermalLoss(TN, T, N, GT_seg, weights=None):
     """
     Thermal Loss to enhance the thermal characteristics of the fused image.
     The texture gradient will be maximized in vegetation and vehicles regions
-    :param image_fused:
-    :param image_target:
+    :param TN: fused thermal image
+    :param T: real thermal image
+    :param N: real night color image
     :param GT_seg:
     :param weights:
     :return: loss value
     """
-    B = image_target.shape[0]
-    GT_resized = F.interpolate(GT_seg.float(), size=image_fused.shape[-2:], mode='nearest').long().detach()
+    B = TN.shape[0]
+    device = T.device
+    GT_resized = F.interpolate(GT_seg.float(), size=TN.shape[-2:], mode='nearest').long().detach()
     weights = weights[[SKY, VEG, PERSON, CAR]] if weights is not None else (
-        torch.tensor([1., 1., 1., 1.], device=image_fused.device))
+        torch.tensor([1., 1., 1., 1.], device=TN.device))
     sky_mask = (GT_resized == SKY).float()
     area_sky = sky_mask.sum(dim=[1, 2, 3])
     valid_sky = area_sky > 200
     veg_mask = (GT_resized == VEG).float()
     area_veg = veg_mask.sum(dim=[1, 2, 3])
     valid_veg = area_veg > 200
-    person_mask = erosion((GT_resized == PERSON).float(), torch.ones(5, 5, device=image_fused.device))
+    person_mask = erosion((GT_resized == PERSON).float(), torch.ones(5, 5, device=TN.device))
     area_person = person_mask.sum(dim=[1, 2, 3])
     valid_person = area_person > 30
     car_mask = sum([GT_resized == V for V in VEHICLES]).float()
     area_car = car_mask.sum(dim=[1, 2, 3])
     valid_car = area_car > 50
-    thermal_diff_low = ReLU()(image_fused - image_target + 0.1)  # only penalize higher values
-    thermal_diff_high = ReLU()(image_target - image_fused)  # only penalize lower values
+    thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
+    thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
+    min_values = torch.min(torch.cat([T, -N.clamp(-1, 0)], dim=1), dim=1, keepdim=True)[0]
 
     # losses init
-    sky_loss = torch.zeros([B, ], device=image_target.device)
-    veg_loss = torch.zeros([B, ], device=image_target.device)
-    person_loss = torch.zeros([B, ], device=image_target.device)
+    sky_loss = torch.zeros([B, ], device=device)
+    veg_loss = torch.zeros([B, ], device=device)
+    person_loss = torch.zeros([B, ], device=device)
     # blobs_loss = torch.zeros([B, ], device=image_target.device)
 
     #  Thermal correction losses per classes
     sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[valid_sky] * 2
     veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
-    veg_loss[valid_sky*valid_veg] += ReLU()((image_fused*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8 -
-                                (image_fused*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg])
+    veg_loss[valid_sky*valid_veg] += ReLU()((TN*veg_mask)[(TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
+                                                          valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
 
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
@@ -431,7 +434,7 @@ def ThermalLoss(image_fused, image_target, GT_seg, weights=None):
     # blobs_loss[valid_blobs] += (thermal_diff_high[valid_blobs] * blobs[valid_blobs]).sum(dim=[1, 2, 3]) / \
     #                            (area_blobs[valid_blobs] + 1e-6)
 
-    thermal_noise_loss = ThermalNoiseLoss()(image_fused).mean() * 2
+    thermal_noise_loss = ThermalNoiseLoss()(TN).mean() * 2
 
     return total_classes_loss + thermal_noise_loss #+ blobs_loss.mean()
 
