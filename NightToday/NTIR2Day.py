@@ -617,7 +617,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                      weights=self.class_weight)
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T.detach(),
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
         # endregion
 
