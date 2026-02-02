@@ -831,8 +831,9 @@ class Image2ImageGAT_Dual(nn.Module):
                             if count < 150:
                                 fake_light = dilation(fake_light, torch.ones((3, 3), device=fake_light.device))
                             fake_light = interpolate(fake_light, (y1 - y0 + 1, x1 - x0 + 1))
-                            mean_TN = 1-T[b][mask_.repeat(3, 1, 1)].mean()
-                            fake_light = ((fake_light - mean_TN) / (1 - mean_TN + 1e-5) * (1 + 0.2 * (torch.rand(1).item()-0.5))).clamp(0, 1)
+                            mean_TN = max(1-T[b][mask_.repeat(3, 1, 1)].mean(), 0.5)
+                            fake_light_norm = (fake_light - fake_light.min()) / (fake_light.max() - fake_light.min() + 1e-6)
+                            fake_light_norm = (fake_light_norm / (1 - mean_TN + 1e-5) + mean_TN).clamp(0, 1)
                             D[b:b+1, :, y0:y1+1, x0:x1+1] = fake_light
                             nb -= 1
                             disk = get_disk_kernel(radius=max(int(math.sqrt(rect_area)), 3), device=fake_light.device)
