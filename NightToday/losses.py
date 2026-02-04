@@ -415,7 +415,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
     veg_loss[valid_sky*valid_veg] += ReLU()((TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
                                             (TN*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
-    build_loss[valid_building] += TVLoss()(TN[valid_building] * building_mask[valid_building]) * 0.2
+    build_loss[valid_building] += TVLoss()(TN[valid_building] * building_mask[valid_building]) * 0.1
 
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
@@ -1075,6 +1075,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             else:
                 HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
             # losses fake TN composition
+            # T_adjusted = (T / (mean_T_light_region + 1e-6)/2).clamp(-1, 1)
             traffic_light_final = T * total_ * (1-HL_region) - HL_region * N_gray
             TN_region = TN * total_
             compo_loss = PixelConsistencyLoss(TN_region[b:b+1], traffic_light_final[b:b+1], total_[b:b+1]) * weight_
@@ -1109,7 +1110,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             # grad_loss to enhance the gradient of traffic light region
             grad_TN = torch.abs(sobel(TN[b:b+1])) * total_[b:b+1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b+1])) * total_[b:b+1]
-            grad_loss = nn.L1Loss()(grad_fake_D, grad_TN.detach()).sum() / (total_[b:b+1].sum() + 1e-6)
+            grad_loss = nn.L1Loss()(grad_fake_D, grad_TN.detach()).sum() / (total_[b:b+1].sum() + 1e-6) * 2
 
             losses[b] += (compo_loss + color_loss + luminosity_loss + rec_consistency_loss + std_loss + grad_loss) * weight_
 
