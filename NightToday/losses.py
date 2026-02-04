@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from ImagesCameras import ImageTensor
 from kornia.color import rgb_to_lab, rgb_to_hsv
 from kornia.contrib import connected_components
-from kornia.filters import sobel, laplacian, get_gaussian_kernel2d
+from kornia.filters import sobel, laplacian, get_gaussian_kernel2d, median_blur
 from kornia.morphology import erosion, closing, dilation
 from torch.nn import LeakyReLU, ReLU
 from torchmetrics.functional.image import image_gradients
@@ -395,7 +395,9 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     valid_car = area_car > 50
     thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
     thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
-    min_values = torch.min(torch.cat([T.mean(1, keepdim=True), -N.mean(1, keepdim=True)], dim=1), dim=1, keepdim=True)[0]
+    T_filtered = median_blur(T.mean(1, keepdim=True), kernel_size=3)
+    N_filtered = median_blur(-N.mean(1, keepdim=True), kernel_size=3)
+    min_values = torch.min(torch.cat([T_filtered, N_filtered], dim=1), dim=1, keepdim=True)[0]
 
     # losses init
     sky_loss = torch.zeros([B, ], device=device)
