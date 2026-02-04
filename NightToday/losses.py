@@ -393,6 +393,9 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     car_mask = sum([GT_resized == V for V in VEHICLES]).float()
     area_car = car_mask.sum(dim=[1, 2, 3])
     valid_car = area_car > 50
+    building_mask = (GT_resized <= 2).float()
+    area_building = building_mask.sum(dim=[1, 2, 3])
+    valid_building = area_building > 200
     thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
     thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
     T_filtered = median_blur(T.mean(1, keepdim=True), kernel_size=3)
@@ -403,6 +406,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     sky_loss = torch.zeros([B, ], device=device)
     veg_loss = torch.zeros([B, ], device=device)
     person_loss = torch.zeros([B, ], device=device)
+    build_loss = torch.zeros([B, ], device=device)
     # blobs_loss = torch.zeros([B, ], device=image_target.device)
 
     #  Thermal correction losses per classes
@@ -411,6 +415,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
     veg_loss[valid_sky*valid_veg] += ReLU()((TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
                                             (TN*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
+    build_loss[valid_building] += TVLoss()(TN[valid_building] * building_mask[valid_building]) * 0.2
 
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
@@ -595,7 +600,7 @@ def TL_color_loss(real_T, real_N, fused_TN, fake_D, GT_seg):
 
 
 class SharpFusionLoss(torch.nn.Module):
-    def __init__(self, lam_grad=6.0, lam_lap=4.0, lam_contrast=4.5, lam_freq=1.7):
+    def __init__(self, lam_grad=7.0, lam_lap=4.5, lam_contrast=3.5, lam_freq=1.5):
         super().__init__()
         self.lam_grad = lam_grad
         self.lam_lap = lam_lap
@@ -1078,7 +1083,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 target_color = torch.tensor([1.0, 0.2, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 color_loss = (torch.relu(torch.max(fake_D[b:b+1, 1:] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
-                color_fake_D = fake_D[:, 0] - fake_D[:, 2]
+                color_fake_D = fake_D[:, 0] - fake_D[:, 2] - fake_D[:, 1]
 
             elif color == 'green':
                 target_color = torch.tensor([0.0, 1.0, 0.7], device=N.device).view(1, 3, 1, 1) * 2 - 1
