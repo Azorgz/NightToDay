@@ -595,7 +595,7 @@ def TL_color_loss(real_T, real_N, fused_TN, fake_D, GT_seg):
 
 
 class SharpFusionLoss(torch.nn.Module):
-    def __init__(self, lam_grad=6.0, lam_lap=4.0, lam_contrast=2.5, lam_freq=1.7):
+    def __init__(self, lam_grad=6.0, lam_lap=4.0, lam_contrast=4.5, lam_freq=1.7):
         super().__init__()
         self.lam_grad = lam_grad
         self.lam_lap = lam_lap
@@ -1104,7 +1104,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, fake_T, mask, contour, w
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], rec_D[b:b + 1], HL_common[b:b + 1])
-            std_loss = (fake_D[b:b+1] * (mask_[b:b+1] - HL_region)).std(1).max() - (fake_D[b:b+1] * HL_region).std(1).min()
+            std_loss = (fake_D[b:b+1] * (mask_[b:b+1] - HL_region)).std(1).max() - (fake_D[b:b+1] * HL_region).std(1).mean() * 2
             losses[b] += (compo_loss + color_loss + luminosity_loss + rec_consistency_loss + std_loss) * weight_
     return losses
 
