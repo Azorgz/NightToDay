@@ -193,22 +193,6 @@
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
     </task>
-    <task id="LOCAL-00087" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769968875991</created>
-      <option name="number" value="00087" />
-      <option name="presentableId" value="LOCAL-00087" />
-      <option name="project" value="LOCAL" />
-      <updated>1769968875991</updated>
-    </task>
-    <task id="LOCAL-00088" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769968985353</created>
-      <option name="number" value="00088" />
-      <option name="presentableId" value="LOCAL-00088" />
-      <option name="project" value="LOCAL" />
-      <updated>1769968985353</updated>
-    </task>
     <task id="LOCAL-00089" summary="Update of TL sample merging">
       <option name="closed" value="true" />
       <created>1769969047124</created>
@@ -585,7 +569,23 @@
       <option name="project" value="LOCAL" />
       <updated>1770210902712</updated>
     </task>
-    <option name="localTasksCounter" value="136" />
+    <task id="LOCAL-00136" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770211131788</created>
+      <option name="number" value="00136" />
+      <option name="presentableId" value="LOCAL-00136" />
+      <option name="project" value="LOCAL" />
+      <updated>1770211131788</updated>
+    </task>
+    <task id="LOCAL-00137" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770211234626</created>
+      <option name="number" value="00137" />
+      <option name="presentableId" value="LOCAL-00137" />
+      <option name="project" value="LOCAL" />
+      <updated>1770211234626</updated>
+    </task>
+    <option name="localTasksCounter" value="138" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">

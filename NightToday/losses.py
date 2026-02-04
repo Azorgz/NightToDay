@@ -1104,7 +1104,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, fake_T, mask, contour, w
             # grad_loss to enhance the gradient of traffic light region
             grad_TN = torch.abs(sobel(TN[b:b+1])) * total_[b:b+1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b+1])) * total_[b:b+1]
-            grad_loss = nn.L1Loss()(grad_fake_D, grad_TN.detach())
+            grad_loss = nn.L1Loss()(grad_fake_D, grad_TN.detach()).sum() / (total_[b:b+1].sum() + 1e-6)
 
             losses[b] += (compo_loss + color_loss + luminosity_loss + rec_consistency_loss + std_loss + grad_loss) * weight_
 
