@@ -1003,7 +1003,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     return total_loss
 
 
-def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, fake_T, mask, contour, weights):
+def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, weights):
     "Traffic Light Luminance Loss. fake_img: fake vis image. fake_mask: IR seg mask. real_mask: Vis seg mask."
     B, _, h, w = N.shape
     _, _, seg_h, seg_w = mask.shape
@@ -1099,7 +1099,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, fake_T, mask, contour, w
             HL_fake_T = (fake_T < fake_T[b:b+1, :, y0_mask:y1, x0_mask:x1_mask].mean()) * mask_
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
-                rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], rec_D[b:b + 1], HL_common[b:b + 1])
+                rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
             std_loss = (fake_D[b:b+1] * (mask_[b:b+1] - HL_region)).std(1).max() - (color_fake_D[b:b+1] * HL_region).mean() * 2
             # grad_loss to enhance the gradient of traffic light region
             grad_TN = torch.abs(sobel(TN[b:b+1])) * total_[b:b+1]

@@ -489,7 +489,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                                  from_=self.T, align_first=False)
             # self.fake_T_com = self.fake_T * (~total_mask) + self.TN_com * total_mask
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
-            self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
+            # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
             self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
             # self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_D_com,
@@ -503,7 +503,7 @@ class Image2ImageGAT_Dual(nn.Module):
             #                                                     self.remapped_T, weights,
             #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_f')
             self.loss_trafficlight[self.N] += self.compute_loss('tll2', self.N_com, self.remapped_T_com, self.TN_com,
-                                                                self.rec_TN_com, self.rec_D_com, self.fake_D_com, self.fake_T_com,
+                                                                self.rec_TN_com, self.D_com, self.fake_D_com, self.fake_T_com,
                                                                 segMask_com, contourMask,
                                                                 weights, loss_name='trafficlight', criterion_lambda='trafficlight_f')
         # endregion
