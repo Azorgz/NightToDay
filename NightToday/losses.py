@@ -1003,7 +1003,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     return total_loss
 
 
-def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, mask, contour, weights):
+def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, fake_T, mask, contour, weights):
     "Traffic Light Luminance Loss. fake_img: fake vis image. fake_mask: IR seg mask. real_mask: Vis seg mask."
     B, _, h, w = N.shape
     _, _, seg_h, seg_w = mask.shape
@@ -1100,6 +1100,10 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, mask, contour, weights):
 
             # losses rec D consistency
             rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b+1], traffic_light_final[b:b+1], total_[b:b+1])
+            HL_fake_T = (fake_T < fake_T[b:b+1, :, y0_mask:y1, x0_mask:x1_mask].mean()) * mask_
+            HL_common = HL_region * HL_fake_T
+            if HL_common.sum() > 0:
+                rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], rec_D[b:b + 1], HL_common[b:b + 1])
             std_loss = (fake_D[b:b+1] * (mask_[b:b+1] - HL_region)).std(1).max() - (fake_D[b:b+1] * HL_region).std(1).min()
             losses[b] += (compo_loss + color_loss + luminosity_loss + rec_consistency_loss + std_loss) * weight_
     return losses
