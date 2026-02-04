@@ -1078,26 +1078,19 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, fake_T, mask, contour, w
                 target_color = torch.tensor([1.0, 0.2, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 color_loss = (torch.relu(torch.max(fake_D[b:b+1, 1:] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
-                color_fake_D  = fake_D[:, 0] - fake_D[:, 2]
-                # loss luminosity
-                luminosity_loss = PixelConsistencyLoss(fake_D[b:b + 1, 0:1].repeat(1, 3, 1, 1),
-                                                       N_gray[b:b + 1, None].repeat(1, 3, 1, 1), HL_region[b:b + 1])
+                color_fake_D = fake_D[:, 0] - fake_D[:, 2]
+
             elif color == 'green':
                 target_color = torch.tensor([0.0, 1.0, 0.7], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 color_loss = (torch.relu(torch.max(fake_D[b:b+1, :1] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
                 color_fake_D = fake_D[:, 1] - fake_D[:, 0]
-                # loss luminosity
-                luminosity_loss = PixelConsistencyLoss(fake_D[b:b + 1, 1:].mean(1, keepdim=True).repeat(1, 3, 1, 1),
-                                                       N_gray[b:b + 1, None].repeat(1, 3, 1, 1), HL_region[b:b + 1])
             else:
                 target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 color_loss = (torch.relu(torch.max((fake_D[b:b+1, -1:]) * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
                 color_fake_D = fake_D[:, :2].mean(1) - fake_D[:, 2]
-                # loss luminosity
-                luminosity_loss = PixelConsistencyLoss(fake_D[b:b + 1, :2].mean(1, keepdim=True).repeat(1, 3, 1, 1),
-                                                       N_gray[b:b + 1, None].repeat(1, 3, 1, 1), HL_region[b:b + 1])
+            luminosity_loss = torch.relu(0.8 - fake_D[b:b + 1, 1:].mean() * HL_region[b:b + 1])
             color_dist = ImageTensor(fake_D[b:b+1]*0.5+0.5).color_distance(ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device) * 0.5+0.5))
             color_loss += (color_dist * HL_region[b:b+1]).max() * 2
 
