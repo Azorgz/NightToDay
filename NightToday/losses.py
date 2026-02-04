@@ -1090,7 +1090,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, rec_D, fake_D, fake_T, mask, contour, w
                 color_loss = (torch.relu(torch.max((fake_D[b:b+1, -1:]) * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
                 color_fake_D = fake_D[:, :2].mean(1) - fake_D[:, 2]
-            luminosity_loss = torch.relu(0.8 - fake_D[b:b + 1, 1:].mean() * HL_region[b:b + 1])
+            luminosity_loss = torch.relu(0.8 - fake_D[b:b + 1].mean(1) * HL_region[b:b + 1]).sum() / (HL_region[b:b + 1].sum() + 1e-6)
             color_dist = ImageTensor(fake_D[b:b+1]*0.5+0.5).color_distance(ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device) * 0.5+0.5))
             color_loss += (color_dist * HL_region[b:b+1]).max() * 2
 
