@@ -1067,7 +1067,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_D, fake_D, mask, contour, weights):
                 target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1) * 0.5+0.5
             losses[b] += F.l1_loss((fake_D[b:b+1] * HL_region[b:b+1]), target_color * HL_region[b:b+1]) * weight_
             # loss luminosity
-            losses[b] += PixelConsistencyLoss(fake_D.max(1, keepdim=True)[0][b:b+1], N_gray[b:b+1], HL_region[b:b+1]) * weight_
+            losses[b] += PixelConsistencyLoss(fake_D.max(1, keepdim=True)[0][b:b+1].squeeze(), N_gray[b:b+1].squeeze(), HL_region[b:b+1].squeeze()) * weight_
             # losses rec D consistency
             losses[b] += PixelConsistencyLoss(rec_D[b:b+1], fake_D[b:b+1], mask_[b:b+1]) * weight_
     return losses
