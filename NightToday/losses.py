@@ -1014,6 +1014,8 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_D, fake_D, mask, contour, weights):
             weight_ = ((weights * mask_)[b:b+1]).max()
             color = determine_color_N(N[b:b+1] * mask_[b:b+1])
             ys, xs = (mask_[0, 0]).nonzero().permute(1, 0)
+            if len(ys) == 0 or len(xs) == 0:
+                continue
             y0_mask, y1_mask, h_mask = ys.min(), ys.max(), ys.max() - ys.min() + 1
             x0_mask, x1_mask, w_mask = xs.min(), xs.max(), xs.max() - xs.min() + 1
             mask_lighted_area = torch.zeros_like(mask, device=mask.device)
