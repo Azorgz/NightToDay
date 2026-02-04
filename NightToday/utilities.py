@@ -1178,7 +1178,7 @@ def determine_color_N(TL_D):
     top_half = TL_D[:, :TL_D.shape[1]//2, :]
     R = (2 * top_half[0] - top_half[2]).mean() + top_half.mean()
     mid_half = TL_D[:, TL_D.shape[1]//3:2*TL_D.shape[1]//3, :]
-    Y = (mid_half[1] + mid_half[0] - mid_half[2]).mean() + mid_half.mean()/2
+    Y = (mid_half[1] + mid_half[0] - mid_half[2]).mean() + mid_half.mean()
     bottom_half = TL_D[:, TL_D.shape[1]//2:, :]
     G = (bottom_half[1] + bottom_half[2] - bottom_half[0]).mean() + bottom_half.mean()
     if R > Y and R > G:
