@@ -193,30 +193,6 @@
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
     </task>
-    <task id="LOCAL-00072" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769877642895</created>
-      <option name="number" value="00072" />
-      <option name="presentableId" value="LOCAL-00072" />
-      <option name="project" value="LOCAL" />
-      <updated>1769877642895</updated>
-    </task>
-    <task id="LOCAL-00073" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769878068534</created>
-      <option name="number" value="00073" />
-      <option name="presentableId" value="LOCAL-00073" />
-      <option name="project" value="LOCAL" />
-      <updated>1769878068534</updated>
-    </task>
-    <task id="LOCAL-00074" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769878908051</created>
-      <option name="number" value="00074" />
-      <option name="presentableId" value="LOCAL-00074" />
-      <option name="project" value="LOCAL" />
-      <updated>1769878908051</updated>
-    </task>
     <task id="LOCAL-00075" summary="Update of TL sample merging">
       <option name="closed" value="true" />
       <created>1769878992605</created>
@@ -585,7 +561,31 @@
       <option name="project" value="LOCAL" />
       <updated>1770202428857</updated>
     </task>
-    <option name="localTasksCounter" value="121" />
+    <task id="LOCAL-00121" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770202490625</created>
+      <option name="number" value="00121" />
+      <option name="presentableId" value="LOCAL-00121" />
+      <option name="project" value="LOCAL" />
+      <updated>1770202490625</updated>
+    </task>
+    <task id="LOCAL-00122" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770202679667</created>
+      <option name="number" value="00122" />
+      <option name="presentableId" value="LOCAL-00122" />
+      <option name="project" value="LOCAL" />
+      <updated>1770202679667</updated>
+    </task>
+    <task id="LOCAL-00123" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770203062839</created>
+      <option name="number" value="00123" />
+      <option name="presentableId" value="LOCAL-00123" />
+      <option name="project" value="LOCAL" />
+      <updated>1770203062840</updated>
+    </task>
+    <option name="localTasksCounter" value="124" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -624,7 +624,7 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
-          <line>956</line>
+          <line>958</line>
           <option name="timeStamp" value="232" />
         </line-breakpoint>
       </breakpoints>
