@@ -1022,13 +1022,14 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, fake_D, mask, contour, weights):
             contour_ = contour * (labels == label).float()
             total_ = mask_ + contour_
             weight_ = ((weights * mask_)[b:b+1]).max()
-            color = determine_color_N(N[b:b+1] * mask_[b:b+1])
             ys, xs = (mask_[0, 0]).nonzero().permute(1, 0)
             if len(ys) == 0 or len(xs) == 0:
                 continue
             y0_mask, y1_mask, h_mask = ys.min(), ys.max(), ys.max() - ys.min() + 1
             x0_mask, x1_mask, w_mask = xs.min(), xs.max(), xs.max() - xs.min() + 1
             mask_lighted_area = torch.zeros_like(mask, device=mask.device)
+            color = determine_color_N(N[b:b+1, :, y0_mask:y1_mask, x0_mask:x1_mask]*0.5+0.5)
+
             if color == 'green':
                 # green light is usually at the bottom
                 y0, y1 = y1_mask - h_mask // 2, y1_mask
@@ -1073,10 +1074,16 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, fake_D, mask, contour, weights):
             # losses color consistency
             if color == 'red':
                 target_color = torch.tensor([1.0, 0.2, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
+                losses[b] += (torch.relu(torch.max(fake_D[b:b+1, 1:] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
+                              * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
             elif color == 'green':
                 target_color = torch.tensor([0.0, 1.0, 0.7], device=N.device).view(1, 3, 1, 1) * 2 - 1
+                losses[b] += (torch.relu(torch.max(fake_D[b:b+1, :1] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
+                              * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
             else:
                 target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
+                losses[b] += (torch.relu(torch.max((fake_D[b:b+1, -1:]) * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
+                              * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
             losses[b] += F.l1_loss(fake_D[b:b+1] * HL_region[b:b+1], target_color * HL_region[b:b+1]) * weight_ * 2
             # loss luminosity
             losses[b] += PixelConsistencyLoss(fake_D.max(1, keepdim=True)[0][b:b+1].repeat(1, 3, 1, 1),

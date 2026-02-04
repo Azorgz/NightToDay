@@ -6,9 +6,9 @@
   <component name="ChangeListManager">
     <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Update of TL sample merging">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/utilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/utilities.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -53,7 +53,7 @@
     "Python.encoders.executor": "Debug",
     "Python.manual_labeling_flir_night.executor": "Debug",
     "Python.test.executor": "Run",
-    "Python.train.executor": "Debug",
+    "Python.train.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "main",
@@ -197,22 +197,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00068" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769846941221</created>
-      <option name="number" value="00068" />
-      <option name="presentableId" value="LOCAL-00068" />
-      <option name="project" value="LOCAL" />
-      <updated>1769846941221</updated>
-    </task>
-    <task id="LOCAL-00069" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769848158559</created>
-      <option name="number" value="00069" />
-      <option name="presentableId" value="LOCAL-00069" />
-      <option name="project" value="LOCAL" />
-      <updated>1769848158559</updated>
     </task>
     <task id="LOCAL-00070" summary="Update of TL sample merging">
       <option name="closed" value="true" />
@@ -590,7 +574,23 @@
       <option name="project" value="LOCAL" />
       <updated>1770198246333</updated>
     </task>
-    <option name="localTasksCounter" value="117" />
+    <task id="LOCAL-00117" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770200108927</created>
+      <option name="number" value="00117" />
+      <option name="presentableId" value="LOCAL-00117" />
+      <option name="project" value="LOCAL" />
+      <updated>1770200108927</updated>
+    </task>
+    <task id="LOCAL-00118" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770200184731</created>
+      <option name="number" value="00118" />
+      <option name="presentableId" value="LOCAL-00118" />
+      <option name="project" value="LOCAL" />
+      <updated>1770200184731</updated>
+    </task>
+    <option name="localTasksCounter" value="119" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -631,6 +631,11 @@
           <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
           <line>956</line>
           <option name="timeStamp" value="232" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/NightToday/losses.py</url>
+          <line>1072</line>
+          <option name="timeStamp" value="240" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
