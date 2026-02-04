@@ -21,7 +21,7 @@ model:
 
   gen:
     downscaling: 2
-    input_size: 256
+    input_size: 512
     hidden_dim: 384
     n_enc_layers: 4
     n_shared_layers: 2
@@ -78,7 +78,7 @@ training:
     lambda_semEdge:  [[ 1,  ], .5]
     lambda_gan:  [[ 0,  ], 1.5]
     lambda_tv:  [[ 1,  ], 5.0]
-    lambda_sga: [[ 40,  ], 0.0]
+    lambda_sga: [[ 40,  ], 1.0]
     lambda_latent: [[ 0, 10], 0.1]
     lambda_att: [[ 40, ], 0.0]
     lambda_fus: [[ 0,  2], 5.0]
