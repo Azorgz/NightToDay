@@ -1165,12 +1165,22 @@ def ObtainTLightMixedMask(temp_connect_mask: torch.Tensor,
 
 
 def determine_color_N(TL_D):
+    if TL_D.ndim == 4:
+        if TL_D.shape[0] == 1:
+            TL_D = TL_D.squeeze(0)
+        else:
+            res = []
+            for TL_D_i in TL_D:
+                res.append(determine_color_N(TL_D_i))
+            return res
+    elif TL_D.ndim != 3:
+        raise ValueError("Input TL_D must be 3D or 4D tensor.")
     top_half = TL_D[:, :TL_D.shape[1]//2, :]
-    R = (top_half[0] - top_half[2]).mean() + top_half.mean()*3/4
+    R = (2 * top_half[0] - top_half[2]).mean() + top_half.mean()
     mid_half = TL_D[:, TL_D.shape[1]//4:3*TL_D.shape[1]//4, :]
-    Y = (mid_half[1]/2 + mid_half[0]/2 - mid_half[2]).mean() + mid_half.mean()/2
+    Y = (mid_half[1] + mid_half[0] - mid_half[2]).mean() + mid_half.mean()/2
     bottom_half = TL_D[:, TL_D.shape[1]//2:, :]
-    G = (bottom_half[1] - bottom_half[0]).mean() + bottom_half.mean()*3/4
+    G = (bottom_half[1] + bottom_half[2] - bottom_half[0]).mean() + bottom_half.mean()
     if R > Y and R > G:
         return 'red'
     elif G > Y and G > R:
