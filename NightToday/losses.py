@@ -991,7 +991,7 @@ def BiasCorrLoss(Seg_mask, fake, real_vis, rec_vis, real_edges, fake_gradmap):
     return total_loss
 
 
-def TrafLighLumiLoss_TN(N, T, TN, rec_D, fake_D, mask, contour, weights):
+def TrafLighLumiLoss_TN(N, T, TN, rec_T, fake_D, mask, contour, weights):
     "Traffic Light Luminance Loss. fake_img: fake vis image. fake_mask: IR seg mask. real_mask: Vis seg mask."
     B, _, h, w = N.shape
     _, _, seg_h, seg_w = mask.shape
@@ -1062,17 +1062,17 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_D, fake_D, mask, contour, weights):
             losses[b] += PixelConsistencyLoss(TN_region[b:b+1], traffic_light_final[b:b+1], total_[b:b+1]) * weight_
             # losses color consistency
             if color == 'red':
-                target_color = torch.tensor([1.0, 0.2, 0.0], device=N.device).view(1, 3, 1, 1) * 0.5+0.5
+                target_color = torch.tensor([1.0, 0.2, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
             elif color == 'green':
-                target_color = torch.tensor([0.0, 1.0, 0.5], device=N.device).view(1, 3, 1, 1) * 0.5+0.5
+                target_color = torch.tensor([0.0, 1.0, 0.5], device=N.device).view(1, 3, 1, 1) * 2 - 1
             else:
-                target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1) * 0.5+0.5
+                target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
             losses[b] += F.l1_loss((fake_D[b:b+1] * HL_region[b:b+1]), target_color * HL_region[b:b+1]) * weight_
             # loss luminosity
             losses[b] += PixelConsistencyLoss(fake_D.max(1, keepdim=True)[0][b:b+1].repeat(1, 3, 1, 1),
                                               N_gray[b:b+1, None].repeat(1, 3, 1, 1), HL_region[b:b+1]) * weight_
             # losses rec D consistency
-            losses[b] += PixelConsistencyLoss(rec_D[b:b+1], fake_D[b:b+1], mask_[b:b+1]) * weight_
+            losses[b] += PixelConsistencyLoss(rec_T[b:b+1], traffic_light_final[b:b+1], total_[b:b+1]) * weight_
     return losses
 
 
