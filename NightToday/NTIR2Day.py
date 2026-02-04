@@ -834,7 +834,7 @@ class Image2ImageGAT_Dual(nn.Module):
                             color = determine_color_N(self.real_N[b, :, y0:y1+1, x0:x1+1])
                             TL = self.TL_collection[color]
                             fake_light = TL['D'][torch.randint(0, len(TL['D']), [1])].to(D.device)
-                            if count < 150:
+                            if count < 250:
                                 fake_light = dilation(fake_light, torch.ones((3, 3), device=fake_light.device))
                             fake_light = interpolate(fake_light, (y1 - y0 + 1, x1 - x0 + 1))
                             mask_road = (interpolate(self.segMask_TN_update[b:b+1], self.fake_D.shape[-2:], mode='nearest') == 0).float()
