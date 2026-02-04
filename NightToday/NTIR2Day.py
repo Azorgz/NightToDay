@@ -513,7 +513,8 @@ class Image2ImageGAT_Dual(nn.Module):
         self.loss_sga[self.D] += self.compute_loss('IRClsDis', self.segMask_D,
                                                    self.fake_T.mean(dim=1, keepdim=True),
                                                    criterion_lambda='ssim', loss_name='sga')
-        self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, self.fake_T, self.real_D,
+        self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, self.segMask_TN_update,
+                                                   self.fake_T, self.real_D, self.remapped_T,
                                                    self.rec_D, self.edges_D, self.get_gradmag(self.fake_T),
                                                    criterion_lambda='bc', loss_name='sga')
         self.loss_sga[self.T] += self.compute_loss('sga', self.get_gradmag(self.real_TN), self.get_gradmag(self.fake_D))
