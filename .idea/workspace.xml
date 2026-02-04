@@ -6,7 +6,6 @@
   <component name="ChangeListManager">
     <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Update of TL sample merging">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -195,22 +194,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00077" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769883311385</created>
-      <option name="number" value="00077" />
-      <option name="presentableId" value="LOCAL-00077" />
-      <option name="project" value="LOCAL" />
-      <updated>1769883311385</updated>
-    </task>
-    <task id="LOCAL-00078" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1769883374026</created>
-      <option name="number" value="00078" />
-      <option name="presentableId" value="LOCAL-00078" />
-      <option name="project" value="LOCAL" />
-      <updated>1769883374026</updated>
     </task>
     <task id="LOCAL-00079" summary="Update of TL sample merging">
       <option name="closed" value="true" />
@@ -588,7 +571,23 @@
       <option name="project" value="LOCAL" />
       <updated>1770204189448</updated>
     </task>
-    <option name="localTasksCounter" value="126" />
+    <task id="LOCAL-00126" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770204257639</created>
+      <option name="number" value="00126" />
+      <option name="presentableId" value="LOCAL-00126" />
+      <option name="project" value="LOCAL" />
+      <updated>1770204257639</updated>
+    </task>
+    <task id="LOCAL-00127" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770204265962</created>
+      <option name="number" value="00127" />
+      <option name="presentableId" value="LOCAL-00127" />
+      <option name="project" value="LOCAL" />
+      <updated>1770204265962</updated>
+    </task>
+    <option name="localTasksCounter" value="128" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
