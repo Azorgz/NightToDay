@@ -25,6 +25,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
+from kornia.augmentation import RandomCrop
 from kornia.contrib import connected_components
 from kornia.morphology import dilation
 from torch import Tensor
@@ -523,20 +524,34 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Scale Robustness Loss
         if self.lambda_scale_robustness > 0.0:
-            scale = float(np.random.randint(0, 4, 1))
-            real_T_s = interpolate(self.real_T, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
-            real_N_s = interpolate(self.real_N, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
-            fake_TN_encoded, fake_fused_IR_s, *_ = self.netG.encode(real_T_s, real_N_s,
-                                                                    from_=self.T, align_first=False)
-            fake_D_s = interpolate(self.netG.decode(fake_TN_encoded, to_=self.D),
-                                   size=self.input_size, mode='bilinear', align_corners=False)
-            fake_D = self.fake_D.detach()
-            fake_fused_IR_s = interpolate(fake_fused_IR_s, size=self.input_size, mode='bilinear', align_corners=False)
-            fake_fused_IR = self.real_TN.detach()
-            self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D_s, fake_D,
-                                                                    loss_name='scale_robustness',
-                                                                    criterion_lambda='scale_robustness')
-            self.loss_scale_robustness[self.N] += self.compute_loss('cycle', fake_fused_IR_s, fake_fused_IR,
+            # scale = float(np.random.randint(0, 4, 1))
+            # real_T_s = interpolate(self.real_T, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
+            # real_N_s = interpolate(self.real_N, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
+            # fake_TN_encoded, fake_fused_IR_s, *_ = self.netG.encode(real_T_s, real_N_s,
+            #                                                         from_=self.T, align_first=False)
+            # fake_D_s = interpolate(self.netG.decode(fake_TN_encoded, to_=self.D),
+            #                        size=self.input_size, mode='bilinear', align_corners=False)
+            # fake_D = self.fake_D.detach()
+            # fake_fused_IR_s = interpolate(fake_fused_IR_s, size=self.input_size, mode='bilinear', align_corners=False)
+            # fake_fused_IR = self.real_TN.detach()
+            # self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D_s, fake_D,
+            #                                                         loss_name='scale_robustness',
+            #                                                         criterion_lambda='scale_robustness')
+            # self.loss_scale_robustness[self.N] += self.compute_loss('cycle', fake_fused_IR_s, fake_fused_IR,
+            #                                                         loss_name='scale_robustness',
+            #                                                         criterion_lambda='scale_robustness')
+            size = self.input_size
+            h_ds, w_ds = size // 2, size // 2
+            random_crop = RandomCrop((h_ds, w_ds))
+            real_T_prep = self.real_T[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
+            real_N_prep = self.real_N[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
+            fake_D_prep = self.fake_D[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
+
+            input_to_crop = torch.cat([real_T_prep, real_N_prep, fake_D_prep], dim=1)
+            real_T_ds, real_N_ds, fake_D_ds = random_crop(input_to_crop).split([3, 3, 3], dim=1)
+            fake_TN_encoded, _, *_ = self.netG.encode(real_T_ds, real_N_ds, from_=self.T, align_first=False)
+            fake_D = self.netG.decode(fake_TN_encoded, to_=self.D)
+            self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D, fake_D_ds,
                                                                     loss_name='scale_robustness',
                                                                     criterion_lambda='scale_robustness')
         # endregion
