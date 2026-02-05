@@ -422,7 +422,9 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     grad_TN_y, grad_TN_x = image_gradients(TN)
     grad_T_y, grad_T_x = image_gradients(T)
     grad_N_y, grad_N_x = image_gradients(T)
-    gradient_loss = torch.relu(grad_T_x - grad_TN_x) + torch.relu(grad_T_y - grad_TN_y) + torch.relu(grad_N_x - grad_TN_x) + torch.relu(grad_N_y - grad_TN_y)
+    gradient_loss = (torch.relu(torch.abs(grad_T_x) - torch.abs(grad_TN_x)) +
+                     torch.relu(torch.abs(grad_N_x) - torch.abs(grad_TN_x)) +
+                     torch.relu(torch.abs(grad_N_y*grad_T_y) - grad_TN_y**2))
 
     #  Blobs filtering
     # blobs = dilation(detect_TL_blobs_mask_free(night_color * 0.5 + 0.5), torch.ones(3, 3, device=image_fused.device))
