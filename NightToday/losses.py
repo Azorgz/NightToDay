@@ -989,7 +989,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
         gradient_horizon = torch.arange(H // 4 - H // 5, device=device).view(1, 1, H // 4 - H // 5, 1).repeat(1, 1, 1, W) / (H // 4 - H // 5) * veg_min
         gradient_horizon_region = gradient_horizon * mid_sky_mask
         sky_loss[valid_veg] += F.relu(upper_sky_mask - veg_min.view(-1, 1, 1, 1)).sum(dim=[1, 2, 3]) / (upper_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
-        sky_loss[valid_veg] += F.relu(gradient_horizon_region - mid_sky_mask).sum(dim=[1, 2, 3]) / (mid_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
+        sky_loss[valid_veg] += (torch.abs(gradient_horizon_region - mid_sky_mask)).sum(dim=[1, 2, 3]) / (mid_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
         sky_loss[valid_veg] += F.relu(veg_min.view(-1, 1, 1, 1) + 0.1 - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
     # endregion
 
