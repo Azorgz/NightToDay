@@ -880,7 +880,7 @@ class Image2ImageGAT_Dual(nn.Module):
                 TL_T = TL['T'][idx].to(T.device)
                 TL_N = TL['N'][idx].to(T.device)
                 min_scale = 9 / TL_T.shape[-1]
-                scale_size = max(torch.randint(25, 100, (1,)).item() / 100, min_scale)
+                scale_size = max(torch.randint(25, 200, (1,)).item() / 100, min_scale)
                 TL_T_ = interpolate(TL_T, scale_factor=scale_size, mode='bilinear', align_corners=False)
                 TL_N_ = interpolate(TL_N, scale_factor=scale_size, mode='bilinear', align_corners=False)
                 TL_D_ = TL_D.match_shape(TL_T_)
