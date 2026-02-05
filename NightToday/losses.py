@@ -1088,8 +1088,8 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             else:
                 HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
             # losses fake TN composition
-            # T_adjusted = (T / (mean_T_light_region + 1e-6)/2).clamp(-1, 1)
-            traffic_light_final = T * total_ * (1-HL_region) - HL_region * N_gray
+            T_adjusted = (T*0.5+0.5) ** (mean_T_light_region/0.5) * 2 - 1
+            traffic_light_final = T_adjusted * total_ * (1-HL_region) - HL_region * N_gray
             TN_region = TN * total_
             compo_loss = PixelConsistencyLoss(TN_region[b:b+1], traffic_light_final[b:b+1], total_[b:b+1]) * weight_
             # losses color consistency
