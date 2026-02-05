@@ -406,7 +406,6 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     sky_loss = torch.zeros([B, ], device=device)
     veg_loss = torch.zeros([B, ], device=device)
     person_loss = torch.zeros([B, ], device=device)
-    build_loss = torch.zeros([B, ], device=device)
     # blobs_loss = torch.zeros([B, ], device=image_target.device)
 
     #  Thermal correction losses per classes
@@ -415,11 +414,10 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
     # veg_loss[valid_sky*valid_veg] += ReLU()((TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
     #                                         (TN*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
-    build_loss[valid_building] += TVLoss()(TN[valid_building] * building_mask[valid_building]) * 0.1
 
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
-    total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2] + build_loss * 0.1) /
+    total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2]) /
             (weights * torch.stack([valid_sky, valid_veg, valid_person, valid_car], dim=-1).float()).sum(1)).mean()
 
     #  Blobs filtering
