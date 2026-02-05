@@ -411,7 +411,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
 
     #  Thermal correction losses per classes
     sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[valid_sky] * 2
-    # veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(dim=[1, 2, 3]) / area_veg[valid_veg] * 5
+    veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(dim=[1, 2, 3]) / area_veg[valid_veg] * 5
     veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
     # veg_loss[valid_sky*valid_veg] += ReLU()((TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
     #                                         (TN*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
@@ -917,7 +917,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     sign_mask = (GT_mask == SIGN).float()
     road_mask = (GT_mask == ROAD).float()
     SLight_mask_ori = (GT_mask == STREETLIGHT).float()
-    motorcycle_mask = (GT_mask == MOTORCYCLE).float()
+    vehicles_mask = ((GT_mask == MOTORCYCLE) | (GT_mask == BUS) | (GT_mask == CAR) | (GT_mask == TRAIN) | (GT_mask == TRUCK)).float()
     sky_mask = (GT_mask == SKY).float()
 
     # Normalize images
@@ -994,7 +994,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     # ########## Color Bias Correction
     # Masks
     rec_losses = torch.zeros(B, device=device)
-    for mask, threshold in zip([sign_mask, SLight_mask_ori, motorcycle_mask, road_mask], [50, 50, 50, 100]):
+    for mask, threshold in zip([sign_mask, SLight_mask_ori, vehicles_mask, road_mask], [50, 50, 50, 100]):
         valid_idx = mask.sum(dim=[1, 2, 3]) > threshold
         if valid_idx.any():
             rec_losses[valid_idx] += PixelConsistencyLoss(rec_vis[valid_idx], real_vis[valid_idx], mask[valid_idx])
