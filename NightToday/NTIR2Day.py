@@ -127,10 +127,7 @@ class Image2ImageGAT_Dual(nn.Module):
             self.criterion_aca = lambda r_v, f_v, f_v_m, f_v_f: AdaptativeColAttentionLoss(r_v, f_v.detach(),
                                                                                            f_v_m.detach() if f_v_m is not None else f_v_m,
                                                                                            f_v_f,
-                                                                                           4, 100000) if isinstance(
-                f_v_f, Tensor) else sum(
-                [AdaptativeColAttentionLoss(r_v, f_v[i].detach(), f_v_m.detach(), f_v_f[i], 4, 100000)] for i in
-                range(len(f_v_f))) / len(f_v_f)
+                                                                                           4, 100000)
             self.criterion_sga = StructuralGradientLoss(8, 0.8)
             self.criterion_IRClsDis = FakeIRPersonLoss
             self.criterion_bc = BiasCorrLoss

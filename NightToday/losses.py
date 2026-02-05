@@ -1279,6 +1279,9 @@ def ClsACALoss(real_vis_fea, cls_mask_real, fake_vis_fea, cls_mask_fake,
     real_nonzero = real_flat.abs().sum(dim=1) > 0
     real_flat = real_flat[real_nonzero]
 
+    if real_flat.size(0) == 0:
+        return torch.tensor(0.0, device=real_vis_fea.device)
+
     # Normalize pixel features
     real_norm = F.normalize(real_flat, p=2, dim=1)
 
