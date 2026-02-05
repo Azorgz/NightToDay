@@ -411,7 +411,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     #  Thermal correction losses per classes
     sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[valid_sky] * 2
     veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(dim=[1, 2, 3]) / area_veg[valid_veg] * 5
-    veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
+    # veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
     # veg_loss[valid_sky*valid_veg] += ReLU()((TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
     #                                         (TN*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
 
@@ -427,7 +427,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     # blobs_loss[valid_blobs] += (thermal_diff_high[valid_blobs] * blobs[valid_blobs]).sum(dim=[1, 2, 3]) / \
     #                            (area_blobs[valid_blobs] + 1e-6)
 
-    thermal_noise_loss = ThermalNoiseLoss()(TN).mean() * 2
+    thermal_noise_loss = ThermalNoiseLoss()(TN, T).mean() * 2
 
     return total_classes_loss + thermal_noise_loss #+ blobs_loss.mean()
 
@@ -686,6 +686,7 @@ class ThermalNoiseLoss(nn.Module):
         self.w_tensor = 0.7
         self.w_tv = 0.4
         self.w_freq = 0.6
+        self.w_edges = 0.2
 
     # -------- Multiscale coherence --------
     def multiscale_loss(self, x):
@@ -695,6 +696,13 @@ class ThermalNoiseLoss(nn.Module):
             us = F.interpolate(ds, size=x.shape[-2:], mode='bilinear', align_corners=False)
             loss += torch.abs(x - us).mean()
         return loss / len(self.scales)
+
+
+    # -------- Edge consistency loss --------
+    def edge_consistency_loss(self, x, ref):
+        edges_x = sobel(x).abs()
+        edges_ref = sobel(ref).abs()
+        return F.relu(edges_x - edges_ref)
 
     # -------- Structure tensor loss --------
     def structure_tensor_loss(self, x):
@@ -729,11 +737,12 @@ class ThermalNoiseLoss(nn.Module):
         return (mag * (R ** self.alpha)).mean()
 
     # -------- Final denoising loss --------
-    def forward(self, I_fused):
+    def forward(self, I_fused, I_remapped):
         L = (self.w_ms * self.multiscale_loss(I_fused) +
              self.w_tensor * self.structure_tensor_loss(I_fused) +
              self.w_tv * self.charbonnier_tv(I_fused) +
-             self.w_freq * self.frequency_decay_loss(I_fused))
+             self.w_freq * self.frequency_decay_loss(I_fused) +
+             self.w_edges * self.edge_consistency_loss(I_fused, I_remapped.detach()).mean())
         return L
 
 
@@ -992,10 +1001,10 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     # ########## Color Bias Correction
     # Masks
     rec_losses = torch.zeros(B, device=device)
-    for mask, threshold in zip([sign_mask, SLight_mask_ori, vehicles_mask, road_mask], [50, 50, 50, 100]):
+    for mask, threshold, weight in zip([sign_mask, SLight_mask_ori, vehicles_mask, road_mask], [50, 50, 50, 100], [2, 1, 0.1, 0.5]):
         valid_idx = mask.sum(dim=[1, 2, 3]) > threshold
         if valid_idx.any():
-            rec_losses[valid_idx] += PixelConsistencyLoss(rec_vis[valid_idx], real_vis[valid_idx], mask[valid_idx])
+            rec_losses[valid_idx] += PixelConsistencyLoss(rec_vis[valid_idx], real_vis[valid_idx], mask[valid_idx]) * weight
 
     CBC_losses = rec_losses.sum()
 
@@ -1079,13 +1088,13 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             compo_loss = PixelConsistencyLoss(TN_region[b:b+1], traffic_light_final[b:b+1], total_[b:b+1]) * weight_
             # losses color consistency
             if color == 'red':
-                target_color = torch.tensor([1.0, 0.2, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
+                target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 color_loss = (torch.relu(torch.max(fake_D[b:b+1, 1:] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
                 color_fake_D = fake_D[:, 0] - fake_D[:, 2] - fake_D[:, 1]
 
             elif color == 'green':
-                target_color = torch.tensor([0.0, 1.0, 0.7], device=N.device).view(1, 3, 1, 1) * 2 - 1
+                target_color = torch.tensor([0.0, 1.0, 0.1], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 color_loss = (torch.relu(torch.max(fake_D[b:b+1, :1] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
                 color_fake_D = fake_D[:, 1] - fake_D[:, 0]
@@ -1096,7 +1105,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 color_fake_D = fake_D[:, :2].mean(1) - fake_D[:, 2]
             luminosity_loss = torch.relu(0.8 - fake_D[b:b + 1].mean(1) * HL_region[b:b + 1]).sum() / (HL_region[b:b + 1].sum() + 1e-6)
             color_dist = ImageTensor(fake_D[b:b+1]*0.5+0.5).color_distance(ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device) * 0.5+0.5))
-            color_loss += (color_dist * HL_region[b:b+1]).max() * 2
+            color_loss += (color_dist * HL_region[b:b+1]).max() + torch.relu((fake_D[b:b+1]*0.5+0.5 - target_color)*HL_region[b:b+1]).mean() * 2
 
             # losses rec D consistency
             rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b+1], traffic_light_final[b:b+1], total_[b:b+1])
