@@ -541,7 +541,7 @@ class Image2ImageGAT_Dual(nn.Module):
             #                                                         loss_name='scale_robustness',
             #                                                         criterion_lambda='scale_robustness')
             size = self.input_size
-            h_ds, w_ds = size // 2, size // 2
+            h_ds, w_ds = size[0] // 2, size[1] // 2
             random_crop = RandomCrop((h_ds, w_ds))
             real_T_prep = self.real_T[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
             real_N_prep = self.real_N[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
