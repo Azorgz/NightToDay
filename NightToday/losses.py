@@ -978,7 +978,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     # valid_sky = common_sky_mask.sum(dim=[1, 2, 3]) > 0
     sky_loss = torch.zeros(B, device=device)
     if valid_veg.any():
-        veg_min = (veg_mask * fake_ir_gray)[valid_veg].flatten(1).min(dim=1)[0].detach()  # (B,)
+        veg_min = (veg_mask * fake_ir_gray)[valid_veg].sum(dim=[1, 2, 3]) / veg_mask.sum(dim=[1, 2, 3]).detach()  # (B,)
         sky_region = (sky_mask * fake_ir_gray)[valid_veg]
         # sky_mean_height_real_ir = (infrared_sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6))  # (B, H)
         # sky_mean_height_fake_ir = sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6)  # (B, H)
@@ -990,7 +990,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
         gradient_horizon_region = gradient_horizon * mid_sky_mask
         sky_loss[valid_veg] += F.relu(upper_sky_mask - veg_min.view(-1, 1, 1, 1)).sum(dim=[1, 2, 3]) / (upper_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
         sky_loss[valid_veg] += (torch.abs(gradient_horizon_region - mid_sky_mask)).sum(dim=[1, 2, 3]) / (mid_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
-        sky_loss[valid_veg] += F.relu(veg_min.view(-1, 1, 1, 1) + 0.1 - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
+        sky_loss[valid_veg] += F.relu(veg_min.view(-1, 1, 1, 1) - lower_sky_mask).sum(dim=[1, 2, 3]) / (lower_sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1
     # endregion
 
     ########### Light region SGA loss
