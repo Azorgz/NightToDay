@@ -419,6 +419,10 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
                                  area_person[valid_person]
     total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2]) /
             (weights * torch.stack([valid_sky, valid_veg, valid_person, valid_car], dim=-1).float()).sum(1)).mean()
+    grad_TN_y, grad_TN_x = image_gradients(TN)
+    grad_T_y, grad_T_x = image_gradients(T)
+    grad_N_y, grad_N_x = image_gradients(T)
+    gradient_loss = torch.relu(grad_T_x - grad_TN_x) + torch.relu(grad_T_y - grad_TN_y) + torch.relu(grad_N_x - grad_TN_x) + torch.relu(grad_N_y - grad_TN_y)
 
     #  Blobs filtering
     # blobs = dilation(detect_TL_blobs_mask_free(night_color * 0.5 + 0.5), torch.ones(3, 3, device=image_fused.device))
@@ -429,7 +433,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
 
     thermal_noise_loss = ThermalNoiseLoss()(TN, T).mean() * 2
 
-    return total_classes_loss + thermal_noise_loss #+ blobs_loss.mean()
+    return total_classes_loss + thermal_noise_loss + gradient_loss.mean() * 0.5
 
 
 def TL_fake_loss(D, f_T, GT_mask_D):
