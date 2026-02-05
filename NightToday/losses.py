@@ -1278,12 +1278,15 @@ def ClsACALoss(real_vis_fea, cls_mask_real, fake_vis_fea, cls_mask_fake,
     # Keep only non-zero rows (valid class pixels)
     real_nonzero = real_flat.abs().sum(dim=1) > 0
     real_flat = real_flat[real_nonzero]
+    fake_nonzero = fake_flat.abs().sum(dim=1) > 0
+    fake_flat = fake_flat[fake_nonzero]
 
-    if real_flat.size(0) < cluster_num:
+    if real_flat.size(0) < cluster_num or fake_flat.size(0) < cluster_num:
         return 0.0
 
     # Normalize pixel features
     real_norm = F.normalize(real_flat, p=2, dim=1)
+    fake_norm = F.normalize(fake_flat, p=2, dim=1)
 
     # ---- Cluster centers from real features ----
     centers = GetFeaMatrixCenter(real_norm, cluster_num, max_iter)  # (K, C)
@@ -1293,12 +1296,6 @@ def ClsACALoss(real_vis_fea, cls_mask_real, fake_vis_fea, cls_mask_fake,
     sim_real = real_norm @ centers_norm.T  # (N_real, K)
     sim_real_max = sim_real.max(dim=1).values.mean()  # mean over pixels
     sim_real_cluster = sim_real.max(dim=0).values.mean()  # mean over clusters
-
-    # ---- Fake similarity ----
-    # Only normalize rows with non-zero values
-    fake_nonzero = fake_flat.abs().sum(dim=1) > 0
-    fake_flat = fake_flat[fake_nonzero]
-    fake_norm = F.normalize(fake_flat, p=2, dim=1)
 
     sim_fake = fake_norm @ centers_norm.T  # (N_fake, K)
     sim_fake_max = sim_fake.max(dim=1).values.mean()  # mean over pixels
