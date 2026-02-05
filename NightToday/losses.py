@@ -1083,20 +1083,25 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 continue
             else:
                 pass
-            radius_HL = (torch.sqrt(HL_region.sum() / torch.pi).int() + 1)
-            if 1/8 > radius_HL/w_mask:
-                center_y, center_x = center_of_mass(HL_region[b:b + 1])
-                radius_HL = w_mask // 4
-                HL_region = torch.zeros_like(HL_region, device=mask.device)
-                HL_region[b, :, int(center_y), int(center_x)] = 1.0
-                HL_region = dilation(HL_region, get_disk_kernel(radius_HL.cpu().numpy(), device=mask.device))
-            elif 1/8 <= radius_HL/w_mask < 1/4:
-                HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
-                HL_region = dilation(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//2, device=mask.device))
-            elif 1/2 > radius_HL/w_mask >= 1/4:
-                HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//8, device=mask.device))
-            else:
-                HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
+            radius_HL = torch.sqrt(HL_region.sum() / torch.pi).cpu().numpy()
+            w_mask = w_mask.cpu().numpy()
+            radius_HL = max(min(radius_HL, w_mask // 2), w_mask // 4)
+            center_x, center_y = center_of_mass(HL_region[b:b + 1])
+            HL_region = torch.zeros_like(HL_region, device=mask.device)
+            HL_region[b, :, int(center_y), int(center_x)] = 1.0
+            HL_region = dilation(HL_region, get_disk_kernel(radius_HL, device=mask.device))
+            # if 1/8 > radius_HL/w_mask:
+            #     center_y, center_x = center_of_mass(HL_region[b:b + 1])
+            #     HL_region = torch.zeros_like(HL_region, device=mask.device)
+            #     HL_region[b, :, int(center_y), int(center_x)] = 1.0
+            #     HL_region = dilation(HL_region, get_disk_kernel(radius_HL.cpu().numpy(), device=mask.device))
+            # elif 1/8 <= radius_HL/w_mask < 1/4:
+            #     HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
+            #     HL_region = dilation(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//2, device=mask.device))
+            # elif 1/2 > radius_HL/w_mask >= 1/4:
+            #     HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//8, device=mask.device))
+            # else:
+            #     HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
             # losses fake TN composition
             T_adjusted = (T*0.5+0.5) ** (mean_T_light_region/0.5) * 2 - 1
             traffic_light_final = T_adjusted * total_ * (1-HL_region) - HL_region * N_gray
