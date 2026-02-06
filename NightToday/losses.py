@@ -355,7 +355,6 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
         sum_losses = (((per_class_loss * valid_mask * weights).sum(dim=1) / weights.mean() +
                        (per_class_ssim_loss * valid_mask[:, [4, 5]] * weights[[4, 5]]).sum(dim=1))
                       / weights[[2, 4, 5]].mean())  # (B,)
-
         # average batch
         loss += sum_losses
     else:
@@ -1124,9 +1123,9 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 # color_loss = (torch.relu(torch.max((fake_D[b:b+1, -1:]) * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                 #               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
                 color_fake_D = fake_D[:, :2].mean(1, keepdim=True) - fake_D[:, 2:3]
-            luminosity_loss = torch.relu(0.8 - fake_D[b:b + 1].mean(1) * HL_region[b:b + 1]).sum() / (HL_region[b:b + 1].sum() + 1e-6)
+            luminosity_loss = torch.relu(0.8 - (fake_D[b:b + 1].mean(1) * HL_region[b:b + 1] + 1 - HL_region[b:b + 1])).sum() / (HL_region[b:b + 1].sum() + 1e-6)
             color_dist = ImageTensor(fake_D[b:b+1]*0.5+0.5).color_distance(ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device) * 0.5+0.5))
-            color_loss = (color_dist * HL_region[b:b+1]).max() + torch.relu((fake_D[b:b+1]*0.5+0.5 - target_color)*HL_region[b:b+1]).mean() * 2
+            color_loss = (color_dist * HL_region[b:b+1]).max() + torch.relu((fake_D[b:b+1]*0.5+0.5 - target_color)*HL_region[b:b+1]).sum() / (HL_region[b:b+1].sum() + 1e-6) * 2
 
             # losses rec D consistency
             rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b+1], traffic_light_final[b:b+1], mask_[b:b+1])
@@ -1136,8 +1135,8 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
             std_loss = (fake_D[b:b+1] * (mask_[b:b+1] - HL_region)).std(1).max() - (color_fake_D[b:b+1]*HL_region[b:b+1] + 1 - HL_region[b:b+1]).min()
             # grad_loss to enhance the gradient of traffic light region
-            grad_TN = torch.abs(sobel(TN[b:b+1])) * total_[b:b+1]
-            grad_fake_D = torch.abs(sobel(fake_D[b:b+1])) * total_[b:b+1]
+            grad_TN = torch.abs(sobel(TN[b:b+1].mean(1, keepdim=True))) * total_[b:b+1]
+            grad_fake_D = torch.abs(sobel(fake_D[b:b+1].mean(1, keepdim=True))) * total_[b:b+1]
             grad_loss = nn.L1Loss()(grad_fake_D, grad_TN.detach()).sum() / (total_[b:b+1].sum() + 1e-6) * 2
             sky_mask = F.interpolate((seg_mask[b:b + 1] == SKY).float(), size=(h, w), mode='nearest')
             sky_contour = sky_mask * contour[b:b+1]
