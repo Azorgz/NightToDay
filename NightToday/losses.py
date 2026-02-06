@@ -1136,7 +1136,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             color_loss = (color_dist * HL_region[b:b+1]).max() + torch.relu((fake_D[b:b+1]*0.5+0.5 - target_color)*HL_region[b:b+1]).sum() / (HL_region[b:b+1].sum() + 1e-6) * 2
 
             # losses rec D consistency
-            rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b+1], traffic_light_final[b:b+1], mask_[b:b+1])
+            rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b+1], TN_region[b:b+1], total_[b:b+1] * sky_mask[b:b+1])
             HL_fake_T = (fake_T < fake_T[b:b+1, :, y0_mask:y1, x0_mask:x1_mask].mean()) * mask_
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
