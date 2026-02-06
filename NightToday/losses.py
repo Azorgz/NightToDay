@@ -595,14 +595,13 @@ def TL_color_loss(real_T, real_N, fused_TN, fake_D, GT_seg):
 #         fake_TL_full = fake_TL_full[:, :, pad[2]:, :]
 #     return fake_TL_full[0]
 def ForegroundContourLoss(fake, GT_seg):
-    sky_mask = (GT_seg == SKY).float()
-    Foreground_mask = (GT_seg == SIGN).float() + (GT_seg == POLE).float() + (GT_seg == TRAFFICLIGHT).float() + (GT_seg == STREETLIGHT).float()
-    Foreground_contour = dilation(Foreground_mask, torch.ones(5, 5, device=GT_seg.device)) - Foreground_mask
+    GT = F.interpolate(GT_seg, size=fake.shape[-2:], mode='nearest')
+    sky_mask = (GT == SKY).float()
+    Foreground_mask = (GT == SIGN).float() + (GT == POLE).float() + (GT == TRAFFICLIGHT).float() + (GT == STREETLIGHT).float()
+    Foreground_contour = dilation(Foreground_mask, torch.ones(5, 5, device=GT.device)) - Foreground_mask
     sky_contour = Foreground_contour * sky_mask
     valid_mask = sky_contour.sum(dim=[1, 2, 3]) > 0
-    sky_contour = F.interpolate(sky_contour, size=fake.shape[-2:], mode='nearest')
     if valid_mask.any():
-        loss = torch.zeros([fake.shape[0], ], device=fake.device)
         sky_mean_fake_D = (sky_mask[valid_mask] * fake[valid_mask]).sum(dim=[1, 2, 3]) / (3 * sky_mask[valid_mask].sum(dim=[1, 2, 3]) + 1e-6)
         sky_contour_min_fake_D = (sky_contour[valid_mask] * fake[valid_mask] + 1 - sky_contour[valid_mask]).min()
         sky_loss = torch.relu(sky_mean_fake_D.detach() - sky_contour_min_fake_D) * 0.5
