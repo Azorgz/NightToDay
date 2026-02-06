@@ -36,7 +36,7 @@ from . import get_config
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
     ThermalLoss, SharpFusionLoss, TrafLighLumiLoss, PixelConsistencyLoss, \
-    TrafLighLumiLoss_TN
+    TrafLighLumiLoss_TN, ForegroundContourLoss
 from .modules import LossScheduler, Get_gradmag_gray
 from .plexers import G_Plexer, D_Plexer, S_Plexer
 from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_disk_kernel, \
@@ -129,6 +129,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                                                            f_v_m.detach() if f_v_m is not None else f_v_m,
                                                                                            f_v_f,
                                                                                            4, 100000)
+            self.criterion_contour = ForegroundContourLoss
             self.criterion_sga = StructuralGradientLoss(8, 0.8)
             self.criterion_IRClsDis = FakeIRPersonLoss
             self.criterion_bc = BiasCorrLoss
@@ -305,6 +306,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'loss_thermal', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_sharpness', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_trafficlight', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_contour', {k: 0. for k in self.names_domains})
 
     def set_pedestrians_color(self):
         if self.pedestrian_color[0] is None:
@@ -637,6 +639,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                      weights=self.class_weight)
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
+        self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
         # endregion
 
         # combined loss

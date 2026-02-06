@@ -24,6 +24,7 @@ from .utilities import ClsMeanPixelValue, GetFeaMatrixCenter, bhw_to_onehot, det
 ROAD = 0
 PAVEMENT = 1
 BUILDING = 2
+POLE = 5
 TRAFFICLIGHT = 6
 SIGN = 7
 VEG = 8
@@ -425,13 +426,6 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
                      torch.relu(torch.abs(grad_N_x) - torch.abs(grad_TN_x)) +
                      torch.relu(torch.abs(grad_N_y*grad_T_y) - grad_TN_y**2))
 
-    #  Blobs filtering
-    # blobs = dilation(detect_TL_blobs_mask_free(night_color * 0.5 + 0.5), torch.ones(3, 3, device=image_fused.device))
-    # area_blobs = blobs.sum(dim=[1, 2, 3])
-    # valid_blobs = area_blobs > 0
-    # blobs_loss[valid_blobs] += (thermal_diff_high[valid_blobs] * blobs[valid_blobs]).sum(dim=[1, 2, 3]) / \
-    #                            (area_blobs[valid_blobs] + 1e-6)
-
     thermal_noise_loss = ThermalNoiseLoss()(TN, T).mean() * 2
 
     return total_classes_loss + thermal_noise_loss + gradient_loss.mean() * 0.5
@@ -600,7 +594,20 @@ def TL_color_loss(real_T, real_N, fused_TN, fake_D, GT_seg):
 #     if cut:
 #         fake_TL_full = fake_TL_full[:, :, pad[2]:, :]
 #     return fake_TL_full[0]
-
+def ForegroundContourLoss(fake, GT_seg):
+    sky_mask = (GT_seg == SKY).float()
+    Foreground_mask = (GT_seg == SIGN).float() + (GT_seg == POLE).float() + (GT_seg == TRAFFICLIGHT).float() + (GT_seg == STREETLIGHT).float()
+    Foreground_contour = dilation(Foreground_mask, torch.ones(5, 5, device=GT_seg.device)) - Foreground_mask
+    sky_contour = Foreground_contour * sky_mask
+    valid_mask = sky_contour.sum(dim=[1, 2, 3]) > 0
+    if valid_mask.any():
+        loss = torch.zeros([fake.shape[0], ], device=fake.device)
+        sky_mean_fake_D = (sky_mask[valid_mask] * fake[valid_mask]).sum(dim=[1, 2, 3]) / (3 * sky_mask[valid_mask].sum(dim=[1, 2, 3]) + 1e-6)
+        sky_contour_min_fake_D = (sky_contour[valid_mask] * fake[valid_mask] + 1 - sky_contour[valid_mask]).min()
+        sky_loss = torch.relu(sky_mean_fake_D.detach() - sky_contour_min_fake_D) * 0.5
+        return sky_loss.mean()
+    else:
+        return 0.0
 
 class SharpFusionLoss(torch.nn.Module):
     def __init__(self, lam_grad=7.0, lam_lap=4.5, lam_contrast=3.5, lam_freq=1.5):
