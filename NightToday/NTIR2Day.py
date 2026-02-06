@@ -72,7 +72,6 @@ class Image2ImageGAT_Dual(nn.Module):
         else:
             self.input_size = self.opt.model.gen.input_size
         # endregion
-        self.input_size = (512, 512)
 
         # region Networks
         self.netG = G_Plexer(self.names_domains, self.opt.model.gen, self.opt.training, self.device)
@@ -152,7 +151,6 @@ class Image2ImageGAT_Dual(nn.Module):
 
             # Partial training setup
             self.set_partial_train()
-        self.save('latest')
 
         # endregion
 
