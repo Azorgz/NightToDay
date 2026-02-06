@@ -600,6 +600,7 @@ def ForegroundContourLoss(fake, GT_seg):
     Foreground_contour = dilation(Foreground_mask, torch.ones(5, 5, device=GT_seg.device)) - Foreground_mask
     sky_contour = Foreground_contour * sky_mask
     valid_mask = sky_contour.sum(dim=[1, 2, 3]) > 0
+    sky_contour = F.interpolate(sky_contour, size=fake.shape[-2:], mode='nearest')
     if valid_mask.any():
         loss = torch.zeros([fake.shape[0], ], device=fake.device)
         sky_mean_fake_D = (sky_mask[valid_mask] * fake[valid_mask]).sum(dim=[1, 2, 3]) / (3 * sky_mask[valid_mask].sum(dim=[1, 2, 3]) + 1e-6)
