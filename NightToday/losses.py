@@ -1112,18 +1112,18 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 # color_loss = (torch.relu(torch.max(fake_D[b:b+1, 1:] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                 #               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
-                color_fake_D = fake_D[:, 0] - fake_D[:, 2] - fake_D[:, 1]
+                color_fake_D = fake_D[:, 0:1] - fake_D[:, 2:3] - fake_D[:, 1:2]
 
             elif color == 'green':
                 target_color = torch.tensor([0.0, 1.0, 0.1], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 # color_loss = (torch.relu(torch.max(fake_D[b:b+1, :1] * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                 #               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
-                color_fake_D = fake_D[:, 1] - fake_D[:, 0]
+                color_fake_D = fake_D[:, 1:2] - fake_D[:, 0:1]
             else:
                 target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
                 # color_loss = (torch.relu(torch.max((fake_D[b:b+1, -1:]) * total_[b:b+1]) - traffic_light_final[b:b+1, 0])
                 #               * total_[b:b+1]).sum() / (total_[b:b+1].sum() + 1e-6)
-                color_fake_D = fake_D[:, :2].mean(1) - fake_D[:, 2]
+                color_fake_D = fake_D[:, :2].mean(1, keepdim=True) - fake_D[:, 2:3]
             luminosity_loss = torch.relu(0.8 - fake_D[b:b + 1].mean(1) * HL_region[b:b + 1]).sum() / (HL_region[b:b + 1].sum() + 1e-6)
             color_dist = ImageTensor(fake_D[b:b+1]*0.5+0.5).color_distance(ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device) * 0.5+0.5))
             color_loss = (color_dist * HL_region[b:b+1]).max() + torch.relu((fake_D[b:b+1]*0.5+0.5 - target_color)*HL_region[b:b+1]).mean() * 2
@@ -1134,7 +1134,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
-            std_loss = (fake_D[b:b+1] * (mask_[b:b+1] - HL_region)).std(1).max() * 2 - color_fake_D[b:b+1][HL_region[:, 0].bool()].std().min()
+            std_loss = (fake_D[b:b+1] * (mask_[b:b+1] - HL_region)).std(1).max() - (color_fake_D[b:b+1]*HL_region[b:b+1] + 1 - HL_region[b:b+1]).min()
             # grad_loss to enhance the gradient of traffic light region
             grad_TN = torch.abs(sobel(TN[b:b+1])) * total_[b:b+1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b+1])) * total_[b:b+1]
