@@ -502,8 +502,8 @@ class Image2ImageGAT_Dual(nn.Module):
             #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_f')
             self.loss_trafficlight[self.N] += self.compute_loss('tll2', self.N_com, self.remapped_T_com, self.TN_com,
                                                                 self.rec_TN_com, self.D_com, self.fake_D_com, self.fake_T_com,
-                                                                segMask_com, contourMask,
-                                                                weights, loss_name='trafficlight', criterion_lambda='trafficlight_f')
+                                                                segMask_com, contourMask, weights, self.segMask_TN_update,
+                                                                loss_name='trafficlight', criterion_lambda='trafficlight_f')
         # endregion
 
         # region Structure-Gradient Alignment loss

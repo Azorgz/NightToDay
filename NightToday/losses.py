@@ -1139,7 +1139,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             grad_TN = torch.abs(sobel(TN[b:b+1])) * total_[b:b+1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b+1])) * total_[b:b+1]
             grad_loss = nn.L1Loss()(grad_fake_D, grad_TN.detach()).sum() / (total_[b:b+1].sum() + 1e-6) * 2
-            sky_mask = (seg_mask[b:b+1] == SKY).float()
+            sky_mask = F.interpolate((seg_mask[b:b + 1] == SKY).float(), size=(h, w), mode='nearest')
             sky_contour = sky_mask * contour[b:b+1]
             if sky_contour.sum() > 0:
                 sky_mean_fake_D = (sky_mask * fake_D[b:b+1]).sum() / (3*sky_mask.sum() + 1e-6)
