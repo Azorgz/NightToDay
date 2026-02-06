@@ -1102,10 +1102,11 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             # else:
             #     HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
             # losses fake TN composition
+            sky_mask = F.interpolate((seg_mask[b:b + 1] == SKY).float(), size=(h, w), mode='nearest')
             T_adjusted = (T*0.5+0.5) ** (mean_T_light_region/0.5) * 2 - 1
-            traffic_light_final = T_adjusted * total_ * (seg_mask != SKY) * (1-HL_region) - HL_region * N_gray
+            traffic_light_final = T_adjusted * total_ * sky_mask * (1-HL_region) - HL_region * N_gray
             TN_region = TN * mask_
-            compo_loss = PixelConsistencyLoss(TN_region[b:b+1], traffic_light_final[b:b+1], total_ * (seg_mask != SKY)[b:b+1]) * weight_
+            compo_loss = PixelConsistencyLoss(TN_region[b:b+1], traffic_light_final[b:b+1], total_[b:b+1] * sky_mask) * weight_
             # losses color consistency
             if color == 'red':
                 target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1
@@ -1138,7 +1139,6 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             grad_TN = torch.abs(sobel(TN[b:b+1].mean(1, keepdim=True))) * total_[b:b+1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b+1].mean(1, keepdim=True))) * total_[b:b+1]
             grad_loss = nn.L1Loss()(grad_fake_D, grad_TN.detach()).sum() / (total_[b:b+1].sum() + 1e-6) * 2
-            sky_mask = F.interpolate((seg_mask[b:b + 1] == SKY).float(), size=(h, w), mode='nearest')
             sky_contour = sky_mask * contour[b:b+1]
             if sky_contour.sum() > 0:
                 sky_mean_fake_D = (sky_mask * fake_D[b:b+1]).sum() / (3*sky_mask.sum() + 1e-6)
