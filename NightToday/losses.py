@@ -1084,7 +1084,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 pass
             radius_HL = torch.sqrt(HL_region.sum() / torch.pi).cpu().numpy()
             w_mask = w_mask.cpu().numpy()
-            radius_HL = max(min(radius_HL, w_mask // 2), w_mask // 4)
+            radius_HL = max(min(radius_HL, w_mask // 3), w_mask // 5)
             center_x, center_y = center_of_mass(HL_region[b:b + 1])
             HL_region = torch.zeros_like(HL_region, device=mask.device)
             HL_region[b, :, int(center_y), int(center_x)] = 1.0
