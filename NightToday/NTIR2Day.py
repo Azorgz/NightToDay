@@ -966,8 +966,8 @@ class Image2ImageGAT_Dual(nn.Module):
                    'fake_T': (self.fake_T_com * 0.5 + 0.5 if self.fake_T_com is not None else self.fake_T * 0.5+0.5),
                    'remapped_T': (self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5+0.5),
                    'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.real_TN * 0.5+0.5),
-                   'rec_D': (self.att_rec_D * 0.5 + 0.5 if self.rec_D_com is not None else self.rec_D * 0.5+0.5),
-                   'rec_T': (self.rec_T_com * 0.5 + 0.5 if self.att_rec_T is not None else self.rec_T * 0.5+0.5),
+                   'rec_D': (self.att_rec_D * 0.5 + 0.5 if self.att_rec_D is not None else self.rec_D * 0.5+0.5),
+                   'rec_T': (self.rec_T_com * 0.5 + 0.5 if self.rec_T_com is not None else self.rec_T * 0.5+0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D is not None else self.fake_D * 0.5+0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
