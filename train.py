@@ -10,7 +10,7 @@ from NightToday.NTIR2Day import Image2ImageGAT_Dual
 
 if __name__ == "__main__":
 
-    displayed_errors = ['loss_contour', 'trafficlight']
+    displayed_errors = ['contour', 'trafficlight']
 
     # Build model from config  (Default: NightToday/NightToday.yaml)
     model = Image2ImageGAT_Dual(trainable=True)
