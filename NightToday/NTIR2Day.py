@@ -575,7 +575,7 @@ class Image2ImageGAT_Dual(nn.Module):
             #                               to_=self.D)
             # rec_T = self.netG.decode(self.netG.encode(fake_D_att, from_=self.D), to_=self.T)
             # self.loss_att[self.T] += self.compute_loss('att', rec_T, fake_D_att)
-            att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=0.05).repeat(1, 3, 1, 1)
+            att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1)/17).repeat(1, 3, 1, 1)
             self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
             self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att', criterion_lambda='att')
         # endregion
