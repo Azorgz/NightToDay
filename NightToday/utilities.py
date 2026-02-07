@@ -1,6 +1,6 @@
 import functools
 from dataclasses import dataclass
-from typing import Literal
+from typing import Literal, List
 
 import numpy as np
 from kmeans_pytorch import kmeans
@@ -10,6 +10,7 @@ from kornia.morphology import closing, dilation, opening, erosion
 from scipy.ndimage import gaussian_filter
 from skimage import measure
 from skimage.morphology import disk
+from skimage.util import random_noise
 from torch import nn, Tensor
 from torch.nn.functional import conv2d
 from torchvision.transforms.functional import gaussian_blur
@@ -752,22 +753,37 @@ def bhw_to_onehot(GT_mask, num_classes):
 class AttackImages(nn.Module):
     """ Add small perturbations to input images for adversarial training. """
 
-    def __init__(self, device='cuda'):
+    def __init__(self, device='cuda', noise_type: str | List[str] = None):
         super(AttackImages, self).__init__()
         self.device = device
+        noise_type = noise_type or ['speckle']
+        self.noise_type = noise_type if isinstance(noise_type, list) else [noise_type]
+        self.noise_funcs = {
+            'gaussian': self._perturb_gaussian,
+            'salt_pepper': self._perturb_salt_pepper,
+            'speckle': self._perturb_speckle,
+            'lab': self._perturb_lab
+            }
 
-    def forward(self, *images, balance: float = 0.2, total: bool = False, epsilon=0.1):
-        image_T, image_N = images
-        if torch.rand(1) > balance:
-            perturbed_image_T = self._perturb(image_T, total, epsilon)
-            perturbed_image_N = image_N
-        else:
-            perturbed_image_T = image_T
-            perturbed_image_N = self._perturb(image_N, total, epsilon)
+    # def forward(self, *images, balance: float = 0.2, total: bool = False, epsilon=0.1):
+    #     image_T, image_N = images
+    #     if torch.rand(1) > balance:
+    #         perturbed_image_T = self._perturb(image_T, total, epsilon)
+    #         perturbed_image_N = image_N
+    #     else:
+    #         perturbed_image_T = image_T
+    #         perturbed_image_N = self._perturb(image_N, total, epsilon)
+    #
+    #     return perturbed_image_T.detach(), perturbed_image_N.detach()
 
-        return perturbed_image_T.detach(), perturbed_image_N.detach()
+    def forward(self, *images, epsilon=0.1):
+        perturbed_images = []
+        for image in images:
+            perturbed_image = self._perturb(image.detach().cpu().numpy(), total=False, epsilon=epsilon)
+            perturbed_images.append(perturbed_image.to(image.device))
+        return perturbed_images if len(perturbed_images) > 1 else perturbed_images[0]
 
-    def _perturb(self, image, total: bool, epsilon):
+    def _perturb_lab(self, image, total: bool, epsilon):
         l, a, b = rgb_to_lab(image * 0.5 + 0.5).split(1, dim=1)
         noise = torch.randn_like(l, device=self.device)
         if total:
@@ -776,6 +792,21 @@ class AttackImages(nn.Module):
             perturbed_l = (l / 100 + epsilon * noise) * 100
         perturbed_l = torch.clamp(perturbed_l, 0, 100.0)
         return lab_to_rgb(torch.cat([perturbed_l, a, b], dim=1)) * 2 - 1
+
+    def _perturb_gaussian(self, image, total: bool, epsilon):
+        return torch.from_numpy(random_noise(image, mode='gaussian', mean=0, var=epsilon, clip=True)).float()
+
+    def _perturb_salt_pepper(self, image, total: bool, epsilon):
+        return torch.from_numpy(random_noise(image, mode='s&p', salt_vs_pepper=0.5, clip=True)).float()
+
+    def _perturb_speckle(self, image, total: bool, epsilon):
+        return torch.from_numpy(random_noise(image, mode='speckle', mean=0, var=epsilon, clip=True)).float()
+
+    def _perturb(self, image, total: bool, epsilon):
+        for n in self.noise_type:
+            if n in self.noise_funcs:
+                image = self.noise_funcs[n](image, total, epsilon)
+        return image
 
 
 # -----------------------------
