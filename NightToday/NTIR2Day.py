@@ -283,7 +283,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'fake_D_com', None)
         setattr(self, 'fake_TN_com', None)
         setattr(self, 'rec_TN_com', None)
-        setattr(self, 'att_rec_T', None)
+        setattr(self, 'att_rec_D', None)
 
     def initialize_losses(self):
         setattr(self, 'loss_D', {k: 0. for k in self.names_domains})
@@ -576,8 +576,8 @@ class Image2ImageGAT_Dual(nn.Module):
             # rec_T = self.netG.decode(self.netG.encode(fake_D_att, from_=self.D), to_=self.T)
             # self.loss_att[self.T] += self.compute_loss('att', rec_T, fake_D_att)
             att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=0.05).repeat(1, 3, 1, 1)
-            self.att_rec_T = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
-            self.loss_att[self.T] += self.compute_loss('att', self.att_rec_T, att_fake_T)
+            self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
+            self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att', criterion_lambda='att')
         # endregion
 
         # self.loss_trafficlight[self.N] += self.compute_loss('cycle', self.rec_TN_com, TN_com,
@@ -966,8 +966,8 @@ class Image2ImageGAT_Dual(nn.Module):
                    'fake_T': (self.fake_T_com * 0.5 + 0.5 if self.fake_T_com is not None else self.fake_T * 0.5+0.5),
                    'remapped_T': (self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5+0.5),
                    'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.real_TN * 0.5+0.5),
-                   'rec_D': (self.rec_D_com * 0.5 + 0.5 if self.rec_D_com is not None else self.rec_D * 0.5+0.5),
-                   'rec_T': (self.att_rec_T * 0.5 + 0.5 if self.att_rec_T is not None else self.rec_T * 0.5+0.5),
+                   'rec_D': (self.att_rec_D * 0.5 + 0.5 if self.rec_D_com is not None else self.rec_D * 0.5+0.5),
+                   'rec_T': (self.rec_T_com * 0.5 + 0.5 if self.att_rec_T is not None else self.rec_T * 0.5+0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D is not None else self.fake_D * 0.5+0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
