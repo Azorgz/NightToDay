@@ -15,7 +15,7 @@ model:
     n_layers: 4
     training_schedule:
       start_epoch: 0
-      end_epoch: 30
+      end_epoch: 75
       updateGT_D_start_epoch: 5
       updateGT_TN_start_epoch: 15
 
@@ -49,7 +49,7 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 30
+  start_epoch: 75
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -78,11 +78,11 @@ training:
     lambda_semEdge:  [[ 1,  ], .5]
     lambda_gan:  [[ 0,  ], 1.5]
     lambda_tv:  [[ 1,  ], 5.0]
-    lambda_sga: [[ 20,  ], 0.0]
+    lambda_sga: [[ 40,  ], 0.0]
     lambda_latent: [[ 0, 10], 0.1]
-    lambda_att: [[ 20, ], 2.]
+    lambda_att: [[ 40, ], 2.]
     lambda_fus: [[ 0,  2], 5.0]
-    lambda_scale_robustness: [[ 30,  ], 1.0]
+    lambda_scale_robustness: [[ 75,  ], 1.0]
     lambda_trafficlight_l: [[ 10,  ], 0.01]
     lambda_trafficlight_f: [[ 10,  ], 0.2]
     lambda_thermal: [[ 1,  ], 2.0]
