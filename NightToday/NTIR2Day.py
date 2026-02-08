@@ -679,7 +679,7 @@ class Image2ImageGAT_Dual(nn.Module):
             fake_D_s = interpolate(self.fake_D, size=rand_size, mode='bilinear', align_corners=False)
 
             if stage == 'train':
-                segMask_D_s = interpolate(self.segMask_D, size=rand_size, mode='nearest')
+                segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest')
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
                 self.criterion_seg = self.update_class_criterion(segMask_D_s.long())
                 self.loss_S[self.D] += self.compute_loss('seg', real_D_pred_seg,
@@ -690,8 +690,8 @@ class Image2ImageGAT_Dual(nn.Module):
 
             elif stage == 'update_D':
                 # Start updating D seg labels and train Thermal Seg with pseudo TIR images and Day labels
-                segMask_D_s = interpolate(self.segMask_D, size=rand_size, mode='nearest').long()
-                segMask_TN_s = interpolate(self.segMask_TN, size=rand_size, mode='nearest').long()
+                segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
+                segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
                 real_T_pred_seg = self.netS(real_TN_s, from_=self.T)
                 fake_D_pred_seg_d = self.netS(fake_D_s.detach(), from_=self.D)
@@ -713,8 +713,8 @@ class Image2ImageGAT_Dual(nn.Module):
                 IR_pred_seg = fake_D_pred_seg_d
 
             elif stage == 'update_TN':
-                segMask_D_s = interpolate(self.segMask_D, size=rand_size, mode='nearest').long()
-                segMask_TN_s = interpolate(self.segMask_TN, size=rand_size, mode='nearest').long()
+                segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
+                segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
                 real_T_pred_seg = self.netS(real_TN_s, from_=self.T)
                 fake_D_pred_seg_d = self.netS(fake_D_s.detach(), from_=self.D)
@@ -737,8 +737,8 @@ class Image2ImageGAT_Dual(nn.Module):
                 IR_pred_seg = fake_D_pred_seg_d
 
             else:
-                segMask_D_s = interpolate(self.segMask_D, size=rand_size, mode='nearest').long()
-                segMask_TN_s = interpolate(self.segMask_TN, size=rand_size, mode='nearest').long()
+                segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
+                segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
                 real_T_pred_seg = self.netS(real_TN_s, from_=self.T)
                 fake_D_pred_seg = self.netS(fake_D_s, from_=self.D)
                 fake_TN_pred_seg = self.netS(fake_TN_s, from_=self.T)
@@ -856,7 +856,7 @@ class Image2ImageGAT_Dual(nn.Module):
                             if count < 250:
                                 fake_light = dilation(fake_light, torch.ones((3, 3), device=fake_light.device))
                             fake_light = interpolate(fake_light, (y1 - y0 + 1, x1 - x0 + 1))
-                            mask_road = (interpolate(self.segMask_TN_update[b:b+1], self.fake_D.shape[-2:], mode='nearest') == 0).float()
+                            mask_road = (interpolate(self.segMask_TN_update[b:b+1].float(), self.fake_D.shape[-2:], mode='nearest') == 0).float()
                             road_mean = ((self.fake_D[b:b+1] * 0.5 + 0.5) * mask_road).mean()
                             fake_light_norm = (fake_light - fake_light.min()) / (fake_light.max() - fake_light.min() + 1e-6)
                             fake_light = (fake_light_norm * (1 - road_mean + 1e-5) + road_mean).clamp(0, 1)
