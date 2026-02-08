@@ -595,7 +595,7 @@ def TL_color_loss(real_T, real_N, fused_TN, fake_D, GT_seg):
 #         fake_TL_full = fake_TL_full[:, :, pad[2]:, :]
 #     return fake_TL_full[0]
 def ForegroundContourLoss(fake, GT_seg):
-    GT = F.interpolate(GT_seg, size=fake.shape[-2:], mode='nearest')
+    GT = F.interpolate(GT_seg.float(), size=fake.shape[-2:], mode='nearest')
     sky_mask = (GT == SKY).float()
     Foreground_mask = (GT == SIGN).float() + (GT == POLE).float() + (GT == TRAFFICLIGHT).float() + (GT == STREETLIGHT).float()
     Foreground_contour = dilation(Foreground_mask, torch.ones(5, 5, device=GT.device)) - Foreground_mask
