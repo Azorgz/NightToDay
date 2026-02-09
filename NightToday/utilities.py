@@ -779,7 +779,7 @@ class AttackImages(nn.Module):
     def forward(self, *images, epsilon=0.1):
         perturbed_images = []
         for image in images:
-            perturbed_image = self._perturb(image.detach().cpu().numpy(), total=False, epsilon=epsilon)
+            perturbed_image = self._perturb(image.detach().cpu().numpy(), epsilon=epsilon)
             perturbed_images.append(perturbed_image.to(image.device))
         return perturbed_images if len(perturbed_images) > 1 else perturbed_images[0]
 
