@@ -70,7 +70,7 @@ training:
     D: [0.5, 0.999]
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
-    lambda_color: [[ 2,  ], 3.0]
+    lambda_color: [[ 2,  ], 0.0]
     lambda_id: [[ 0, 10 ], 0.1]
     lambda_cycle:  [[ 0,  ], 5.0]
     lambda_ssim:  [[ 0,  ], 2.5]
@@ -85,7 +85,7 @@ training:
     lambda_scale_robustness: [[ 75,  ], 1.0] # 1.0
     lambda_trafficlight_l: [[ 10,  ], 0.1] # 0.01
     lambda_trafficlight_f: [[ 10,  ], 0.2] # 0.2
-    lambda_thermal: [[ 1,  ], 0.0]
+    lambda_thermal: [[ 1,  ], 2.0]
     lambda_contour: [[ 20,  ], 0.2]
     lambda_sharpness: [[ 0,  ], 25.0]
     lambda_cgr: [[ 5, ], 2.5]  # Conditional Gradient Repair
