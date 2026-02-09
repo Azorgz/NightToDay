@@ -779,7 +779,7 @@ class AttackImages(nn.Module):
     def forward(self, *images, epsilon=0.1):
         perturbed_images = []
         for image in images:
-            perturbed_image = self._perturb(image.detach().cpu().numpy(), epsilon=epsilon)
+            perturbed_image = self._perturb(image.detach(), epsilon=epsilon)
             perturbed_images.append(perturbed_image.to(image.device))
         return perturbed_images if len(perturbed_images) > 1 else perturbed_images[0]
 
@@ -791,16 +791,16 @@ class AttackImages(nn.Module):
         return lab_to_rgb(torch.cat([perturbed_l, a, b], dim=1)) * 2 - 1
 
     def _perturb_gaussian(self, image, epsilon):
-        return torch.from_numpy(random_noise(image, mode='gaussian', mean=0, var=epsilon, clip=True)).float()
+        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='gaussian', mean=0, var=epsilon, clip=True)).float()
 
     def _perturb_salt_pepper(self, image, epsilon):
-        return torch.from_numpy(random_noise(image, mode='s&p', salt_vs_pepper=0.5, clip=True)).float()
+        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='s&p', salt_vs_pepper=0.5, clip=True)).float()
 
     def _perturb_poisson(self, image, epsilon):
-        return torch.from_numpy(random_noise(image, mode='poisson', salt_vs_pepper=0.5, clip=True)).float()
+        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='poisson', salt_vs_pepper=0.5, clip=True)).float()
 
     def _perturb_speckle(self, image, epsilon):
-        return torch.from_numpy(random_noise(image, mode='speckle', mean=0, var=epsilon, clip=True)).float()
+        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='speckle', mean=0, var=epsilon, clip=True)).float()
 
     def _perturb(self, image, epsilon: float):
         idx = torch.randperm(len(self.noise_type))[0]
