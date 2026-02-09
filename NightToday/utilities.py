@@ -762,7 +762,6 @@ class AttackImages(nn.Module):
             'gaussian': self._perturb_gaussian,
             'salt_pepper': self._perturb_salt_pepper,
             'speckle': self._perturb_speckle,
-            'lab': self._perturb_lab
             }
 
     # def forward(self, *images, balance: float = 0.2, total: bool = False, epsilon=0.1):
