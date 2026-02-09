@@ -783,16 +783,16 @@ class AttackImages(nn.Module):
         return perturbed_images if len(perturbed_images) > 1 else perturbed_images[0]
 
     def _perturb_gaussian(self, image, epsilon):
-        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='gaussian', mean=0, var=epsilon, clip=True)).float()
+        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='gaussian', mean=0, var=epsilon/2, clip=True)).float()
 
     def _perturb_salt_pepper(self, image, epsilon):
         return torch.from_numpy(random_noise(image.cpu().numpy(), mode='s&p', salt_vs_pepper=0.5, clip=True)).float()
 
     def _perturb_poisson(self, image, epsilon):
-        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='poisson', salt_vs_pepper=0.5, clip=True)).float()
+        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='poisson', clip=True)).float()
 
     def _perturb_speckle(self, image, epsilon):
-        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='speckle', mean=0, var=epsilon, clip=True)).float()
+        return torch.from_numpy(random_noise(image.cpu().numpy(), mode='speckle', mean=0, var=epsilon/2, clip=True)).float()
 
     def _perturb(self, image, epsilon: float):
         idx = torch.randperm(len(self.noise_type))[0]
