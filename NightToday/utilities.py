@@ -756,7 +756,7 @@ class AttackImages(nn.Module):
     def __init__(self, device='cuda', noise_type: str | List[str] = None):
         super(AttackImages, self).__init__()
         self.device = device
-        noise_type = noise_type or ['speckle', 'gaussian']
+        noise_type = noise_type or ['speckle', 'gaussian', 'salt_pepper']
         self.noise_type = noise_type if isinstance(noise_type, list) else [noise_type]
         self.noise_funcs = {
             'gaussian': self._perturb_gaussian,
