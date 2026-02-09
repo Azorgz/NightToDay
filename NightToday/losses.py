@@ -360,7 +360,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
         loss += sum_losses
     else:
         loss += (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
-    loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), valid) * 0.2
+    # loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), valid) * 0.2
 
     return loss.mean()
 
