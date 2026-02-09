@@ -756,7 +756,7 @@ class AttackImages(nn.Module):
     def __init__(self, device='cuda', noise_type: str | List[str] = None):
         super(AttackImages, self).__init__()
         self.device = device
-        noise_type = noise_type or ['speckle', 'gaussian', 'lab']
+        noise_type = noise_type or ['speckle', 'gaussian']
         self.noise_type = noise_type if isinstance(noise_type, list) else [noise_type]
         self.noise_funcs = {
             'gaussian': self._perturb_gaussian,
@@ -782,13 +782,6 @@ class AttackImages(nn.Module):
             perturbed_image = self._perturb(image.detach(), epsilon=epsilon)
             perturbed_images.append(perturbed_image.to(image.device))
         return perturbed_images if len(perturbed_images) > 1 else perturbed_images[0]
-
-    def _perturb_lab(self, image, epsilon):
-        l, a, b = rgb_to_lab(image * 0.5 + 0.5).split(1, dim=1)
-        noise = torch.randn_like(l, device=self.device)
-        perturbed_l = (l / 100 + epsilon * noise) * 100
-        perturbed_l = torch.clamp(perturbed_l, 0, 100.0)
-        return lab_to_rgb(torch.cat([perturbed_l, a, b], dim=1)) * 2 - 1
 
     def _perturb_gaussian(self, image, epsilon):
         return torch.from_numpy(random_noise(image.cpu().numpy(), mode='gaussian', mean=0, var=epsilon, clip=True)).float()
