@@ -887,9 +887,9 @@ class Image2ImageGAT_Dual(nn.Module):
         if nb > 0:
             for i in range(nb):
                 rand_idx = torch.rand(1)
-                if rand_idx < 0.48:
+                if rand_idx < 0.40:
                     color = 'green'
-                elif rand_idx > 0.52:
+                elif rand_idx > 0.60:
                     color = 'red'
                 else:
                     color = 'orange'

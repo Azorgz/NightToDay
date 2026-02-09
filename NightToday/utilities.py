@@ -756,7 +756,7 @@ class AttackImages(nn.Module):
     def __init__(self, device='cuda', noise_type: str | List[str] = None):
         super(AttackImages, self).__init__()
         self.device = device
-        noise_type = noise_type or ['speckle']
+        noise_type = noise_type or ['speckle', 'gaussian', 'lab']
         self.noise_type = noise_type if isinstance(noise_type, list) else [noise_type]
         self.noise_funcs = {
             'gaussian': self._perturb_gaussian,
@@ -783,29 +783,28 @@ class AttackImages(nn.Module):
             perturbed_images.append(perturbed_image.to(image.device))
         return perturbed_images if len(perturbed_images) > 1 else perturbed_images[0]
 
-    def _perturb_lab(self, image, total: bool, epsilon):
+    def _perturb_lab(self, image, epsilon):
         l, a, b = rgb_to_lab(image * 0.5 + 0.5).split(1, dim=1)
         noise = torch.randn_like(l, device=self.device)
-        if total:
-            perturbed_l = (epsilon / 5 * noise) * 100
-        else:
-            perturbed_l = (l / 100 + epsilon * noise) * 100
+        perturbed_l = (l / 100 + epsilon * noise) * 100
         perturbed_l = torch.clamp(perturbed_l, 0, 100.0)
         return lab_to_rgb(torch.cat([perturbed_l, a, b], dim=1)) * 2 - 1
 
-    def _perturb_gaussian(self, image, total: bool, epsilon):
+    def _perturb_gaussian(self, image, epsilon):
         return torch.from_numpy(random_noise(image, mode='gaussian', mean=0, var=epsilon, clip=True)).float()
 
-    def _perturb_salt_pepper(self, image, total: bool, epsilon):
+    def _perturb_salt_pepper(self, image, epsilon):
         return torch.from_numpy(random_noise(image, mode='s&p', salt_vs_pepper=0.5, clip=True)).float()
 
-    def _perturb_speckle(self, image, total: bool, epsilon):
+    def _perturb_poisson(self, image, epsilon):
+        return torch.from_numpy(random_noise(image, mode='poisson', salt_vs_pepper=0.5, clip=True)).float()
+
+    def _perturb_speckle(self, image, epsilon):
         return torch.from_numpy(random_noise(image, mode='speckle', mean=0, var=epsilon, clip=True)).float()
 
-    def _perturb(self, image, total: bool, epsilon):
-        for n in self.noise_type:
-            if n in self.noise_funcs:
-                image = self.noise_funcs[n](image, total, epsilon)
+    def _perturb(self, image, epsilon: float):
+        idx = torch.randperm(len(self.noise_type))[0]
+        image = self.noise_funcs[self.noise_type[idx]](image, epsilon)
         return image
 
 
