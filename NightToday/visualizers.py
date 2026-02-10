@@ -7,7 +7,7 @@ from . import TrainConfig
 class Visualizer:
     def __init__(self, opt: TrainConfig):
         self.display = 'laptop' in socket.gethostname()
-        self.save_dir = opt.visualize_dir if self.display else '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/training_visuals/'
+        self.save_dir = opt.visualize_dir if self.display else '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/training_visuals/'
         self.display_freq = opt.visualize_freq
         self.size = opt.input_size
         self.screen = None

@@ -248,29 +248,42 @@ class ColorConsistencyLoss(nn.Module):
         w = torch.ones(C, 1, k, k, device=x.device) / (k * k)
         mean = F.conv2d(x, w, padding=k // 2, groups=C)
         mean2 = F.conv2d(x * x, w, padding=k // 2, groups=C)
-        return -torch.sqrt(mean2 - mean * mean + 1e-6).mean() * self.lambda_contrast
+        return -torch.sqrt(mean2 - mean * mean + 1e-2).mean() * self.lambda_contrast
 
     def l1_loss_color(self, fake_rgb, real_rgb, mask):
         if not self.lambda_l1:
             return 0.0
         return torch.relu(nn.L1Loss()(fake_rgb*mask, real_rgb*mask) - 0.1) * self.lambda_l1
 
-    def saturation_loss_color(self, fake_rgb, real_n, tau=0.1):
+    # def saturation_loss_color(self, fake_rgb, real_n, tau=0.1):
+    #     """
+    #     thermal: (B,1,H,W) normalized to [0,1]
+    #     """
+    #     if not self.lambda_saturation:
+    #         return 0.0
+    #     hsv_fake = rgb_to_hsv(fake_rgb)
+    #     hsv_real = rgb_to_hsv(real_n)
+    #     V_mask = ((hsv_real[:, 2] > 0.33).float() * (hsv_real[:, 2] < 0.95)).squeeze(1)
+    #     weight = ((hsv_real[:, 1]*1.1 > hsv_fake[:, 1]) * V_mask).float().squeeze(1)
+    #     Sat_diff = torch.relu(hsv_real[:, 1] - hsv_fake[:, 1] + tau).squeeze(1)
+    #     S = Sat_diff
+    #     H = torch.sqrt((hsv_real[:, 0] - hsv_fake[:, 0]) ** 2 + 1e-6).squeeze(1)
+    #     loss = (S * H * weight).sum() / (weight.sum() + 1e-6)
+    #     return loss * self.lambda_saturation
+
+    def saturation_loss_color(self, fake_rgb, real_n):
         """
         thermal: (B,1,H,W) normalized to [0,1]
         """
         if not self.lambda_saturation:
             return 0.0
-        hsv_fake = rgb_to_hsv(fake_rgb)
-        hsv_real = rgb_to_hsv(real_n)
-
-        V_mask = ((hsv_real[:, 2] > 0.33).float() * (hsv_real[:, 2] < 0.95)).squeeze(1)
-        weight = ((hsv_real[:, 1]*1.1 > hsv_fake[:, 1]) * V_mask).float().squeeze(1)
-        Sat_diff = torch.relu(hsv_real[:, 1] - hsv_fake[:, 1] + tau).squeeze(1)
-        S = Sat_diff
-        H = torch.sqrt((hsv_real[:, 0] - hsv_fake[:, 0]) ** 2 + 1e-6).squeeze(1)
-        loss = (S * H * weight).sum() / (weight.sum() + 1e-6)
-        return loss * self.lambda_saturation
+        fake_maxc, _ = fake_rgb.max(dim=1, keepdim=True)
+        fake_minc, _ = fake_rgb.min(dim=1, keepdim=True)
+        fake_sat = (fake_maxc - fake_minc) / (fake_maxc + 1e-6)
+        real_maxc, _ = real_n.max(dim=1, keepdim=True)
+        real_minc, _ = real_n.min(dim=1, keepdim=True)
+        real_sat = (real_maxc - real_minc) / (real_maxc + 1e-6)
+        return (torch.relu(real_sat + 0.05 - fake_sat) - torch.relu(fake_sat - real_sat)*0.5).mean() * self.lambda_saturation
 
     def lab_edge_sharpness_loss(self, fake):
         if not self.lambda_lab_edge:
@@ -360,7 +373,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
         loss += sum_losses
     else:
         loss += (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
-    # loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), valid) * 0.2
+    loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), valid) * 0.2
 
     return loss.mean()
 
