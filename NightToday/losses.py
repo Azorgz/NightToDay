@@ -246,12 +246,14 @@ class ColorConsistencyLoss(nn.Module):
         """
         if not self.lambda_saturation:
             return 0.0
-        fake_maxc, _ = fake_rgb.max(dim=1, keepdim=True)
-        fake_minc, _ = fake_rgb.min(dim=1, keepdim=True)
-        fake_sat = (fake_maxc - fake_minc) / (fake_maxc + 1e-6)
         real_maxc, _ = real_n.max(dim=1, keepdim=True)
         real_minc, _ = real_n.min(dim=1, keepdim=True)
-        real_sat = (real_maxc - real_minc) / (real_maxc + 1e-6)
+        real_sat = ((real_maxc - real_minc) / (real_maxc + 1e-6))**2
+
+        fake_maxc, _ = fake_rgb.max(dim=1, keepdim=True)
+        fake_minc, _ = fake_rgb.min(dim=1, keepdim=True)
+        fake_sat = ((fake_maxc - fake_minc) / (fake_maxc + 1e-6)) * real_sat
+
         hue_fake = rgb_to_hsv(fake_rgb)[:, 0:1, :, :]
         hue_real = rgb_to_hsv(real_n)[:, 0:1, :, :]
         cos_dist = torch.cos(hue_fake - hue_real)**3
