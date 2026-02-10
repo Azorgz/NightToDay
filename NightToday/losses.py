@@ -200,9 +200,6 @@ class ColorConsistencyLoss(nn.Module):
         self.lambda_saturation = 0.1
         self.lambda_lab_edge = 0.01
         self.lambda_l1 = 0.
-        self.lambda_contrast = 0.00
-        self.saturation_gated = 0.00
-        self.lambda_gray_balance = 0.0
 
     def forward(self, fake_color: torch.Tensor, real_color: torch.Tensor, mask_high_color) -> torch.Tensor:
         """
@@ -214,46 +211,18 @@ class ColorConsistencyLoss(nn.Module):
         self_lab_edge_loss = self.lab_edge_sharpness_loss(fake_color)
         self_saturation_loss = self.saturation_loss_color(fake_color*mask_high_color,
                                                           (real_color*mask_high_color))
-        l1_loss = self.l1_loss_color(fake_color, real_color, mask_high_color)
-        contrast_loss = self.contrast_loss(fake_color)
-        sat_gated_loss = self.sat_loss_gated(fake_color, real_color)
-        gray_balance_loss = self.gray_balance_loss(fake_color, real_color)
-        return self_saturation_loss + l1_loss + contrast_loss + self_lab_edge_loss + sat_gated_loss + gray_balance_loss
+        l1_loss = self.luminance_loss_color(fake_color, real_color)
+        return self_saturation_loss + l1_loss + self_lab_edge_loss
 
-    def gray_balance_loss(self, fake, real):
-        if not self.lambda_gray_balance:
-            return 0.0
-        real_gray_mask = (real.std(1, keepdim=True) < 0.02) & (real.mean(1, keepdim=True) > 0.3) & (real.mean(1, keepdim=True) < 0.8)
-        real_gray = real.mean(dim=1, keepdim=True)
-        loss = (torch.relu(fake.std(1) - real_gray.std(1))*real_gray_mask).sum(dim=[1,2,3]) / (real_gray_mask.sum(dim=[1,2,3]) + 1e-6)
-        return loss.mean() * self.lambda_gray_balance
-
-    def sat_loss_gated(self, fake, real, v_thresh=0.33):
-        if not self.lambda_contrast:
-            return 0.0
-        maxc, _ = fake.max(dim=1)
-        minc, _ = fake.min(dim=1)
-        gray_mask_real = (fake.std(1) < 0.05) & (fake.mean(1) > 0.3) & (fake.mean(1) < 0.8)
-        v = maxc
-        s = (maxc - minc) / (maxc + 1e-6)
-        th = torch.max(torch.stack([v.mean(dim=[-1, -2]), torch.ones(fake.shape[0], device=fake.device) * v_thresh], 1), dim=1)[0]
-        w = (v > th.view(fake.shape[0], 1, 1)).float() * (v < 0.98) * (~gray_mask_real)
-        return torch.relu(0.6 -(s * w).sum() / (w.sum() + 1e-6))
-
-    def contrast_loss(self, x, k=7):
-        # negative => encourage higher contrast
-        if not self.lambda_contrast:
-            return 0.0
-        B, C, H, W = x.shape
-        w = torch.ones(C, 1, k, k, device=x.device) / (k * k)
-        mean = F.conv2d(x, w, padding=k // 2, groups=C)
-        mean2 = F.conv2d(x * x, w, padding=k // 2, groups=C)
-        return -torch.sqrt(mean2 - mean * mean + 1e-2).mean() * self.lambda_contrast
-
-    def l1_loss_color(self, fake_rgb, real_rgb, mask):
+    def luminance_loss_color(self, fake_rgb, real_rgb):
         if not self.lambda_l1:
             return 0.0
-        return torch.relu(nn.L1Loss()(fake_rgb*mask, real_rgb*mask) - 0.1) * self.lambda_l1
+        fake_norm = fake_rgb * 0.5 + 0.5
+        real_norm = real_rgb * 0.5 + 0.5
+        fake_lum = 0.299 * fake_norm[:, 0:1, :, :] + 0.587 * fake_norm[:, 1:2, :, :] + 0.114 * fake_norm[:, 2:3, :, :]
+        real_lum = 0.299 * real_norm[:, 0:1, :, :] + 0.587 * real_norm[:, 1:2, :, :] + 0.114 * real_norm[:, 2:3, :, :]
+        real_lum = real_lum * (real_norm > 0.3).float() * (real_norm < 0.90).float()
+        return torch.relu(real_lum + 0.05 - fake_lum) * self.lambda_l1
 
     # def saturation_loss_color(self, fake_rgb, real_n, tau=0.1):
     #     """
