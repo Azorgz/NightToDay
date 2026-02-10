@@ -197,7 +197,7 @@ class ColorConsistencyLoss(nn.Module):
 
     def __init__(self):
         super(ColorConsistencyLoss, self).__init__()
-        self.lambda_saturation = 0.1
+        self.lambda_saturation = 1.
         self.lambda_lab_edge = 0.01
         self.lambda_l1 = 0.
 
