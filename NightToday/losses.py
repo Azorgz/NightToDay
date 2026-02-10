@@ -248,7 +248,7 @@ class ColorConsistencyLoss(nn.Module):
             return 0.0
         real_maxc, _ = real_n.max(dim=1, keepdim=True)
         real_minc, _ = real_n.min(dim=1, keepdim=True)
-        real_sat = ((real_maxc - real_minc) / (real_maxc + 1e-6))**2
+        real_sat = ((real_maxc - real_minc) / (real_maxc + 1e-6))
 
         fake_maxc, _ = fake_rgb.max(dim=1, keepdim=True)
         fake_minc, _ = fake_rgb.min(dim=1, keepdim=True)
@@ -258,7 +258,7 @@ class ColorConsistencyLoss(nn.Module):
         hue_real = rgb_to_hsv(real_n)[:, 0:1, :, :]
         cos_dist = torch.cos(hue_fake - hue_real)**3
         coeff = (real_n > 0.25).float() * (real_n < 0.90).float()
-        return (torch.relu(real_sat - fake_sat*cos_dist)*coeff).sum() / (coeff.sum() + 1e-6) * self.lambda_saturation
+        return (torch.relu(real_sat**2 - fake_sat*cos_dist)*coeff).sum() / (coeff.sum() + 1e-6) * self.lambda_saturation
 
     def lab_edge_sharpness_loss(self, fake):
         if not self.lambda_lab_edge:
