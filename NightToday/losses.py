@@ -10,7 +10,7 @@ import torch.nn.functional as F
 from ImagesCameras import ImageTensor
 from kornia.color import rgb_to_lab, rgb_to_hsv
 from kornia.contrib import connected_components
-from kornia.filters import sobel, laplacian, get_gaussian_kernel2d, median_blur
+from kornia.filters import sobel, laplacian, get_gaussian_kernel2d, median_blur, bilateral_blur
 from kornia.morphology import erosion, closing, dilation
 from torch.nn import LeakyReLU, ReLU
 from torchmetrics.functional.image import image_gradients
@@ -217,10 +217,8 @@ class ColorConsistencyLoss(nn.Module):
     def luminance_loss_color(self, fake_rgb, real_rgb):
         if not self.lambda_l1:
             return 0.0
-        fake_norm = fake_rgb
-        real_norm = real_rgb
-        fake_lum = 0.299 * fake_norm[:, 0:1, :, :] + 0.587 * fake_norm[:, 1:2, :, :] + 0.114 * fake_norm[:, 2:3, :, :]
-        real_lum = 0.299 * real_norm[:, 0:1, :, :] + 0.587 * real_norm[:, 1:2, :, :] + 0.114 * real_norm[:, 2:3, :, :]
+        fake_lum = 0.299 * fake_rgb[:, 0:1, :, :] + 0.587 * fake_rgb[:, 1:2, :, :] + 0.114 * fake_rgb[:, 2:3, :, :]
+        real_lum = 0.299 * real_rgb[:, 0:1, :, :] + 0.587 * real_rgb[:, 1:2, :, :] + 0.114 * real_rgb[:, 2:3, :, :]
         real_lum = real_lum * (real_lum > 0.3).float() * (real_lum < 0.90).float()
         return torch.relu(torch.L1(real_lum, fake_lum) - 0.1) * self.lambda_l1
 
@@ -246,18 +244,20 @@ class ColorConsistencyLoss(nn.Module):
         """
         if not self.lambda_saturation:
             return 0.0
-        real_maxc, _ = real_n.max(dim=1, keepdim=True)
-        real_minc, _ = real_n.min(dim=1, keepdim=True)
+        real_n_ds  = bilateral_blur(real_n, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
+        real_maxc, _ = real_n_ds.max(dim=1, keepdim=True)
+        real_minc, _ = real_n_ds.min(dim=1, keepdim=True)
         real_sat = ((real_maxc - real_minc) / (real_maxc + 1e-6))
 
-        fake_maxc, _ = fake_rgb.max(dim=1, keepdim=True)
-        fake_minc, _ = fake_rgb.min(dim=1, keepdim=True)
+        fake_rgb_ds  = bilateral_blur(fake_rgb, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
+        fake_maxc, _ = fake_rgb_ds.max(dim=1, keepdim=True)
+        fake_minc, _ = fake_rgb_ds.min(dim=1, keepdim=True)
         fake_sat = ((fake_maxc - fake_minc) / (fake_maxc + 1e-6)) * real_sat
 
-        hue_fake = rgb_to_hsv(fake_rgb)[:, 0:1, :, :]
-        hue_real = rgb_to_hsv(real_n)[:, 0:1, :, :]
+        hue_fake = rgb_to_hsv(fake_rgb_ds)[:, 0:1, :, :]
+        hue_real = rgb_to_hsv(real_n_ds)[:, 0:1, :, :]
         cos_dist = torch.cos(hue_fake - hue_real)**3
-        coeff = (real_n.mean(1) > 0.25).float() * (real_n.mean(1) < 0.90).float()
+        coeff = (real_n_ds.mean(1) > 0.25).float() * (real_n_ds.mean(1) < 0.90).float()
         return (torch.relu(real_sat**2 - fake_sat*cos_dist)*coeff).sum() / (coeff.sum() + 1e-6) * self.lambda_saturation
 
     def lab_edge_sharpness_loss(self, fake):
