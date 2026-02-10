@@ -252,13 +252,13 @@ class ColorConsistencyLoss(nn.Module):
         fake_rgb_ds  = bilateral_blur(fake_rgb, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
         fake_maxc, _ = fake_rgb_ds.max(dim=1, keepdim=True)
         fake_minc, _ = fake_rgb_ds.min(dim=1, keepdim=True)
-        fake_sat = ((fake_maxc - fake_minc) / (fake_maxc + 1e-6)) * real_sat
+        fake_sat = ((fake_maxc - fake_minc) / (fake_maxc + 1e-6))
 
         hue_fake = rgb_to_hsv(fake_rgb_ds)[:, 0:1, :, :]
         hue_real = rgb_to_hsv(real_n_ds)[:, 0:1, :, :]
         cos_dist = torch.cos(hue_fake - hue_real)**3
         coeff = (real_n_ds.mean(1) > 0.25).float() * (real_n_ds.mean(1) < 0.90).float()
-        return (torch.relu(real_sat**2 - fake_sat*cos_dist)*coeff).sum() / (coeff.sum() + 1e-6) * self.lambda_saturation
+        return (torch.relu(real_sat - fake_sat*cos_dist)*coeff).sum() / (coeff.sum() + 1e-6) * self.lambda_saturation
 
     def lab_edge_sharpness_loss(self, fake):
         if not self.lambda_lab_edge:
