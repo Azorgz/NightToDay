@@ -221,8 +221,8 @@ class ColorConsistencyLoss(nn.Module):
         real_norm = real_rgb
         fake_lum = 0.299 * fake_norm[:, 0:1, :, :] + 0.587 * fake_norm[:, 1:2, :, :] + 0.114 * fake_norm[:, 2:3, :, :]
         real_lum = 0.299 * real_norm[:, 0:1, :, :] + 0.587 * real_norm[:, 1:2, :, :] + 0.114 * real_norm[:, 2:3, :, :]
-        real_lum = real_lum * (real_norm > 0.3).float() * (real_norm < 0.90).float()
-        return torch.relu(real_lum + 0.05 - fake_lum) * self.lambda_l1
+        real_lum = real_lum * (real_lum > 0.3).float() * (real_lum < 0.90).float()
+        return torch.relu(torch.L1(real_lum, fake_lum) - 0.1) * self.lambda_l1
 
     # def saturation_loss_color(self, fake_rgb, real_n, tau=0.1):
     #     """
