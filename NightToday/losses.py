@@ -244,18 +244,18 @@ class ColorConsistencyLoss(nn.Module):
         """
         if not self.lambda_saturation:
             return 0.0
-        real_n_ds = bilateral_blur(real_n, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
-        real_maxc, _ = real_n_ds.max(dim=1, keepdim=True)
-        real_minc, _ = real_n_ds.min(dim=1, keepdim=True)
+        # real_n_ds = bilateral_blur(real_n, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
+        real_maxc, _ = real_n.max(dim=1, keepdim=True)
+        real_minc, _ = real_n.min(dim=1, keepdim=True)
         real_sat = ((real_maxc - real_minc) / (real_maxc + 1e-6))
 
-        fake_rgb_ds = bilateral_blur(fake_rgb, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
-        fake_maxc, _ = fake_rgb_ds.max(dim=1, keepdim=True)
-        fake_minc, _ = fake_rgb_ds.min(dim=1, keepdim=True)
+        # fake_rgb_ds = bilateral_blur(fake_rgb, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
+        fake_maxc, _ = fake_rgb.max(dim=1, keepdim=True)
+        fake_minc, _ = fake_rgb.min(dim=1, keepdim=True)
         fake_sat = ((fake_maxc - fake_minc) / (fake_maxc + 1e-6))
 
-        hue_fake = rgb_to_hsv(fake_rgb_ds)[:, 0:1, :, :]
-        hue_real = rgb_to_hsv(real_n_ds)[:, 0:1, :, :]
+        hue_fake = rgb_to_hsv(fake_rgb)[:, 0:1, :, :]
+        hue_real = rgb_to_hsv(real_n)[:, 0:1, :, :]
         cos_dist = torch.cos(hue_fake - hue_real) ** 3
         # coeff = (real_n_ds > 0.25).float() * (real_n_ds < 0.90).float()
         return (torch.relu(real_sat - fake_sat * cos_dist)).mean() * self.lambda_saturation
