@@ -46,7 +46,7 @@ training:
   checkpoint_save_latest: 500  # steps
   split_optimizers: False
   split_weights: False
-  visualize_freq: 50  # steps
+  visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
   start_epoch: 75
