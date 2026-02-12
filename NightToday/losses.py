@@ -198,7 +198,7 @@ class ColorConsistencyLoss(nn.Module):
     def __init__(self):
         super(ColorConsistencyLoss, self).__init__()
         self.lambda_saturation = 1.
-        self.lambda_lab_edge = 0.01
+        self.lambda_lab_edge = 0.5
         self.lambda_l1 = 0.
 
     def forward(self, fake_color: torch.Tensor, real_color: torch.Tensor, mask_high_color) -> torch.Tensor:
@@ -244,12 +244,10 @@ class ColorConsistencyLoss(nn.Module):
         """
         if not self.lambda_saturation:
             return 0.0
-        # real_n_ds = bilateral_blur(real_n, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
         real_maxc, _ = real_n.max(dim=1, keepdim=True)
         real_minc, _ = real_n.min(dim=1, keepdim=True)
         real_sat = ((real_maxc - real_minc) / (real_maxc + 1e-6))
 
-        # fake_rgb_ds = bilateral_blur(fake_rgb, kernel_size=(5, 5), sigma_space=(1.0, 1.0), sigma_color=0.1)
         fake_maxc, _ = fake_rgb.max(dim=1, keepdim=True)
         fake_minc, _ = fake_rgb.min(dim=1, keepdim=True)
         fake_sat = ((fake_maxc - fake_minc) / (fake_maxc + 1e-6))
@@ -311,7 +309,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
     if GT_seg is not None:
         if color_dist.shape[-2:] != GT_seg.shape[-2:]:
             GT_seg = F.interpolate(GT_seg.float(), size=(H, W), mode='nearest').long()
-        high_color_mask = high_color_mask * (GT_seg != SKY)
+        veg_mask = (GT_seg == VEG).float()
         valid = valid * (GT_seg != SKY)
 
         # build masks in a single vectorized call
@@ -347,9 +345,12 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
                       / weights[[2, 4, 5]].mean())  # (B,)
         # average batch
         loss += sum_losses
+        # loss += (((torch.relu(fake_color[:, 0:1] - fake_color[:, 1:2]) +
+        #          torch.relu(fake_color[:, 2:3] - fake_color[:, 1:2])) * veg_mask).sum(dim=[1, 2, 3]) /
+        #          (veg_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
     else:
         loss += (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
-    loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), valid)
+    loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), valid) * 0.2
 
     return loss.mean()
 
