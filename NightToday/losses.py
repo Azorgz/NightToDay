@@ -1122,10 +1122,11 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             # HL_region[b, :, int(center_y), int(center_x)] = 1.0
             # HL_region = dilation(HL_region, get_disk_kernel(radius_HL, device=mask.device))
             if 1/8 > radius_HL/w_mask:
-                center_y, center_x = center_of_mass(HL_region[b:b + 1])
-                HL_region = torch.zeros_like(HL_region, device=mask.device)
-                HL_region[b, :, int(center_y), int(center_x)] = 1.0
-                HL_region = dilation(HL_region, get_disk_kernel(radius_HL, device=mask.device))
+                continue
+                # center_y, center_x = center_of_mass(HL_region[b:b + 1])
+                # HL_region = torch.zeros_like(HL_region, device=mask.device)
+                # HL_region[b, :, int(center_y), int(center_x)] = 1.0
+                # HL_region = dilation(HL_region, get_disk_kernel(radius_HL, device=mask.device))
             elif 1/8 <= radius_HL/w_mask < 1/4:
                 HL_region = erosion(HL_region, get_disk_kernel(radius_HL//4, device=mask.device))
                 HL_region = dilation(HL_region, get_disk_kernel(radius_HL//2, device=mask.device))
