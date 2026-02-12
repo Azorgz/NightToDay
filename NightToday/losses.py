@@ -1117,14 +1117,14 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 center_y, center_x = center_of_mass(HL_region[b:b + 1])
                 HL_region = torch.zeros_like(HL_region, device=mask.device)
                 HL_region[b, :, int(center_y), int(center_x)] = 1.0
-                HL_region = dilation(HL_region, get_disk_kernel(radius_HL.cpu().numpy(), device=mask.device))
+                HL_region = dilation(HL_region, get_disk_kernel(radius_HL, device=mask.device))
             elif 1/8 <= radius_HL/w_mask < 1/4:
-                HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
-                HL_region = dilation(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//2, device=mask.device))
+                HL_region = erosion(HL_region, get_disk_kernel(radius_HL//4, device=mask.device))
+                HL_region = dilation(HL_region, get_disk_kernel(radius_HL//2, device=mask.device))
             elif 1/2 > radius_HL/w_mask >= 1/4:
-                HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//8, device=mask.device))
+                HL_region = erosion(HL_region, get_disk_kernel(radius_HL//8, device=mask.device))
             else:
-                HL_region = erosion(HL_region, get_disk_kernel(radius_HL.cpu().numpy()//4, device=mask.device))
+                HL_region = erosion(HL_region, get_disk_kernel(radius_HL//4, device=mask.device))
             # losses fake TN composition
             sky_mask = F.interpolate((seg_mask[b:b + 1] == SKY).float(), size=(h, w), mode='nearest')
             T_adjusted = (T * 0.5 + 0.5) ** (mean_T_light_region / 0.5) * 2 - 1
