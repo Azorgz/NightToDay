@@ -726,10 +726,10 @@ class ThermalNoiseLoss(nn.Module):
         return loss / len(self.scales)
 
     # -------- Edge consistency loss --------
-    def edge_consistency_loss(self, x, ref, ref2):
-        edges_x = sobel(x).abs()
-        edges_ref = sobel(ref).abs()
-        edges_ref2 = sobel(ref2).abs()
+    def edge_consistency_loss(self, Fus, IR, N):
+        edges_x = sobel(Fus).abs()
+        edges_ref = sobel(IR).abs()
+        edges_ref2 = sobel(N).abs() * dilation((N < 0.9).float(), kernel=torch.ones(3, 3, device=N.device))  # focus on dark areas
         return F.relu(edges_x - edges_ref*0.9)/2 + F.relu(edges_x - edges_ref2*0.9)/2
 
     # -------- Structure tensor loss --------
