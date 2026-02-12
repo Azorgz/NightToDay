@@ -493,9 +493,9 @@ class Image2ImageGAT_Dual(nn.Module):
             # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
             self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
-            # self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_D_com,
-            #                                                     self.D_com,
-            #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_l')
+            self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_TN_com,
+                                                                self.TN_com,
+                                                                loss_name='trafficlight', criterion_lambda='trafficlight_l')
             # self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
             #                                                     self.remapped_T * contourMask + self.fake_T_com * segMask_com,
             #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_l')
