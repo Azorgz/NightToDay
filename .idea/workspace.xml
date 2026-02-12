@@ -4,7 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Update of TL sample merging" />
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Update of TL sample merging">
+      <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/download_res.sh" beforeDir="false" afterPath="$PROJECT_DIR$/download_res.sh" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -47,23 +50,23 @@
     &quot;Python.crop_TF_in_src.executor&quot;: &quot;Run&quot;,
     &quot;Python.encoders.executor&quot;: &quot;Debug&quot;,
     &quot;Python.manual_labeling_flir_night.executor&quot;: &quot;Run&quot;,
-    &quot;Python.test.executor&quot;: &quot;Run&quot;,
-    &quot;Python.train.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.test.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.train.executor&quot;: &quot;Run&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
-    &quot;last_opened_file_path&quot;: &quot;/home/godeta/PycharmProjects/MyTransform/checkpoints/NightToday&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/godeta/PycharmProjects/MyTransform/checkpoints/download&quot;,
     &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
     &quot;settings.editor.selected.configurable&quot;: &quot;project.propVCSSupport.DirectoryMappings&quot;
   }
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/checkpoints/download" />
       <recent name="$PROJECT_DIR$/checkpoints/NightToday" />
       <recent name="$PROJECT_DIR$" />
       <recent name="$PROJECT_DIR$/checkpoints" />
       <recent name="$PROJECT_DIR$/NightToday" />
-      <recent name="$PROJECT_DIR$/NightToday/MultiResTransGAN" />
     </key>
     <key name="MoveFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/checkpoints/NightToday" />
@@ -73,7 +76,7 @@
       <recent name="$PROJECT_DIR$/Networks/configs" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.train">
+  <component name="RunManager" selected="Python.test">
     <configuration name="crop_TF_in_src" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="MyTransform" />
       <option name="ENV_FILES" value="" />
@@ -163,16 +166,16 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.manual_labeling_flir_night" />
       <item itemvalue="Python.crop_TF_in_src" />
+      <item itemvalue="Python.manual_labeling_flir_night" />
       <item itemvalue="Python.test" />
       <item itemvalue="Python.train" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.test" />
         <item itemvalue="Python.train" />
         <item itemvalue="Python.manual_labeling_flir_night" />
-        <item itemvalue="Python.test" />
         <item itemvalue="Python.crop_TF_in_src" />
       </list>
     </recent_temporary>
@@ -192,46 +195,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00174" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1770304567389</created>
-      <option name="number" value="00174" />
-      <option name="presentableId" value="LOCAL-00174" />
-      <option name="project" value="LOCAL" />
-      <updated>1770304567389</updated>
-    </task>
-    <task id="LOCAL-00175" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1770305260007</created>
-      <option name="number" value="00175" />
-      <option name="presentableId" value="LOCAL-00175" />
-      <option name="project" value="LOCAL" />
-      <updated>1770305260007</updated>
-    </task>
-    <task id="LOCAL-00176" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1770365776809</created>
-      <option name="number" value="00176" />
-      <option name="presentableId" value="LOCAL-00176" />
-      <option name="project" value="LOCAL" />
-      <updated>1770365776809</updated>
-    </task>
-    <task id="LOCAL-00177" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1770366163864</created>
-      <option name="number" value="00177" />
-      <option name="presentableId" value="LOCAL-00177" />
-      <option name="project" value="LOCAL" />
-      <updated>1770366163864</updated>
-    </task>
-    <task id="LOCAL-00178" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1770366287772</created>
-      <option name="number" value="00178" />
-      <option name="presentableId" value="LOCAL-00178" />
-      <option name="project" value="LOCAL" />
-      <updated>1770366287772</updated>
     </task>
     <task id="LOCAL-00179" summary="Update of TL sample merging">
       <option name="closed" value="true" />
@@ -585,7 +548,47 @@
       <option name="project" value="LOCAL" />
       <updated>1770731895462</updated>
     </task>
-    <option name="localTasksCounter" value="223" />
+    <task id="LOCAL-00223" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770734620097</created>
+      <option name="number" value="00223" />
+      <option name="presentableId" value="LOCAL-00223" />
+      <option name="project" value="LOCAL" />
+      <updated>1770734620097</updated>
+    </task>
+    <task id="LOCAL-00224" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770734697431</created>
+      <option name="number" value="00224" />
+      <option name="presentableId" value="LOCAL-00224" />
+      <option name="project" value="LOCAL" />
+      <updated>1770734697431</updated>
+    </task>
+    <task id="LOCAL-00225" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770734889240</created>
+      <option name="number" value="00225" />
+      <option name="presentableId" value="LOCAL-00225" />
+      <option name="project" value="LOCAL" />
+      <updated>1770734889240</updated>
+    </task>
+    <task id="LOCAL-00226" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770735081343</created>
+      <option name="number" value="00226" />
+      <option name="presentableId" value="LOCAL-00226" />
+      <option name="project" value="LOCAL" />
+      <updated>1770735081343</updated>
+    </task>
+    <task id="LOCAL-00227" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1770735175792</created>
+      <option name="number" value="00227" />
+      <option name="presentableId" value="LOCAL-00227" />
+      <option name="project" value="LOCAL" />
+      <updated>1770735175792</updated>
+    </task>
+    <option name="localTasksCounter" value="228" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
