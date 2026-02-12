@@ -8,6 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from ImagesCameras import ImageTensor
+from kornia import create_meshgrid
 from kornia.color import rgb_to_lab, rgb_to_hsv
 from kornia.contrib import connected_components
 from kornia.filters import sobel, laplacian, get_gaussian_kernel2d, median_blur, bilateral_blur
@@ -425,7 +426,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
                      torch.relu(torch.abs(grad_N_x) - torch.abs(grad_TN_x)) +
                      torch.relu(torch.abs(grad_N_y * grad_T_y) - grad_TN_y ** 2))
 
-    thermal_noise_loss = ThermalNoiseLoss()(TN, T).mean() * 2
+    thermal_noise_loss = ThermalNoiseLoss()(TN, T, N).mean() * 2
 
     return total_classes_loss + thermal_noise_loss + gradient_loss.mean() * 0.5
 
@@ -725,10 +726,11 @@ class ThermalNoiseLoss(nn.Module):
         return loss / len(self.scales)
 
     # -------- Edge consistency loss --------
-    def edge_consistency_loss(self, x, ref):
+    def edge_consistency_loss(self, x, ref, ref2):
         edges_x = sobel(x).abs()
         edges_ref = sobel(ref).abs()
-        return F.relu(edges_x - edges_ref)
+        edges_ref2 = sobel(ref2).abs()
+        return F.relu(edges_x - edges_ref*0.9)/2 + F.relu(edges_x - edges_ref2*0.9)/2
 
     # -------- Structure tensor loss --------
     def structure_tensor_loss(self, x):
@@ -745,9 +747,13 @@ class ThermalNoiseLoss(nn.Module):
         return (lambda2 / (lambda1 + 1e-6)).mean()
 
     # -------- Charbonnier TV --------
-    def charbonnier_tv(self, x):
-        dx, dy = image_gradients(x)
-        return torch.mean(torch.sqrt(dx ** 2 + dy ** 2 + self.eps ** 2))
+    def charbonnier_tv(self, x, y, z):
+        dx_x, dy_x = image_gradients(x)
+        dx_y, dy_y = image_gradients(y)
+        dx_z, dy_z = image_gradients(z)
+        dx_x = dx_x * (dx_x > dx_y) * (dx_x > dx_z)
+        dy_x = dy_x * (dy_x > dy_y) * (dy_x > dy_z)
+        return torch.mean(torch.sqrt(dx_x ** 2 + dy_x ** 2 + self.eps ** 2))
 
     # -------- Frequency decay --------
     def frequency_decay_loss(self, x):
@@ -755,20 +761,21 @@ class ThermalNoiseLoss(nn.Module):
         X = torch.fft.fftshift(torch.fft.fft2(x, norm='ortho'))
         mag = torch.abs(X)
 
-        u = torch.linspace(-1, 1, H, device=x.device)
-        v = torch.linspace(-1, 1, W, device=x.device)
-        U, V = torch.meshgrid(u, v, indexing='ij')
-        R = torch.sqrt(U * U + V * V)
+        R = torch.sqrt(create_meshgrid(H, W, device=x.device).pow(2).sum(dim=-1))
+        # u = torch.linspace(-1, 1, H, device=x.device)
+        # v = torch.linspace(-1, 1, W, device=x.device)
+        # U, V = torch.meshgrid(u, v, indexing='ij')
+        # R = torch.sqrt(U * U + V * V)
 
         return (mag * (R ** self.alpha)).mean()
 
     # -------- Final denoising loss --------
-    def forward(self, I_fused, I_remapped):
+    def forward(self, I_fused, I_remapped, N):
         L = (self.w_ms * self.multiscale_loss(I_fused) +
              self.w_tensor * self.structure_tensor_loss(I_fused) +
-             self.w_tv * self.charbonnier_tv(I_fused) +
+             self.w_tv * self.charbonnier_tv(I_fused, I_remapped, N) +
              self.w_freq * self.frequency_decay_loss(I_fused) +
-             self.w_edges * self.edge_consistency_loss(I_fused, I_remapped.detach()).mean())
+             self.w_edges * self.edge_consistency_loss(I_fused, I_remapped, N).mean())
         return L
 
 
