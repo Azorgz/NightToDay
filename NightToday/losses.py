@@ -349,9 +349,9 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
         loss += sum_losses
         loss += ((torch.relu(0.8 - fake_color.mean(1)) * sky_mask).sum(dim=[1, 2, 3])
                  / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
-        loss += (((torch.relu(fake_color[:, 0:1] - fake_color[:, 2:3]) +
-                 torch.relu(fake_color[:, 1:2] - fake_color[:, 2:3])) * sky_mask)
-                 .sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
+        # loss += (((torch.relu(fake_color[:, 0:1] - fake_color[:, 2:3]) +
+        #          torch.relu(fake_color[:, 1:2] - fake_color[:, 2:3])) * sky_mask)
+        #          .sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
         # loss += (((torch.relu(fake_color[:, 0:1] - fake_color[:, 1:2]) +
         #          torch.relu(fake_color[:, 2:3] - fake_color[:, 1:2])) * veg_mask).sum(dim=[1, 2, 3]) /
         #          (veg_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
