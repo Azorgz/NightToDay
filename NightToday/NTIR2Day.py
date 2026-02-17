@@ -322,6 +322,13 @@ class Image2ImageGAT_Dual(nn.Module):
         self.real_D = self.real_D * ((self.segMask_D != 11).float() - contours).expand(-1, 3,
                                                                                        *self.real_D.shape[-2:]) + colors
 
+    def grenner_vegetation(self):
+        vegetation_mask = (self.segMask_D == 8).float()
+        real_D_grenner = (self.real_D * 0.5 + 0.5)
+        real_D_grenner[:, 1] = torch.sqrt(real_D_grenner[:, 1] + 1e-6).clamp(0, 1) * 2 - 1
+        self.real_D = self.real_D * (1 - vegetation_mask) + real_D_grenner * vegetation_mask
+
+
     # endregion
 
     # region ------------------------ Inference Function -------------------- #
@@ -394,6 +401,7 @@ class Image2ImageGAT_Dual(nn.Module):
         self.epoch = epoch if epoch is not None else self.epoch
         self.set_input(**kwargs)
         self.set_pedestrians_color()
+        self.grenner_vegetation()
         self.initialize_losses()
         # apply scheduler
         if hasattr(self, 'loss_scheduler'):
