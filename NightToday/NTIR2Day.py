@@ -325,7 +325,7 @@ class Image2ImageGAT_Dual(nn.Module):
     def grenner_vegetation(self):
         vegetation_mask = (self.segMask_D == 8).float()
         real_D_grenner = (self.real_D * 0.5 + 0.5)
-        real_D_grenner[:, 1] = (real_D_grenner[:, 1] * 1.1).clamp(0, 1) * 2 - 1
+        real_D_grenner[:, 1] = (real_D_grenner[:, 1] * 1.01).clamp(0, 1) * 2 - 1
         self.real_D = self.real_D * (1 - vegetation_mask) + real_D_grenner * vegetation_mask
 
 
