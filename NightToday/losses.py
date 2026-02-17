@@ -226,10 +226,12 @@ class ColorConsistencyLoss(nn.Module):
     def L1_loss_color(self, fake_rgb, real_rgb):
         if not self.lambda_l1:
             return 0.0
-        mask = dilation(((0.3 < real_rgb) * (real_rgb < 0.90)).float(), get_disk_kernel(2, device=real_rgb.device))
+        mask = ((0.1 < real_rgb) * (real_rgb < 0.90)).float()
         real_rgb = real_rgb * mask
         fake_rgb = fake_rgb * mask
-        loss = F.l1_loss(fake_rgb, real_rgb, reduction='none')
+        weight_lum = 1 - (real_rgb.mean(1, keepdim=True) - 0.5).abs() * 2
+        weight_sat = ((real_rgb.max(1, keepdim=True)[0] - real_rgb.min(1, keepdim=True)[0]) * 2).clamp(0, 1)
+        loss = F.l1_loss(fake_rgb, real_rgb, reduction='none') * torch.max(torch.cat([weight_lum, weight_sat], dim=1), dim=1, keepdim=True)[0]
         return (loss**2 + loss).mean() * self.lambda_l1
 
     # def saturation_loss_color(self, fake_rgb, real_n, tau=0.1):
