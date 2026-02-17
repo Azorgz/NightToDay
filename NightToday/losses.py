@@ -200,7 +200,7 @@ class ColorConsistencyLoss(nn.Module):
         super(ColorConsistencyLoss, self).__init__()
         self.lambda_saturation = 1.
         self.lambda_lab_edge = 0.1
-        self.lambda_l1 = 0.
+        self.lambda_l1 = 0.1
 
     def forward(self, fake_color: torch.Tensor, real_color: torch.Tensor, mask_high_color) -> torch.Tensor:
         """
@@ -212,7 +212,7 @@ class ColorConsistencyLoss(nn.Module):
         self_lab_edge_loss = self.lab_edge_sharpness_loss(fake_color)
         self_saturation_loss = self.saturation_loss_color(fake_color * mask_high_color,
                                                           (real_color * mask_high_color))
-        l1_loss = self.luminance_loss_color(fake_color, real_color)
+        l1_loss = self.L1_loss_color(fake_color, real_color)
         return self_saturation_loss + l1_loss + self_lab_edge_loss
 
     def luminance_loss_color(self, fake_rgb, real_rgb):
@@ -222,6 +222,15 @@ class ColorConsistencyLoss(nn.Module):
         real_lum = 0.299 * real_rgb[:, 0:1, :, :] + 0.587 * real_rgb[:, 1:2, :, :] + 0.114 * real_rgb[:, 2:3, :, :]
         real_lum = real_lum * (real_lum > 0.3).float() * (real_lum < 0.90).float()
         return torch.relu(real_lum + 0.05 - fake_lum) * self.lambda_l1
+
+    def L1_loss_color(self, fake_rgb, real_rgb):
+        if not self.lambda_l1:
+            return 0.0
+        mask = dilation(((0.3 < real_rgb) * (real_rgb < 0.90)).float(), get_disk_kernel(2, device=real_rgb.device))
+        real_rgb = real_rgb * mask
+        fake_rgb = fake_rgb * mask
+        loss = F.l1_loss(fake_rgb, real_rgb, reduction='none')
+        return (loss**2 + loss) * self.lambda_l1
 
     # def saturation_loss_color(self, fake_rgb, real_n, tau=0.1):
     #     """
