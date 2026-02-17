@@ -403,7 +403,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     area_car = car_mask.sum(dim=[1, 2, 3])
     valid_car = area_car > 50
     building_mask = (GT_resized <= 2).float()
-    area_building = building_mask.sum(dim=[1, 2, 3])
+    # area_building = building_mask.sum(dim=[1, 2, 3])
     # valid_building = area_building > 200
     thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
     thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
@@ -420,6 +420,9 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     #  Thermal correction losses per classes
     sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[
         valid_sky] * 2
+    mask = (T[valid_sky] < -0.8)
+    mask[:, :, ::2] = 0
+    sky_loss[valid_sky] += torch.relu((TN[valid_sky] - T[valid_sky] * mask).sum(dim=[1, 2, 3]) / (mask.sum(dim=[1, 2, 3]) + 1e-6))
     veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(
         dim=[1, 2, 3]) / area_veg[valid_veg] * 5
     # veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
