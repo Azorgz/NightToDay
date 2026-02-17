@@ -50,6 +50,14 @@ class FLIR(TrainDataset):
             x = int(image.shape[3]//crop_ratio_w)
             y = int(image.shape[2]//crop_ratio_h)
             image = image.crop((x, x, y, y), mode='lrtb')
+            shape_ratio = image.shape[-2] / image.shape[-1]
+            if shape_ratio != 288/360:
+                if shape_ratio > 288/360:
+                    new_w = int(image.shape[-2] / (288/360))
+                    image = image.resize((image.shape[-2], new_w))
+                else:
+                    new_h = int(image.shape[-1] * (288/360))
+                    image = image.resize((new_h, image.shape[-1]))
             # image = image.resize((400, 500)).crop((200, 250, 288, 360), mode='uvhw', center=True)
             if crop:
                 image[(image.sum(1, keepdim=True) == 0).repeat(1, 3, 1, 1)] = 0.5
