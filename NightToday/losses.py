@@ -230,7 +230,7 @@ class ColorConsistencyLoss(nn.Module):
         real_rgb = real_rgb * mask
         fake_rgb = fake_rgb * mask
         loss = F.l1_loss(fake_rgb, real_rgb, reduction='none')
-        return (loss**2 + loss) * self.lambda_l1
+        return (loss**2 + loss).mean() * self.lambda_l1
 
     # def saturation_loss_color(self, fake_rgb, real_n, tau=0.1):
     #     """
