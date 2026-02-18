@@ -6,7 +6,7 @@ model:
   mode: 'train'  # 'train', 'test'
   build_from_checkpoint: True
   fusion_first: True
-  pedestrian_color: null #[black, red] # color of pedestrian in fake D images (color, contour)
+  pedestrian_color: [red, black] #[black, red] # color of pedestrian in fake D images (color, contour)
 
   seg:
     num_classes: 19
