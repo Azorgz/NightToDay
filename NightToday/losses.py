@@ -418,10 +418,10 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     # blobs_loss = torch.zeros([B, ], device=image_target.device)
 
     #  Thermal correction losses per classes
-    sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[
-        valid_sky] * 2
+    # sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[
+    #     valid_sky] * 2
     mask = (T[valid_sky] < -0.8)
-    mask[:, :, ::2] = 0
+    mask[:, :, 2::] = 0
     sky_loss[valid_sky] += torch.relu((TN[valid_sky] - T[valid_sky] * mask).sum(dim=[1, 2, 3]) / (mask.sum(dim=[1, 2, 3]) + 1e-6))
     veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(
         dim=[1, 2, 3]) / area_veg[valid_veg] * 5

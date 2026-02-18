@@ -324,10 +324,11 @@ class Image2ImageGAT_Dual(nn.Module):
 
     def grenner_vegetation(self):
         vegetation_mask = (self.segMask_D == 8).float()
-        real_D_grenner = (self.real_D * 0.5 + 0.5)
-        real_D_grenner[:, 1] = (real_D_grenner[:, 1] * 1.05).clamp(0, 1)
-        self.real_D = self.real_D * (1 - vegetation_mask) + (real_D_grenner * 2 - 1) * vegetation_mask
-
+        sky_mask = (self.segMask_D == 10).float()
+        real_D = (self.real_D * 0.5 + 0.5)
+        greener_veg = torch.cat([real_D[:, 0:1], (real_D[:, 1:2] * 1.05).clamp(0, 1), real_D[:, 2:3]], dim=1) * 2 - 1
+        bluer_sky = torch.cat([(real_D[:, 0:1]*0.98).clamp(0, 1), (real_D[:, 1:2]*0.98).clamp(0, 1), (real_D[:, 2:3] * 1.02).clamp(0, 1)], dim=1) * 2 - 1
+        self.real_D = self.real_D * (1 - vegetation_mask - sky_mask) + greener_veg * vegetation_mask + bluer_sky * sky_mask
 
     # endregion
 
