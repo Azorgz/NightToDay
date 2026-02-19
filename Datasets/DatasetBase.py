@@ -49,6 +49,7 @@ class TrainDataset(Dataset):
     name: str = 'Base'
     root: str = ''
     train_D = ''
+    train_D_T = ''
     train_T = ''
     train_N = ''
     TN_edges = ''
@@ -69,6 +70,9 @@ class TrainDataset(Dataset):
         opt.sampling = opt.sampling if opt.sampling > 1 else int(1/opt.sampling)
         self.train_D = [os.path.join(self.train_D, f) for idx, f
                         in enumerate(sorted(os.listdir(self.train_D))) if idx % opt.sampling == 0]
+        if self.train_D_T:
+            self.train_D_T = [os.path.join(self.train_D_T, f) for idx, f
+                              in enumerate(sorted(os.listdir(self.train_D_T))) if idx % opt.sampling == 0]
         self.train_T = [os.path.join(self.train_T, f) for idx, f
                         in enumerate(sorted(os.listdir(self.train_T))) if idx % opt.sampling == 0]
         self.train_N = [os.path.join(self.train_N, f) for idx, f
@@ -106,6 +110,10 @@ class TrainDataset(Dataset):
 
     def __getitem__(self, idx):
         image_D = self.normalize(self.load_image(self.train_D, idx % len(self.train_D), fac=1.1))
+        if self.train_D_T:
+            image_D_T = self.normalize(self.load_image(self.train_D_T, idx % len(self.train_D_T), fac=1.1))
+        else:
+            image_D_T = None
         image_T = self.normalize(self.load_image(self.train_T, idx % len(self.train_T), False).GRAY().RGB('gray'))
         image_N = self.normalize(self.load_image(self.train_N, idx % len(self.train_N), True))
         image_D_seg = (self.load_image(self.D_seg, idx % (len(self.D_seg) or 1), seg=True).to_tensor()).to(torch.uint8)
@@ -113,9 +121,10 @@ class TrainDataset(Dataset):
         image_D_edges = self.load_image(self.D_edges, idx % (len(self.D_edges) or 1)).to_tensor()
         image_TN_edges = self.load_image(self.TN_edges, idx % (len(self.TN_edges) or 1), False).to_tensor()
         if torch.rand(1) < 0.5:
-            image_D, image_D_seg, image_D_edges = self.augmentations(torch.cat([image_D, image_D_seg, image_D_edges], dim=1)).split([3, 1, 1], 1)
+            image_D, image_D_seg, image_D_edges, image_D_T = self.augmentations(torch.cat([image_D, image_D_seg, image_D_edges, image_D_T if image_D_T is not None else image_D], dim=1)).split([3, 1, 1, 3], 1)
             image_T, image_N, image_TN_edges, image_TN_seg = self.augmentations(torch.cat([image_T, image_N, image_TN_edges, image_TN_seg], dim=1)).split([3, 3, 1, 1], 1)
-        return image_D, image_T, image_N, image_D_seg, image_TN_seg, image_D_edges, image_TN_edges, self.TL_collection
+        image_D_T = image_D_T if self.train_D_T else None
+        return image_D, image_D_T, image_T, image_N, image_D_seg, image_TN_seg, image_D_edges, image_TN_edges, self.TL_collection
 
     def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, **kwargs) -> Tensor:
         """

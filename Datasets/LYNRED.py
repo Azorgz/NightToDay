@@ -13,6 +13,7 @@ class LYNRED(TrainDataset):
 
     def __init__(self, opt):
         self.train_D = self.root + "LYNRED_datasets/trainA"
+        self.train_D_T = None
         self.train_T = self.root + "LYNRED_datasets/trainB"
         self.train_N = self.root + "LYNRED_datasets/trainC"
         self.TN_edges = self.root + "LYNRED_datasets/LYNRED_IR_edge_map"

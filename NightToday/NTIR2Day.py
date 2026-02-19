@@ -256,6 +256,7 @@ class Image2ImageGAT_Dual(nn.Module):
 
     def set_input(self, *args, **kwargs):
         setattr(self, 'real_D', kwargs.get('D', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
+        setattr(self, 'real_D_T', kwargs.get('D_T', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
         setattr(self, 'real_T', kwargs.get('T', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
         setattr(self, 'real_N', kwargs.get('N', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
         setattr(self, 'real_TN', None)
@@ -285,6 +286,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'fake_D_com', None)
         setattr(self, 'fake_TN_com', None)
         setattr(self, 'rec_TN_com', None)
+        setattr(self, 'fake_D_day', None)
         setattr(self, 'att_rec_D', None)
 
     def initialize_losses(self):
@@ -294,6 +296,7 @@ class Image2ImageGAT_Dual(nn.Module):
         setattr(self, 'loss_cycle', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_id', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_color', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_color_day', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_grad', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_sga', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_tv', {k: 0. for k in self.names_domains})
@@ -591,62 +594,6 @@ class Image2ImageGAT_Dual(nn.Module):
             self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att', criterion_lambda='att')
         # endregion
 
-        # self.loss_trafficlight[self.N] += self.compute_loss('cycle', self.rec_TN_com, TN_com,
-        #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_l')
-        # # Fourth step : Learning to reconstruct fused thermal traffic lights from translatable thermal traffic lights
-        # self.loss_trafficlight[self.D] += self.compute_loss('tlc', self.fake_D_com, TN_com.detach(), segMask_TN_com.detach(),
-        #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_c')
-
-        # if self.netS.stage in ['update_TN', 'trained']: #'update_TN',
-        #     fake_D_Mask = interpolate(self.segMask_D_update.float(), size=self.input_size, mode='bilinear')
-        #########Fake_IR_Composition, OAMix-TIR
-        # valid, FG_Mask, FG_FakeTN, FG_RealVis, HL_Mask, ComIR_Light_Mask = \
-        #     get_FG_MergeMask(self.segMask_D, fake_D_Mask, self.real_D, self.fake_T.detach())
-        #     if valid:
-        #         IR_com = self.get_IR_Com(FG_Mask, FG_FakeTN, self.real_TN.detach(),
-        #                                       self.segMask_TN_update.detach(), HL_Mask)
-        #         fake_D_com = self.netG.decode(self.netG.encode(self.IR_com, self.T), self.D)
-        #         loss_ACL_B += self.criterionPixCon(fake_D_com, FG_RealVis, FG_FakeTN[:, 3:])
-        #         Com_RealVis = out_FG_RealVis + out_FG_RealVis_flip
-        #         ###Traffic Light Luminance Loss
-
-        #         ####Traffic light color loss
-        #         loss_TLight_color = self.criterionTLC(self.real_B, self.fake_A, self.SegMask_B_update.detach(), \
-        #                                               Com_RealVis, ComIR_Light_Mask, HL_Mask, self.gpu_ids[0])
-        #         loss_TLight_appe = loss_tll + loss_TLight_color
-        #         ####Appearance consistency loss of domain B
-        #         self.loss_AC[self.DB] = loss_ACL_B + loss_ACL_B_flip + self.criterionComIR(FakeIR_FG_Mask,
-        #                                                                                    FakeIR_FG_Mask_flip, \
-        #                                                                                    self.SegMask_B_update.detach(),
-        #                                                                                    self.IR_com, self.fake_A_IR_com,
-        #                                                                                    self.gpu_ids[0])
-        #
-        #         FakeVis_FG_Mask, FakeVis_FG_Mask_flip, _ = self.get_FG_MergeMaskVis(fake_A_Mask, self.SegMask_A.detach(),
-        #                                                                             self.gpu_ids[0])
-        #         self.Vis_com = (torch.ones_like(FakeVis_FG_Mask) - FakeVis_FG_Mask - FakeVis_FG_Mask_flip).mul(
-        #             self.real_A) + \
-        #                        FakeVis_FG_Mask.mul(self.fake_A) + FakeVis_FG_Mask_flip.mul(
-        #             torch.flip(self.fake_A.detach(), dims=[3]))
-        #         ###########
-        #
-        #         encoded_Vis_com = self.netG.encode(self.Vis_com, self.DA)
-        #         self.fake_B_Vis_com = self.netG.decode(encoded_Vis_com, self.DB)
-        #
-        #         if torch.sum(FakeVis_FG_Mask) > 0.0:
-        #             loss_ACL_A = self.criterionPixCon(self.fake_B_Vis_com, self.real_B, FakeVis_FG_Mask,
-        #                                               self.opt.ssim_winsize)
-        #         else:
-        #             loss_ACL_A = 0.0
-        #
-        #         if torch.sum(FakeVis_FG_Mask_flip) > 0.0:
-        #             loss_ACL_A_flip = self.criterionPixCon(self.fake_B_Vis_com, torch.flip(self.real_B, dims=[3]),
-        #                                                    FakeVis_FG_Mask_flip, self.opt.ssim_winsize)
-        #         else:
-        #             loss_ACL_A_flip = 0.0
-        #         ####Appearance consistency loss of domain A
-        #         self.loss_AC[self.DA] = loss_ACL_A + loss_ACL_A_flip
-        #         ##############################
-
         # region Color/Thermal loss
         self.loss_color[self.T] += self.compute_loss('color', self.fake_D, self.real_N, self.segMask_TN_update,
                                                      weights=self.class_weight)
@@ -655,6 +602,11 @@ class Image2ImageGAT_Dual(nn.Module):
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
+
+        encoded_TD, _, _, _ = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
+        self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
+        self.loss_color_day[self.T] += self.compute_loss('cycle', encoded_TD, encoded_D, loss_name='color_day', criterion_lambda='color_day')
+        self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day, self.real_D, loss_name='color_day', criterion_lambda='color_day')
         # endregion
 
         # combined loss
@@ -977,7 +929,7 @@ class Image2ImageGAT_Dual(nn.Module):
                    'fake_T': (self.fake_T_com * 0.5 + 0.5 if self.fake_T_com is not None else self.fake_T * 0.5+0.5),
                    'remapped_T': (self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5+0.5),
                    'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.real_TN * 0.5+0.5),
-                   'rec_D': (self.att_rec_D * 0.5 + 0.5 if self.att_rec_D is not None else self.rec_D * 0.5+0.5),
+                   'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5+0.5),
                    'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_T * 0.5+0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5+0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}

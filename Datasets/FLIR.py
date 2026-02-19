@@ -17,6 +17,7 @@ class FLIR(TrainDataset):
 
     def __init__(self, opt):
         self.train_D = self.root + "FLIR_datasets/trainA"
+        self.train_D_T = self.root + "FLIR_datasets/trainA_T"
         self.train_T = self.root + "FLIR_datasets/trainB"
         self.train_N = self.root + "FLIR_datasets/trainC"
         self.TN_edges = self.root + "FLIR_datasets/FLIR_IR_edge_map"

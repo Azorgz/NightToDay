@@ -25,14 +25,16 @@ def collate_ImageTensor_train(batch):
     Custom collate function to handle ImageTensor objects in a batch.
     """
     image_D = [item[0] for item in batch]
-    image_T = [item[1] for item in batch]
-    image_N = [item[2] for item in batch]
-    image_D_seg = [item[3] for item in batch]
-    image_TN_seg = [item[4] for item in batch]
-    image_D_edges = [item[5] for item in batch]
-    image_TN_edges = [item[6] for item in batch]
-    TL_collection = batch[0][7]
+    image_D_T = [item[1] for item in batch]
+    image_T = [item[2] for item in batch]
+    image_N = [item[3] for item in batch]
+    image_D_seg = [item[4] for item in batch]
+    image_TN_seg = [item[5] for item in batch]
+    image_D_edges = [item[6] for item in batch]
+    image_TN_edges = [item[7] for item in batch]
+    TL_collection = batch[0][8]
     return {'D': torch.cat(image_D),
+            'D_T': torch.cat(image_D_T),
             'T': torch.cat(image_T),
             'N': torch.cat(image_N),
             'seg_D': torch.cat(image_D_seg),
