@@ -86,8 +86,10 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Train parameters, criterion and losses
         if self.mode == 'train' and trainable:
-            p_color = self.opt.model.pedestrian_color
-            if isinstance(p_color, str):
+            p_color = self.opt.training.pedestrian_color
+            if isinstance(p_color, list):
+                if len(p_color) == 1:
+                    p_color = [determine_color_N(mcolors.CSS4_COLORS[p_color[0]])]*2
                 self.pedestrian_color = (Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[0]])),
                                          Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[1]])))
             else:

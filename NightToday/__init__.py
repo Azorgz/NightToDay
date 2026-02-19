@@ -71,7 +71,6 @@ class ModelConfig:
     mode: Literal['train', 'test']
     build_from_checkpoint: bool
     fusion_first: bool
-    pedestrian_color: Literal['red']
     gen: GenConfig
     discr: DiscrConfig
     seg: SegConfig
@@ -93,6 +92,7 @@ class TrainConfig:
     checkpoint_dir: str | Path
     checkpoint_freq: int
     checkpoint_save_latest: int
+    pedestrian_color: Tuple[Literal['red', 'black', 'green', 'blue'], Literal['red', 'black', 'green', 'blue']]
     split_optimizers: bool
     split_weights: bool
     visualize_dir: str | Path
@@ -200,7 +200,6 @@ def get_config(path=None) -> OptImage2ImageGATConfig:
                               mode=conf['model']['mode'],
                               build_from_checkpoint=conf['model']['build_from_checkpoint'],
                               fusion_first=conf['model']['fusion_first'],
-                              pedestrian_color=conf['model']['pedestrian_color'],
                               gen=GenConfig(**conf['model']['gen']),
                               discr=DiscrConfig(**conf['model']['discr']),
                               seg=SegConfig(**conf['model']['seg']))
@@ -211,6 +210,7 @@ def get_config(path=None) -> OptImage2ImageGATConfig:
         checkpoint_dir=os.getcwd() + '/' + conf['training']['checkpoint_dir'] + '/' + modelConfig.name,
         checkpoint_freq=conf['training']['checkpoint_freq'],
         checkpoint_save_latest=conf['training']['checkpoint_save_latest'],
+        pedestrian_color=conf['training']['pedestrian_color'],
         split_optimizers=conf['training']['split_optimizers'],
         split_weights=split_weights,
         visualize_dir=os.getcwd() + '/' + conf['training']['visualize_dir'] + '/' + modelConfig.name,

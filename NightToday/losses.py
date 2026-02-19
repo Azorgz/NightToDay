@@ -359,8 +359,8 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
                       / weights[[2, 4, 5]].mean())  # (B,)
         # average batch
         loss += sum_losses
-        loss += ((torch.relu(0.8 - fake_color.mean(1)) * sky_mask).sum(dim=[1, 2, 3])
-                 / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
+        # loss += ((torch.relu(0.8 - fake_color.mean(1)) * sky_mask).sum(dim=[1, 2, 3])
+        #          / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
         # loss += (((torch.relu(fake_color[:, 0:1] - fake_color[:, 2:3]) +
         #          torch.relu(fake_color[:, 1:2] - fake_color[:, 2:3])) * sky_mask)
         #          .sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
@@ -412,7 +412,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     min_values = torch.min(torch.cat([T_filtered, N_filtered], dim=1), dim=1, keepdim=True)[0]
 
     # losses init
-    sky_loss = torch.zeros([B, ], device=device)
+    # sky_loss = torch.zeros([B, ], device=device)
     veg_loss = torch.zeros([B, ], device=device)
     person_loss = torch.zeros([B, ], device=device)
     # blobs_loss = torch.zeros([B, ], device=image_target.device)
@@ -422,7 +422,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     #     valid_sky] * 2
     mask = (T[valid_sky] < -0.8)
     mask[:, :, 2::] = 0
-    sky_loss[valid_sky] += torch.relu((TN[valid_sky] - T[valid_sky] * mask).sum(dim=[1, 2, 3]) / (mask.sum(dim=[1, 2, 3]) + 1e-6))
+    # sky_loss[valid_sky] += torch.relu((TN[valid_sky] - T[valid_sky] * mask).sum(dim=[1, 2, 3]) / (mask.sum(dim=[1, 2, 3]) + 1e-6))
     veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(
         dim=[1, 2, 3]) / area_veg[valid_veg] * 5
     # veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
@@ -432,7 +432,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
     total_classes_loss = ((veg_loss * weights[1] + person_loss * weights[2]) /
-                          (weights * torch.stack([valid_sky, valid_veg, valid_person, valid_car], dim=-1).float()).sum(
+                          (weights * torch.stack([valid_veg, valid_person], dim=-1).float()).sum(
                               1)).mean()
     grad_TN_y, grad_TN_x = image_gradients(TN)
     grad_T_y, grad_T_x = image_gradients(T)
