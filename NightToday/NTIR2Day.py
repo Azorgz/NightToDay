@@ -89,7 +89,7 @@ class Image2ImageGAT_Dual(nn.Module):
             p_color = self.opt.training.pedestrian_color
             if isinstance(p_color, list):
                 if len(p_color) == 1:
-                    p_color = [determine_color_N(mcolors.CSS4_COLORS[p_color[0]])]*2
+                    p_color = [determine_color_N(mcolors.CSS4_COLORS[p_color[0]])] * 2
                 self.pedestrian_color = (Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[0]])),
                                          Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[1]])))
             else:
@@ -112,7 +112,8 @@ class Image2ImageGAT_Dual(nn.Module):
 
             self.criterion_gan = lambda d, r, p_r, f, v: self.GANLoss(d, r, p_r, f, v)
             self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
-            self.criterion_cycle = lambda rec, real: nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec, real) / self.lambda_cycle
+            self.criterion_cycle = lambda rec, real: nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec,
+                                                                                                                real) / self.lambda_cycle
             self.criterion_latent = lambda y, t: self.L1(y, t.detach())
             self.criterion_ssim = lambda x, y: SSIM_Loss()((x + 1) / 2, (y + 1) / 2) * self.lambda_ssim
             self.criterion_tv = TVLoss(TVLoss_weight=1)
@@ -332,8 +333,10 @@ class Image2ImageGAT_Dual(nn.Module):
         sky_mask = (self.segMask_D == 10).float()
         real_D = (self.real_D * 0.5 + 0.5)
         greener_veg = torch.cat([real_D[:, 0:1], (real_D[:, 1:2] * 1.05).clamp(0, 1), real_D[:, 2:3]], dim=1) * 2 - 1
-        bluer_sky = torch.cat([(real_D[:, 0:1]*0.98).clamp(0, 1), (real_D[:, 1:2]*0.98).clamp(0, 1), (real_D[:, 2:3] * 1.02).clamp(0, 1)], dim=1) * 2 - 1
-        self.real_D = self.real_D * (1 - vegetation_mask - sky_mask) + greener_veg * vegetation_mask + bluer_sky * sky_mask
+        bluer_sky = torch.cat([(real_D[:, 0:1] * 0.98).clamp(0, 1), (real_D[:, 1:2] * 0.98).clamp(0, 1),
+                               (real_D[:, 2:3] * 1.02).clamp(0, 1)], dim=1) * 2 - 1
+        self.real_D = self.real_D * (
+                    1 - vegetation_mask - sky_mask) + greener_veg * vegetation_mask + bluer_sky * sky_mask
 
     # endregion
 
@@ -501,15 +504,16 @@ class Image2ImageGAT_Dual(nn.Module):
             self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
             total_mask = segMask_com | contourMask
             encoded_TN, self.TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
-                                                                 from_=self.T, align_first=False)
+                                                                               from_=self.T, align_first=False)
             # self.fake_T_com = self.fake_T * (~total_mask) + self.TN_com * total_mask
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
             # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
             self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
-            self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_TN_com,
-                                                                self.TN_com,
-                                                                loss_name='trafficlight', criterion_lambda='trafficlight_l')
+            # self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_TN_com,
+            #                                                     self.TN_com,
+            #                                                     loss_name='trafficlight',
+            #                                                     criterion_lambda='trafficlight_l')
             # self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
             #                                                     self.remapped_T * contourMask + self.fake_T_com * segMask_com,
             #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_l')
@@ -518,9 +522,12 @@ class Image2ImageGAT_Dual(nn.Module):
             #                                                     self.remapped_T, weights,
             #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_f')
             self.loss_trafficlight[self.N] += self.compute_loss('tll2', self.N_com, self.remapped_T_com, self.TN_com,
-                                                                self.rec_TN_com, self.D_com, self.fake_D_com, self.fake_T_com,
-                                                                segMask_com, contourMask, weights, self.segMask_TN_update,
-                                                                loss_name='trafficlight', criterion_lambda='trafficlight_f')
+                                                                self.rec_TN_com, self.D_com, self.fake_D_com,
+                                                                self.fake_T_com,
+                                                                segMask_com, contourMask, weights,
+                                                                self.segMask_TN_update,
+                                                                loss_name='trafficlight',
+                                                                criterion_lambda='trafficlight_f')
         # endregion
 
         # region Structure-Gradient Alignment loss
@@ -560,9 +567,9 @@ class Image2ImageGAT_Dual(nn.Module):
             size = self.input_size
             h_ds, w_ds = size[0] // 2, size[1] // 2
             random_crop = RandomCrop((h_ds, w_ds))
-            real_T_prep = self.real_T[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
-            real_N_prep = self.real_N[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
-            fake_D_prep = self.fake_D[..., size[0]//5:-size[0]//5, size[1]//5:-size[1]//5] *0.5+0.5
+            real_T_prep = self.real_T[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
+            real_N_prep = self.real_N[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
+            fake_D_prep = self.fake_D[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
 
             input_to_crop = torch.cat([real_T_prep, real_N_prep, fake_D_prep], dim=1)
             real_T_ds, real_N_ds, fake_D_ds = random_crop(input_to_crop).split([3, 3, 3], dim=1)
@@ -589,9 +596,11 @@ class Image2ImageGAT_Dual(nn.Module):
             #                               to_=self.D)
             # rec_T = self.netG.decode(self.netG.encode(fake_D_att, from_=self.D), to_=self.T)
             # self.loss_att[self.T] += self.compute_loss('att', rec_T, fake_D_att)
-            att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1)/17).repeat(1, 3, 1, 1)
+            att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1) / 17).repeat(1, 3, 1,
+                                                                                                              1)
             self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
-            self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att', criterion_lambda='att')
+            self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att',
+                                                       criterion_lambda='att')
         # endregion
 
         # region Color/Thermal loss
@@ -606,8 +615,10 @@ class Image2ImageGAT_Dual(nn.Module):
         encoded_TD, _, _, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
         encoded_D = self.netG.encode(real_D, from_=self.D)
         self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
-        self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day', criterion_lambda='color_day')
-        self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day, real_D, loss_name='color_day', criterion_lambda='color_day')
+        self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
+                                                         criterion_lambda='color_day')
+        self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day, real_D, loss_name='color_day',
+                                                         criterion_lambda='color_day')
         # endregion
 
         # combined loss
@@ -635,7 +646,7 @@ class Image2ImageGAT_Dual(nn.Module):
             return rand_size, self.segMask_TN
         else:
             rand_scale = torch.randint(8, 20, (1, 1))
-            rand_size = int(rand_scale.item() * self.input_size[0]/16)
+            rand_size = int(rand_scale.item() * self.input_size[0] / 16)
 
             real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
             real_TN_s = interpolate(self.real_TN, size=rand_size, mode='bilinear', align_corners=False)
@@ -813,23 +824,25 @@ class Image2ImageGAT_Dual(nn.Module):
                         x0, x1 = xs.min(), xs.max()
                         rect_area = (y1 - y0 + 1) * (x1 - x0 + 1)
                         ratio_xy = (y1 - y0 + 1) / (x1 - x0 + 1)
-                        if rect_area/count > 0.95 and 1.2 < ratio_xy < 5.:
-                            color = determine_color_N(self.real_N[b, :, y0:y1+1, x0:x1+1])
+                        if rect_area / count > 0.95 and 1.2 < ratio_xy < 5.:
+                            color = determine_color_N(self.real_N[b, :, y0:y1 + 1, x0:x1 + 1])
                             TL = self.TL_collection[color]
                             fake_light = TL['D'][torch.randint(0, len(TL['D']), [1])].to(D.device)
                             if count < 250:
                                 fake_light = dilation(fake_light, torch.ones((3, 3), device=fake_light.device))
                             fake_light = interpolate(fake_light, (y1 - y0 + 1, x1 - x0 + 1))
-                            mask_road = (interpolate(self.segMask_TN_update[b:b+1].float(), self.fake_D.shape[-2:], mode='nearest') == 0).float()
-                            road_mean = ((self.fake_D[b:b+1] * 0.5 + 0.5) * mask_road).mean()
-                            fake_light_norm = (fake_light - fake_light.min()) / (fake_light.max() - fake_light.min() + 1e-6)
+                            mask_road = (interpolate(self.segMask_TN_update[b:b + 1].float(), self.fake_D.shape[-2:],
+                                                     mode='nearest') == 0).float()
+                            road_mean = ((self.fake_D[b:b + 1] * 0.5 + 0.5) * mask_road).mean()
+                            fake_light_norm = (fake_light - fake_light.min()) / (
+                                        fake_light.max() - fake_light.min() + 1e-6)
                             fake_light = (fake_light_norm * (1 - road_mean + 1e-5) + road_mean).clamp(0, 1)
-                            D[b:b+1, :, y0:y1+1, x0:x1+1] = fake_light
+                            D[b:b + 1, :, y0:y1 + 1, x0:x1 + 1] = fake_light
                             nb -= 1
                             disk = get_disk_kernel(radius=max(int(math.sqrt(rect_area)), 3), device=fake_light.device)
-                            x0 = (x1+x0)//2 - disk.shape[-1]//2
+                            x0 = (x1 + x0) // 2 - disk.shape[-1] // 2
                             x1 = x0 + disk.shape[-1]
-                            y0 = (y1+y0)//2 - disk.shape[-2]//2
+                            y0 = (y1 + y0) // 2 - disk.shape[-2] // 2
                             y1 = y0 + disk.shape[-2]
                             if x0 < 0:
                                 disk = disk[:, -x0:]
@@ -843,7 +856,7 @@ class Image2ImageGAT_Dual(nn.Module):
                             if y1 > H:
                                 disk = disk[:H - y1 + disk.shape[-2], :]
                                 y1 = H
-                            contour_mask[b:b+1, :, y0:y1, x0:x1] = disk
+                            contour_mask[b:b + 1, :, y0:y1, x0:x1] = disk
                             contour_mask -= mask_.float()
                             weights += mask_[None].float() * 5.
                         else:
@@ -873,8 +886,10 @@ class Image2ImageGAT_Dual(nn.Module):
                 valid_pos[..., :TL_N_.shape[-2], :], valid_pos[..., -TL_N_.shape[-2]:, :] = 0, 0
                 valid_pos[..., -TL_N_.shape[-1]:], valid_pos[..., :TL_N_.shape[-1]] = 0, 0
                 if valid_pos.sum() == 0:
-                    y_idxs, x_idxs = torch.randint(0, T.shape[-2] - TL_N_.shape[-2], (1,)), torch.randint(0, T.shape[-1] -
-                                                                                                          TL_N_.shape[-1],
+                    y_idxs, x_idxs = torch.randint(0, T.shape[-2] - TL_N_.shape[-2], (1,)), torch.randint(0,
+                                                                                                          T.shape[-1] -
+                                                                                                          TL_N_.shape[
+                                                                                                              -1],
                                                                                                           (1,))
                     y = y_idxs.item()
                     x = x_idxs.item()
@@ -924,15 +939,16 @@ class Image2ImageGAT_Dual(nn.Module):
 
     # region ------------------------ Training Helpers ----------------------- #
     def visualize_current_results(self, save=False):
-        visuals = {'real_D': (self.D_com * 0.5 + 0.5 if self.D_com is not None else self.real_D * 0.5+0.5),
-                   'real_T': (self.T_com * 0.5 + 0.5 if self.T_com is not None else self.real_T * 0.5+0.5),
-                   'real_N': (self.N_com * 0.5 + 0.5 if self.N_com is not None else self.real_N * 0.5+0.5),
-                   'fake_T': (self.fake_T_com * 0.5 + 0.5 if self.fake_T_com is not None else self.fake_T * 0.5+0.5),
-                   'remapped_T': (self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5+0.5),
-                   'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.real_TN * 0.5+0.5),
-                   'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5+0.5),
-                   'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_T * 0.5+0.5),
-                   'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5+0.5)}
+        visuals = {'real_D': (self.D_com * 0.5 + 0.5 if self.D_com is not None else self.real_D * 0.5 + 0.5),
+                   'real_T': (self.T_com * 0.5 + 0.5 if self.T_com is not None else self.real_T * 0.5 + 0.5),
+                   'real_N': (self.N_com * 0.5 + 0.5 if self.N_com is not None else self.real_N * 0.5 + 0.5),
+                   'fake_T': (self.fake_T_com * 0.5 + 0.5 if self.fake_T_com is not None else self.fake_T * 0.5 + 0.5),
+                   'remapped_T': (
+                       self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5 + 0.5),
+                   'real_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.real_TN * 0.5 + 0.5),
+                   'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5 + 0.5),
+                   'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_T * 0.5 + 0.5),
+                   'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5 + 0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
         if save:
