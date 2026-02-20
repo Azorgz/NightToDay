@@ -1019,8 +1019,9 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
         veg_min = (veg_mask * fake_ir_gray)[valid_veg].sum(dim=[1, 2, 3]) / veg_mask.sum(dim=[1, 2, 3]).detach()  # (B,)
         sky_region = (sky_mask * fake_ir_gray)[valid_veg]
         sky_region_HL = sky_region.mean(1, keepdim=True) > sky_region.sum(dim=[1, 2, 3])/(3*sky_mask.sum())*1.1 # (B,1,H,W)
-        if sky_region_HL.any():
-            sky_loss[valid_veg] += F.relu(veg_min * 1.1 - sky_region[sky_region_HL].flatten(1)).min(1).values
+        valid_veg = valid_veg * (sky_region_HL.sum(dim=[1, 2, 3]) > 0)
+        if valid_veg.any():
+            sky_loss[valid_veg] += (F.relu(veg_min * 1.1 - sky_region) * sky_region_HL).flatten(1).max(1).values
         # sky_mean_height_real_ir = (infrared_sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6))  # (B, H)
         # sky_mean_height_fake_ir = sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6)  # (B, H)
         # sky_loss[valid_sky] += F.relu(sky_mean_height_real_ir - sky_mean_height_fake_ir).sum(dim=1) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) > 0).sum(1) * 0.2
