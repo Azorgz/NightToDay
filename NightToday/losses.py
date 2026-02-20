@@ -432,7 +432,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
     total_classes_loss = ((veg_loss * weights[1] + person_loss * weights[2]) /
-                          (weights * torch.stack([valid_veg, valid_person], dim=-1).float()).sum(
+                          (weights[1:3] * torch.stack([valid_veg, valid_person], dim=-1).float()).sum(
                               1)).mean()
     grad_TN_y, grad_TN_x = image_gradients(TN)
     grad_T_y, grad_T_x = image_gradients(T)
