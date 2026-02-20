@@ -605,7 +605,7 @@ class Image2ImageGAT_Dual(nn.Module):
 
         encoded_TD, _, _, _ = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
         self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
-        self.loss_color_day[self.T] += self.compute_loss('cycle', encoded_TD, encoded_D, loss_name='color_day', criterion_lambda='color_day')
+        self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day', criterion_lambda='color_day')
         self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day, self.real_D, loss_name='color_day', criterion_lambda='color_day')
         # endregion
 
