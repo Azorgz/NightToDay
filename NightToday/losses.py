@@ -1155,7 +1155,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             traffic_light_final = T_adjusted * total_ * (1 - sky_mask) * (1 - HL_region) - HL_region * N_gray
             TN_region = TN * mask_
             compo_loss = PixelConsistencyLoss(TN_region[b:b + 1], traffic_light_final[b:b + 1],
-                                              total_ * (1 - sky_mask)) * weight_
+                                              total_ * (1 - sky_mask)) * weight_ * 0.2
             # losses color consistency
             if color == 'red':
                 target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1) * 2 - 1

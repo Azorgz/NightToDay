@@ -38,6 +38,8 @@ class FLIR(TrainDataset):
         Load an image from a given path and return it as a Tensor.
         """
         image = ImageTensor(path[idx]) ** fac * 255 if seg else ImageTensor(path[idx])
+        if image.depth==16:
+            image = image.normalize()
         # if crop and self.crop_xxyy:
             # crop = self.crop_xxyy[idx]
             # crop = crop[0]*500//640, crop[1]*500//640, crop[2]*400//512, crop[3]*400//512

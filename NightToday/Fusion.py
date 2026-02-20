@@ -356,7 +356,6 @@ class U_ResNetFusion(nn.Module):
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
-        self.thermal_postprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins, 1)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -458,7 +457,7 @@ class MonotonicThermalLUT(nn.Module):
         x_mean_b = x[:, :, 2::].mean(dim=[1, 2, 3])
         x_std_t = x[:, :, ::2].std(dim=[1, 2, 3])
         x_std = x[:, :, ].std(dim=[1, 2, 3])
-        low_lum_t = (x[:, :, 2::] < -0.90).sum(dim=[1, 2, 3]) / (x[:, :, 2::]>=-1).sum(dim=[1, 2, 3])
+        low_lum_t = (x[:, :, ::2] < -0.90).sum(dim=[1, 2, 3]) / torch.tensor([x.shape[0], torch.prod(torch.tensor(x.shape[-2:]))//2])
         cond1 = x_mean_b > x_mean_t * 2
         cond2 = x_std_t > x_std
         cond3 = low_lum_t > 0.1
