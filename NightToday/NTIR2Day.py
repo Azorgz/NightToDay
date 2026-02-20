@@ -257,7 +257,8 @@ class Image2ImageGAT_Dual(nn.Module):
 
     def set_input(self, *args, **kwargs):
         setattr(self, 'real_D', kwargs.get('D', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
-        setattr(self, 'real_D_T', kwargs.get('D_T', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
+        setattr(self, 'real_D_T', kwargs.get('D_T', ImageTensor.rand(1, 3, 4, 4)).to(self.device)
+        if kwargs.get('D_T', ImageTensor.rand(1, 3, 4, 4)) is not None else None)
         setattr(self, 'real_T', kwargs.get('T', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
         setattr(self, 'real_N', kwargs.get('N', ImageTensor.rand(1, 3, 4, 4)).to(self.device))
         setattr(self, 'real_TN', None)
