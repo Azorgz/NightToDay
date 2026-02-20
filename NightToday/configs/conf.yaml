@@ -71,7 +71,7 @@ training:
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
     lambda_color: [[ 2,  ], 3.0]
-    lambda_color_day: [[ 2,  ], 5.0]
+    lambda_color_day: [[ 2,  ], 2.5]
     lambda_id: [[ 0, 10 ], 0.1]
     lambda_cycle:  [[ 0,  ], 5.0]
     lambda_ssim:  [[ 0,  ], 2.5]
