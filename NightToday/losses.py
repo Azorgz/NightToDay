@@ -1018,7 +1018,8 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     if valid_veg.any():
         veg_min = (veg_mask * fake_ir_gray)[valid_veg].sum(dim=[1, 2, 3]) / veg_mask.sum(dim=[1, 2, 3]).detach()  # (B,)
         sky_region = (sky_mask * fake_ir_gray)[valid_veg]
-        sky_region_HL = sky_region.mean(1, keepdim=True) > sky_region.sum(dim=[1, 2, 3])/(3*sky_mask.sum())*1.1 # (B,1,H,W)
+        sky_day = (sky_mask * real_gray)[valid_veg]
+        sky_region_HL = sky_day > sky_day.sum(dim=[1, 2, 3])/(3*sky_mask.sum())*1.2 # (B,1,H,W)
         valid_veg = valid_veg * (sky_region_HL.sum(dim=[1, 2, 3]) > 0)
         if valid_veg.any():
             sky_loss[valid_veg] += (F.relu(veg_min * 1.1 - sky_region) * sky_region_HL).flatten(1).max(1).values
