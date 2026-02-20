@@ -405,7 +405,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     building_mask = (GT_resized <= 2).float()
     # area_building = building_mask.sum(dim=[1, 2, 3])
     # valid_building = area_building > 200
-    thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
+    thermal_diff_low = ReLU()(TN - T.detach() + 0.1)  # only penalize higher values
     thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
     T_filtered = median_blur(T.mean(1, keepdim=True), kernel_size=3)
     N_filtered = median_blur(-N.mean(1, keepdim=True), kernel_size=3)
@@ -420,7 +420,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     #  Thermal correction losses per classes
     # sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[
     #     valid_sky] * 2
-    sky_loss[valid_sky] += (TN[valid_sky] * sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6)
+    sky_loss[valid_sky] += (thermal_diff_low * sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6)
     veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(
         dim=[1, 2, 3]) / area_veg[valid_veg] * 5
     # veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
@@ -429,8 +429,8 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
 
     person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
                                  area_person[valid_person]
-    total_classes_loss = ((veg_loss * weights[1] + person_loss * weights[2]) /
-                          (weights[1:3] * torch.stack([valid_veg, valid_person], dim=-1).float()).sum(
+    total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2]) /
+                          (weights[:3] * torch.stack([valid_sky, valid_veg, valid_person], dim=-1).float()).sum(
                               1)).mean()
     grad_TN_y, grad_TN_x = image_gradients(TN)
     grad_T_y, grad_T_x = image_gradients(T)
