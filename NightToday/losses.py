@@ -390,6 +390,7 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     GT_resized = F.interpolate(GT_seg.float(), size=TN.shape[-2:], mode='nearest').long().detach()
     weights = weights[[SKY, VEG, PERSON, CAR]] if weights is not None else (
         torch.tensor([1., 1., 1., 1.], device=TN.device))
+    weights[0] *= 0.2  # sky
     sky_mask = erosion((GT_resized == SKY).float(), torch.ones(3, 3, device=TN.device))
     area_sky = sky_mask.sum(dim=[1, 2, 3])
     valid_sky = area_sky > 200
@@ -399,10 +400,10 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     person_mask = erosion((GT_resized == PERSON).float(), torch.ones(5, 5, device=TN.device))
     area_person = person_mask.sum(dim=[1, 2, 3])
     valid_person = area_person > 30
-    car_mask = sum([GT_resized == V for V in VEHICLES]).float()
-    area_car = car_mask.sum(dim=[1, 2, 3])
-    valid_car = area_car > 50
-    building_mask = (GT_resized <= 2).float()
+    # car_mask = sum([GT_resized == V for V in VEHICLES]).float()
+    # area_car = car_mask.sum(dim=[1, 2, 3])
+    # valid_car = area_car > 50
+    # building_mask = (GT_resized <= 2).float()
     # area_building = building_mask.sum(dim=[1, 2, 3])
     # valid_building = area_building > 200
     thermal_diff_low = ReLU()(TN - T.detach() + 0.1)  # only penalize higher values
