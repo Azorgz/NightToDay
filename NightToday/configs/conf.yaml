@@ -104,10 +104,10 @@ data:
       sampling: 1
       augmentations:
         hflip: True
-    - name: 'LYNRED'
-      sampling: 1
-      augmentations:
-        hflip: True
+#    - name: 'LYNRED'
+#      sampling: 1
+#      augmentations:
+#        hflip: True
 #  test_datasets:
 #      - name: 'LYNRED_DAY_SAMPLES'
 #        sampling: 1
