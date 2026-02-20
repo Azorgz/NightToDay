@@ -111,7 +111,7 @@ class TrainDataset(Dataset):
     def __getitem__(self, idx):
         image_D = self.normalize(self.load_image(self.train_D, idx % len(self.train_D), fac=1.1))
         if self.train_D_T:
-            image_D_T = self.normalize(self.load_image(self.train_D_T, idx % len(self.train_D_T), fac=1.1))
+            image_D_T = self.normalize(self.load_image(self.train_D_T, idx % len(self.train_D_T), False).GRAY().RGB('gray'))
         else:
             image_D_T = None
         image_T = self.normalize(self.load_image(self.train_T, idx % len(self.train_T), False).GRAY().RGB('gray'))
