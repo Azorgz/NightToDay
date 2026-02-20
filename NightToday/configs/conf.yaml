@@ -43,7 +43,7 @@ training:
   checkpoint_dir: '/checkpoints'
   checkpoint_freq: 1  # epochs
   checkpoint_save_latest: 500  # steps
-  pedestrian_color: [red, black] #[black, red] # color of pedestrian in fake D images (color, contour)
+  pedestrian_color: #[red, black] #[black, red] # color of pedestrian in fake D images (color, contour)
   split_optimizers: False
   split_weights: False
   visualize_freq: 25  # steps
