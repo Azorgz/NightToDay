@@ -7,6 +7,9 @@ from tqdm import tqdm
 from NightToday import build_train_data_from_config
 from NightToday.NTIR2Day import Image2ImageGAT_Dual
 
+import os
+os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
+
 
 if __name__ == "__main__":
 
