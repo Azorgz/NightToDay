@@ -1013,16 +1013,16 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     # endregion
 
     # region Cloud Artifact Correction, force the temperature of the sky to be consistent with the input infrared image at the same height
-    valid_veg = veg_mask.sum(dim=[1, 2, 3]) > 0
-    sky_loss = torch.zeros(B, device=device)
-    if valid_veg.any():
-        veg_min = (veg_mask * fake_ir_gray)[valid_veg].sum(dim=[1, 2, 3]) / veg_mask.sum(dim=[1, 2, 3]).detach()  # (B,)
-        sky_region = (sky_mask * fake_ir_gray)[valid_veg]
-        sky_day = (sky_mask * real_gray)[valid_veg]
-        sky_region_HL = sky_day > sky_day.sum(dim=[1, 2, 3])/(sky_mask.sum())*1.1 # (B,1,H,W)
-        valid_veg = valid_veg * (sky_region_HL.sum(dim=[1, 2, 3]) > 0)
-        if valid_veg.any():
-            sky_loss[valid_veg] += (F.relu(veg_min * 1.1 - sky_region) * sky_region_HL).flatten(1).max(1).values
+    # valid_veg = veg_mask.sum(dim=[1, 2, 3]) > 0
+    # sky_loss = torch.zeros(B, device=device)
+    # if valid_veg.any():
+    #     veg_min = (veg_mask * fake_ir_gray)[valid_veg].sum(dim=[1, 2, 3]) / veg_mask.sum(dim=[1, 2, 3]).detach()  # (B,)
+    #     sky_region = (sky_mask * fake_ir_gray)[valid_veg]
+    #     sky_day = (sky_mask * real_gray)[valid_veg]
+    #     sky_region_HL = sky_day > sky_day.sum(dim=[1, 2, 3])/(sky_mask.sum())*1.1 # (B,1,H,W)
+    #     valid_veg = valid_veg * (sky_region_HL.sum(dim=[1, 2, 3]) > 0)
+    #     if valid_veg.any():
+    #         sky_loss[valid_veg] += (F.relu(veg_min * 1.1 - sky_region) * sky_region_HL).flatten(1).max(1).values
         # sky_mean_height_real_ir = (infrared_sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6))  # (B, H)
         # sky_mean_height_fake_ir = sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6)  # (B, H)
         # sky_loss[valid_sky] += F.relu(sky_mean_height_real_ir - sky_mean_height_fake_ir).sum(dim=1) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) > 0).sum(1) * 0.2
@@ -1076,7 +1076,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     ############ Thermal Channel equality loss
     thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
 
-    total_loss = ABC_losses + CBC_losses + thermal_eq_loss + sky_loss.sum() * 0.2
+    total_loss = ABC_losses + CBC_losses + thermal_eq_loss  # + sky_loss.sum() * 0.2
     return total_loss
 
 
@@ -1149,8 +1149,12 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             T_adjusted = (T * 0.5 + 0.5) ** (mean_T_light_region / 0.5) * 2 - 1
             traffic_light_final = T_adjusted * total_ * (1 - sky_mask) * (1 - HL_region) - HL_region * N_gray
             TN_region = TN * mask_
-            compo_loss = PixelConsistencyLoss(TN_region[b:b + 1], traffic_light_final[b:b + 1],
-                                              total_ * (1 - sky_mask)) * weight_ * 0.2
+            fake_D_region = fake_D * mask_
+            compo_loss = (PixelConsistencyLoss(TN_region[b:b + 1], traffic_light_final[b:b + 1],
+                                              total_ * (1 - sky_mask)) +
+                          PixelConsistencyLoss(1-fake_D_region[b:b + 1].max(dim=1, keepdim=True)[0], traffic_light_final[b:b + 1],
+                                               total_ * (1 - sky_mask)) / 2
+                          ) * weight_ * 0.2
             # losses color consistency
             if color == 'red':
                 target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1)
