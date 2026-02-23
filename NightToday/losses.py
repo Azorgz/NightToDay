@@ -1167,7 +1167,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
 
             elif color == 'green':
                 target_color = torch.tensor([0.0, 1.0, 0.1], device=N.device).view(1, 3, 1, 1)
-                color_fake_D = fake_D[:, 1:2] - fake_D[:, 0:1]  # [-2:2]
+                color_fake_D = fake_D[:, 1:2] - fake_D[:, 0:1] * 9 / 10 - fake_D[:, 2:3] / 10  # [-2:2]
             else:
                 target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1)
                 color_fake_D = fake_D[:, :2].mean(1, keepdim=True) - fake_D[:, 2:3]  # [-2:2]
@@ -1189,8 +1189,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
-            std_loss = (fake_D[b:b + 1] * (mask_ - HL_region)).std(1).max() - (
-                    color_fake_D[b:b + 1] * HL_region[b:b + 1]).min()
+            std_loss = (fake_D[b:b + 1] * (mask_ - HL_region)).std(1).max()
             # grad_loss to enhance the gradient of traffic light region
             grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
