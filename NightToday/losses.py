@@ -1018,37 +1018,37 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     # endregion
 
     # region Cloud Artifact Correction, force the temperature of the sky to be consistent with the input infrared image at the same height
-    # valid_veg = veg_mask.sum(dim=[1, 2, 3]) > 0
-    # sky_loss = torch.zeros(B, device=device)
-    # if valid_veg.any():
-    #     veg_min = (veg_mask * fake_ir_gray)[valid_veg].sum(dim=[1, 2, 3]) / veg_mask.sum(dim=[1, 2, 3]).detach()  # (B,)
-    #     sky_region = (sky_mask * fake_ir_gray)[valid_veg]
-    #     sky_day = (sky_mask * real_gray)[valid_veg]
-    #     sky_region_HL = sky_day > sky_day.sum(dim=[1, 2, 3])/(sky_mask.sum())*1.1 # (B,1,H,W)
-    #     valid_veg = valid_veg * (sky_region_HL.sum(dim=[1, 2, 3]) > 0)
-    #     if valid_veg.any():
-    #         sky_loss[valid_veg] += (F.relu(veg_min * 1.1 - sky_region) * sky_region_HL).flatten(1).max(1).values
-    # sky_mean_height_real_ir = (infrared_sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6))  # (B, H)
-    # sky_mean_height_fake_ir = sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6)  # (B, H)
-    # sky_loss[valid_sky] += F.relu(sky_mean_height_real_ir - sky_mean_height_fake_ir).sum(dim=1) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) > 0).sum(1) * 0.2
-    # upper_sky_mask = sky_region[:, :, :H // 5]
-    # up_area = sky_mask[:, :, :H // 5].sum(dim=[1, 2, 3])
-    # mid_sky_mask = sky_region[:, :, H // 5:H // 4]
-    # mid_area = sky_mask[:, :, H // 5:H // 4].sum(dim=[1, 2, 3])
-    # lower_sky_mask = sky_region[:, :, H // 4:]
-    # lower_area = sky_mask[:, :, H // 4:].sum(dim=[1, 2, 3])
-    # gradient_horizon = torch.arange(H // 4 - H // 5, device=device).view(1, 1, H // 4 - H // 5, 1).repeat(1, 1, 1,
-    #                                                                                                       W) / (
-    #                                H // 4 - H // 5) * veg_min
-    # gradient_horizon_region = gradient_horizon * mid_sky_mask
-    # if up_area:
-    #     sky_loss[valid_veg] += F.relu(upper_sky_mask).sum(dim=[1, 2, 3]) / up_area * 0.1
-    # if mid_area:
-    #     sky_loss[valid_veg] += F.relu((gradient_horizon_region * sky_mask[:, :, H // 5:H // 4] - mid_sky_mask)).sum(
-    #         dim=[1, 2, 3]) / mid_area * 0.1
-    # if lower_area:
-    #     sky_loss[valid_veg] += F.relu(veg_min * sky_mask[:, :, H // 4:] - lower_sky_mask).sum(
-    #         dim=[1, 2, 3]) / lower_area * 0.1
+    valid_veg = veg_mask.sum(dim=[1, 2, 3]) > 0
+    sky_loss = torch.zeros(B, device=device)
+    if valid_veg.any():
+        veg_min = (veg_mask * fake_ir_gray)[valid_veg].sum(dim=[1, 2, 3]) / veg_mask.sum(dim=[1, 2, 3]).detach()  # (B,)
+        sky_region = (sky_mask * fake_ir_gray)[valid_veg]
+        # sky_day = (sky_mask * real_gray)[valid_veg]
+        # sky_region_HL = sky_day > sky_day.sum(dim=[1, 2, 3])/(sky_mask.sum())*1.1 # (B,1,H,W)
+        # valid_veg = valid_veg * (sky_region_HL.sum(dim=[1, 2, 3]) > 0)
+        # if valid_veg.any():
+        #     sky_loss[valid_veg] += (F.relu(veg_min * 1.1 - sky_region) * sky_region_HL).flatten(1).max(1).values
+        # sky_mean_height_real_ir = (infrared_sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6))  # (B, H)
+        # sky_mean_height_fake_ir = sky_region[valid_sky].sum(dim=[1, 3]) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) + 1e-6)  # (B, H)
+        # sky_loss[valid_sky] += F.relu(sky_mean_height_real_ir - sky_mean_height_fake_ir).sum(dim=1) / (common_sky_mask[valid_sky].sum(dim=[1, 3]) > 0).sum(1) * 0.2
+        upper_sky_mask = sky_region[:, :, :H // 5]
+        up_area = sky_mask[:, :, :H // 5].sum(dim=[1, 2, 3])
+        mid_sky_mask = sky_region[:, :, H // 5:H // 4]
+        mid_area = sky_mask[:, :, H // 5:H // 4].sum(dim=[1, 2, 3])
+        lower_sky_mask = sky_region[:, :, H // 4:]
+        lower_area = sky_mask[:, :, H // 4:].sum(dim=[1, 2, 3])
+        gradient_horizon = torch.arange(H // 4 - H // 5, device=device).view(1, 1, H // 4 - H // 5, 1).repeat(1, 1, 1,
+                                                                                                              W) / (
+                                       H // 4 - H // 5) * veg_min
+        gradient_horizon_region = gradient_horizon * mid_sky_mask
+        if up_area:
+            sky_loss[valid_veg] += F.relu(upper_sky_mask).sum(dim=[1, 2, 3]) / up_area * 0.1
+        if mid_area:
+            sky_loss[valid_veg] += F.relu((gradient_horizon_region * sky_mask[:, :, H // 5:H // 4] - mid_sky_mask)).sum(
+                dim=[1, 2, 3]) / mid_area * 0.1
+        if lower_area:
+            sky_loss[valid_veg] += F.relu(veg_min * sky_mask[:, :, H // 4:] - lower_sky_mask).sum(
+                dim=[1, 2, 3]) / lower_area * 0.1
     # endregion
 
     ########### Light region SGA loss
@@ -1081,7 +1081,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     ############ Thermal Channel equality loss
     thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
 
-    total_loss = ABC_losses + CBC_losses + thermal_eq_loss  # + sky_loss.sum() * 0.2
+    total_loss = ABC_losses + CBC_losses + thermal_eq_loss + sky_loss.sum() * 0.2
     return total_loss
 
 
@@ -1159,7 +1159,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                                                total_ * (1 - sky_mask)) +
                           PixelConsistencyLoss(
                               1 - fake_D_region[b:b + 1].max(dim=1, keepdim=True)[0].repeat(1, 3, 1, 1),
-                              traffic_light_final[b:b + 1], total_ * (1 - sky_mask)) / 2) * weight_ * 0.2
+                              traffic_light_final[b:b + 1], total_ * (1 - sky_mask)) / 2) * weight_
             # losses color consistency
             if color == 'red':
                 target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1)
@@ -1192,10 +1192,10 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             std_loss = (fake_D[b:b + 1] * (mask_ - HL_region)).std(1).max() - (
                     color_fake_D[b:b + 1] * HL_region[b:b + 1]).min()
             # grad_loss to enhance the gradient of traffic light region
-            # grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
-            # grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
-            # grad_loss = (nn.L1Loss()(grad_fake_D, grad_TN) * total_[b:b + 1]).sum() / (
-            #             total_[b:b + 1].sum() + 1e-6) * 2
+            grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
+            grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
+            grad_loss = (nn.L1Loss()(grad_fake_D, grad_TN) * total_[b:b + 1]).sum() / (
+                        total_[b:b + 1].sum() + 1e-6) * 2
             sky_contour = sky_mask * contour[b:b + 1]
             if sky_contour.sum() > 0:
                 sky_mean_fake_D = (sky_mask * fake_D[b:b + 1]).sum() / (3 * sky_mask.sum() + 1e-6)
@@ -1204,7 +1204,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             else:
                 sky_loss = 0.
 
-            losses[b] += (compo_loss + color_loss + luminosity_loss +
+            losses[b] += (compo_loss + color_loss + luminosity_loss + grad_loss +
                           rec_consistency_loss + std_loss + sky_loss) * weight_
     return losses
 
