@@ -44,21 +44,21 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.crop_TF_in_src.executor": "Run",
-    "Python.encoders.executor": "Debug",
-    "Python.manual_labeling_flir_night.executor": "Run",
-    "Python.test.executor": "Run",
-    "Python.train.executor": "Debug",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "git-widget-placeholder": "main",
-    "last_opened_file_path": "/home/godeta/PycharmProjects/MyTransform",
-    "run.code.analysis.last.selected.profile": "pProject Default",
-    "settings.editor.selected.configurable": "project.propVCSSupport.DirectoryMappings"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.crop_TF_in_src.executor&quot;: &quot;Run&quot;,
+    &quot;Python.encoders.executor&quot;: &quot;Debug&quot;,
+    &quot;Python.manual_labeling_flir_night.executor&quot;: &quot;Run&quot;,
+    &quot;Python.test.executor&quot;: &quot;Run&quot;,
+    &quot;Python.train.executor&quot;: &quot;Debug&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/home/godeta/PycharmProjects/MyTransform&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;pProject Default&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;project.propVCSSupport.DirectoryMappings&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$" />
@@ -165,8 +165,8 @@
       <method v="2" />
     </configuration>
     <list>
-      <item itemvalue="Python.manual_labeling_flir_night" />
       <item itemvalue="Python.crop_TF_in_src" />
+      <item itemvalue="Python.manual_labeling_flir_night" />
       <item itemvalue="Python.test" />
       <item itemvalue="Python.train" />
     </list>
