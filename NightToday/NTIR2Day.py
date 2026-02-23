@@ -482,6 +482,7 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region Fusion Loss
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
+        self.loss_sharpness[self.D] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.remapped_T)
         gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
         self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_T, -gray_N.repeat(1, 3, 1, 1),
                                                    loss_name='fus', criterion_lambda='fus')
