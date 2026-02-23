@@ -1132,9 +1132,9 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                                    torch.ones(3, 3, device=mask.device))
             HL_region_N = (N_gray * total_ > mean_N_light_region).float()
             HL_region = HL_region_T * HL_region_N
-            if HL_region.sum() == 0 and HL_region_N.sum() > 0:
-                HL_region = HL_region_N
-            elif HL_region_N.sum() == 0:
+            if HL_region.sum() == 0: # and HL_region_N.sum() > 0:
+            #     HL_region = HL_region_N
+            # elif HL_region_N.sum() == 0:
                 continue
             else:
                 pass
@@ -1163,14 +1163,14 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             # losses color consistency
             if color == 'red':
                 target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1)
-                color_fake_D = fake_D[:, 0:1] - fake_D[:, 2:3] / 2 - fake_D[:, 1:2] / 2
+                color_fake_D = fake_D[:, 0:1] - fake_D[:, 2:3] / 2 - fake_D[:, 1:2] / 2  # [-2:2]
 
             elif color == 'green':
                 target_color = torch.tensor([0.0, 1.0, 0.1], device=N.device).view(1, 3, 1, 1)
-                color_fake_D = fake_D[:, 1:2] - fake_D[:, 0:1]
+                color_fake_D = fake_D[:, 1:2] - fake_D[:, 0:1]  # [-2:2]
             else:
                 target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1)
-                color_fake_D = fake_D[:, :2].mean(1, keepdim=True) - fake_D[:, 2:3]
+                color_fake_D = fake_D[:, :2].mean(1, keepdim=True) - fake_D[:, 2:3]  # [-2:2]
 
             luminosity_loss = torch.relu(
                 2. - (color_fake_D * HL_region[b:b + 1] + 2 - 2 * HL_region[b:b + 1])).sum() / (
