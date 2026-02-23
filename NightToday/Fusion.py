@@ -382,7 +382,8 @@ class U_ResNetFusion(nn.Module):
     def forward(self, ir, vis_night, align_first=True, **kwargs):
         ir = self.thermal_preprocess(ir, **kwargs)
         if align_first:
-            vis_night = self.spatial_aligner(vis_night, ir).detach()
+            vis_night = self.spatial_aligner(vis_night*0.5+0.5, ir*0.5+0.5).detach()
+            vis_night = vis_night*2-1
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
         for layer in self.encoder:
             x_feat = layer(x_feat)
