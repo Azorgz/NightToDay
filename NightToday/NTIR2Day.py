@@ -674,8 +674,7 @@ class Image2ImageGAT_Dual(nn.Module):
         rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
         self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
         # self.rec_T = self.rec_TN
-        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_TN, self.fake_TN,
-                                                     loss_name='cycle', criterion_lambda='thermal')
+        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_TN, self.fake_TN)
         # endregion
 
         # region Cycle loss on Latent Space
