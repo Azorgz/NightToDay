@@ -978,8 +978,9 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     # Grayscale
     real_gray = 0.299 * real_vis_norm[:, 0:1, :, :] + 0.587 * real_vis_norm[:, 1:2, :, :] + 0.114 * real_vis_norm[:,
                                                                                                     2:3, :, :]
-    fake_ir_gray = 0.299 * fake_ir_norm[:, 0:1, :, :] + 0.587 * fake_ir_norm[:, 1:2, :, :] + 0.114 * fake_ir_norm[:,
-                                                                                                     2:3, :, :]
+    # fake_ir_gray = 0.299 * fake_ir_norm[:, 0:1, :, :] + 0.587 * fake_ir_norm[:, 1:2, :, :] + 0.114 * fake_ir_norm[:,
+    #                                                                                                  2:3, :, :]
+    fake_ir_gray = fake_ir_norm[:, 0:1]
     real_lab = rgb_to_lab(real_vis_norm)
     real_lab[:, :1, :, :] = real_lab[:, :1, :, :] / 100 + 1e-6  # [1e-6 1]
     real_lab[:, 1:, :, :] = real_lab[:, 1:, :, :] / 128  # [-1 1]
@@ -1069,9 +1070,9 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     CBC_losses = rec_losses.sum()
 
     ############ Thermal Channel equality loss
-    thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
+    # thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
 
-    total_loss = ABC_losses + CBC_losses + thermal_eq_loss + sky_loss.sum() * 0.2
+    total_loss = ABC_losses + CBC_losses + sky_loss.sum() * 0.2 # + thermal_eq_loss
     return total_loss
 
 
