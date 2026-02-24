@@ -687,9 +687,9 @@ class Image2ImageGAT_Dual(nn.Module):
         # region Fusion Loss
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
-        self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_T[:, :1].repeat(1, 3, 1, 1),
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_TN[:, :1].repeat(1, 3, 1, 1),
                                                    -gray_N.repeat(1, 3, 1, 1), loss_name='fus', criterion_lambda='fus')
-        self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T[:, :1].repeat(1, 3, 1, 1),
+        self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_TN[:, :1].repeat(1, 3, 1, 1),
                                                    self.remapped_T, loss_name='fus', criterion_lambda='fus')
         # endregion
 
@@ -1132,7 +1132,7 @@ class Image2ImageGAT_Dual(nn.Module):
                        self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5 + 0.5),
                    'fake_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.fake_TN * 0.5 + 0.5),
                    'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5 + 0.5),
-                   'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_T * 0.5 + 0.5),
+                   'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_TN * 0.5 + 0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5 + 0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
