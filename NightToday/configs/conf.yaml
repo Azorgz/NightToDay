@@ -52,7 +52,7 @@ training:
   start_epoch: 3
   total_epochs: 100
   resume: True
-  resume_epoch: 2
+  resume_epoch: 1
 #    G2: 100
 #    G3: 100
 #    D: 100
