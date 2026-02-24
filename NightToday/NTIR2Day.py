@@ -1134,7 +1134,7 @@ class Image2ImageGAT_Dual(nn.Module):
                    'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5 + 0.5),
                    'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_TN * 0.5 + 0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5 + 0.5)}
-        out = {lab: ImageTensor(im[0], colorspace='RGB' if not 'fake_T' in lab else 'LAB') for lab, im in visuals.items() if im is not None}
+        out = {lab: ImageTensor(im[0], colorspace='LAB' if ('fake_T' in lab or 'rec_T' in lab) else 'RGB') for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
         if save:
             self.visualizer.save_current_results({'Training': out}, self.epoch)
