@@ -785,7 +785,7 @@ class Image2ImageGAT_Dual(nn.Module):
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
 
-        if self.real_D_T is not None:
+        if self.real_D_T is not None and self.lambda_color_day > 0.0:
             encoded_TD, _, _, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
             encoded_D = self.netG.encode(real_D, from_=self.D).detach()
             self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
