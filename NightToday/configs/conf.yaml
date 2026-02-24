@@ -19,9 +19,9 @@ model:
       updateGT_TN_start_epoch: 15
 
   gen:
-    downscaling: 3
+    downscaling: 2
     input_size: 512
-    hidden_dim: 256
+    hidden_dim: 384
     n_enc_layers: 4
     n_shared_layers: 2
     n_dec_layers: 5
@@ -31,13 +31,13 @@ model:
         bins: 2048
         scene: 1
       hidden_dim: 256
-      n_enc_layers: 5
+      n_enc_layers: 4
       dropout: 0.25
       n_downscaling: 2
 
   discr:
     base_dim: 64
-    n_layers: 5
+    n_layers: 4
 
 training:
   checkpoint_dir: '/checkpoints'
@@ -52,7 +52,7 @@ training:
   start_epoch: 3
   total_epochs: 100
   resume: True
-  resume_epoch: 1
+  resume_epoch: latest
 #    G2: 100
 #    G3: 100
 #    D: 100
