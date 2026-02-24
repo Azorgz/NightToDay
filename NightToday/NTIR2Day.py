@@ -848,9 +848,9 @@ class Image2ImageGAT_Dual(nn.Module):
                 segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
                 segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
-                real_T_pred_seg = self.netS(real_TN_s, from_=self.T)
+                real_TN_pred_seg = self.netS(real_TN_s, from_=self.T)
                 fake_D_pred_seg_d = self.netS(fake_D_s.detach(), from_=self.D)
-                fake_TN_pred_seg_d = self.netS(real_TN_s.detach(), from_=self.T)
+                fake_T_pred_seg_d = self.netS(fake_T_s.detach(), from_=self.T)
 
                 self.segMask_D_update = UpdateVisGT(real_TN_s.detach(), segMask_D_s, 0.25).long()
                 self.criterion_seg = self.update_class_criterion(self.segMask_D_update)
@@ -859,10 +859,10 @@ class Image2ImageGAT_Dual(nn.Module):
                                                          self.segMask_D_update.squeeze(1), loss_name='S')
                 self.loss_S[self.D] += self.compute_loss('semEdge', real_D_pred_seg,
                                                          self.segMask_D_update, loss_name='S')
-                self.loss_seg[self.D] += self.compute_loss('seg', fake_TN_pred_seg_d,
+                self.loss_seg[self.D] += self.compute_loss('seg', fake_T_pred_seg_d,
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
-                self.segMask_TN_update = (UpdateIRGTv1(real_T_pred_seg.detach(), fake_D_pred_seg_d,
+                self.segMask_TN_update = (UpdateIRGTv1(real_TN_pred_seg.detach(), fake_D_pred_seg_d,
                                                        255 * torch.ones_like(segMask_D_s), real_TN_s) *
                                           mask_uncertain + ~mask_uncertain * segMask_TN_s)
                 IR_pred_seg = fake_D_pred_seg_d
