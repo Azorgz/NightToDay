@@ -19,10 +19,10 @@ model:
       updateGT_TN_start_epoch: 15
 
   gen:
-    downscaling: 2
+    downscaling: 3
     input_size: 512
     hidden_dim: 256
-    n_enc_layers: 5
+    n_enc_layers: 4
     n_shared_layers: 2
     n_dec_layers: 5
     dropout: 0.0

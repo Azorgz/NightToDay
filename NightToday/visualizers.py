@@ -25,7 +25,7 @@ class Visualizer:
         composition = None
         row = None
         for i, label in enumerate(labels):
-            image = visuals[label].RGB().cpu() if label in visuals else ImageTensor.rand(*shape) * 0
+            image = visuals[label].RGB().cpu() if label in labels else ImageTensor.rand(*shape) * 0
             if row is None:
                 row = image
             else:

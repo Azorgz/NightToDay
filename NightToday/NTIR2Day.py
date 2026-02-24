@@ -1116,9 +1116,9 @@ class Image2ImageGAT_Dual(nn.Module):
                 contour_mask.detach(), weights.detach())
 
     def create_TN(self):
-        L = self.real_T.mean(1, keepdim=True) * 50 + 50
-        AB = rgb_to_lab(self.real_N * 0.5 + 0.5)[:, 1:]
-        self.real_TN = lab_to_rgb(torch.cat([L, AB], dim=1)) * 2 - 1
+        L = self.real_T.mean(1, keepdim=True)
+        AB = rgb_to_lab(self.real_N * 0.5 + 0.5)[:, 1:] / 128
+        self.real_TN = torch.cat([L, AB], dim=1)
 
     # endregion
 
@@ -1134,7 +1134,7 @@ class Image2ImageGAT_Dual(nn.Module):
                    'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5 + 0.5),
                    'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_TN * 0.5 + 0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5 + 0.5)}
-        out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
+        out = {lab: ImageTensor(im[0], colorspace='RGB' if not 'fake_T' in lab else 'LAB') for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
         if save:
             self.visualizer.save_current_results({'Training': out}, self.epoch)
