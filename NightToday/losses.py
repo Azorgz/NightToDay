@@ -1154,7 +1154,6 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             T_adjusted = (T * 0.5 + 0.5) ** (mean_T_light_region / 0.5) * 2 - 1
             traffic_light_final = T_adjusted * total_ * (1 - sky_mask) * (1 - HL_region) - HL_region * N_gray
             TN_region = TN * mask_
-            fake_D_region = fake_D * mask_
             compo_loss = (PixelConsistencyLoss(TN_region[b:b + 1], traffic_light_final[b:b + 1],
                                                total_ * (1 - sky_mask)) * 0.5) * weight_
             # losses color consistency
