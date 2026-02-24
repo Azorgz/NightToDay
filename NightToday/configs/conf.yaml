@@ -20,7 +20,7 @@ model:
 
   gen:
     downscaling: 2
-    input_size: 512
+    input_size: 256
     hidden_dim: 384
     n_enc_layers: 4
     n_shared_layers: 2

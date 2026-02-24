@@ -305,7 +305,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
     color_dist = im_fake.color_distance(im_target)  # shape (B,1,H,W) or (B,H,W)
     hsv_target = im_target.HSV()
     color_magn = hsv_target[:, 1:2, :, :] * hsv_target[:, 2:3, :, :]
-    target_l, target_ab = rgb_to_lab(im_target).split([1, 2], 1)  # L channel
+    target_l, target_ab = rgb_to_lab(im_target.to_tensor()).split([1, 2], 1)  # L channel
     low_lum = target_l < th_low * 100
     high_lum = target_l > th_high * 100
     valid = ~low_lum * ~high_lum * 1.
@@ -322,8 +322,6 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
     if GT_seg is not None:
         if color_dist.shape[-2:] != GT_seg.shape[-2:]:
             GT_seg = F.interpolate(GT_seg.float(), size=(H, W), mode='nearest').long()
-        veg_mask = (GT_seg == VEG).float()
-        sky_mask = (GT_seg == SKY).float()
         valid = valid * (GT_seg != SKY)
 
         # build masks in a single vectorized call
@@ -359,14 +357,6 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
                       / weights[[2, 4, 5]].mean())  # (B,)
         # average batch
         loss += sum_losses
-        # loss += ((torch.relu(0.8 - fake_color.mean(1)) * sky_mask).sum(dim=[1, 2, 3])
-        #          / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
-        # loss += (((torch.relu(fake_color[:, 0:1] - fake_color[:, 2:3]) +
-        #          torch.relu(fake_color[:, 1:2] - fake_color[:, 2:3])) * sky_mask)
-        #          .sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
-        # loss += (((torch.relu(fake_color[:, 0:1] - fake_color[:, 1:2]) +
-        #          torch.relu(fake_color[:, 2:3] - fake_color[:, 1:2])) * veg_mask).sum(dim=[1, 2, 3]) /
-        #          (veg_mask.sum(dim=[1, 2, 3]) + 1e-6) * 0.1)
     else:
         loss += (color_dist * high_color_mask).sum(dim=[1, 2, 3]) / (high_color_mask.sum(dim=[1, 2, 3]) + 1e-6)
     loss += ColorConsistencyLoss()(im_fake.to_tensor(), im_target.to_tensor(), valid) * 0.2

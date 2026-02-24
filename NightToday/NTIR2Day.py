@@ -1118,7 +1118,7 @@ class Image2ImageGAT_Dual(nn.Module):
     def create_TN(self):
         L = self.real_T.mean(1, keepdim=True) * 50 + 50
         AB = rgb_to_lab(self.real_N * 0.5 + 0.5)[:, 1:]
-        self.real_TN = lab_to_rgb(torch.cat([L, AB], dim=1))
+        self.real_TN = lab_to_rgb(torch.cat([L, AB], dim=1)) * 2 - 1
 
     # endregion
 
