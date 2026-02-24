@@ -433,213 +433,13 @@ class Image2ImageGAT_Dual(nn.Module):
         self.backward_D()
         self.netD.step_grads(*self.partial_train_net['D'])
 
-    # def backward_G(self):
-    #     self.pred_real_D = self.netD(self.real_D, from_=self.D)
-    #     self.pred_real_T = self.netD(self.real_T, from_=self.T)
-    #
-    #     encoded_D = self.netG.encode(self.real_D, from_=self.D)
-    #     encoded_TN, self.real_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
-    #                                                                               from_=self.T, epoch=self.epoch)
-    #
-    #     # region Identity "auto-encode" loss
-    #     if self.lambda_id > 0:
-    #         # Same encoder and decoder should recreate image
-    #         id_D = self.netG.decode(encoded_D, to_=self.D)
-    #         self.loss_id[self.D] += self.compute_loss('id', id_D, self.real_D)
-    #         id_TN = self.netG.decode(encoded_TN, to_=self.T)
-    #         self.loss_id[self.T] += self.compute_loss('id', id_TN, self.real_TN)
-    #     # endregion
-    #
-    #     # region GAN loss
-    #     """D_T(G_T(D))"""
-    #     self.fake_T = self.netG.decode(encoded_D, to_=self.T)
-    #     # self.fake_T = self.netG.fusion.thermal_postprocess(self.fake_T)
-    #     self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T),
-    #                                              self.remapped_T, self.pred_real_T, self.fake_T, False, loss_name='G')
-    #     """D_N(G_N(T))"""
-    #     self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T),
-    #                                              self.remapped_T, self.pred_real_T, self.real_TN, False, loss_name='G')
-    #     """D_D(G_D(T))"""
-    #     self.fake_D = self.netG.decode(encoded_TN, to_=self.D)
-    #     self.loss_G[self.D] += self.compute_loss('gan', partial(self.netD, from_=self.D), self.real_D,
-    #                                              self.pred_real_D, self.fake_D, False, loss_name='G')
-    #     # endregion
-    #
-    #     # region Cycle loss
-    #     #  Forward
-    #     rec_encoded_D = self.netG.encode(self.fake_T, from_=self.T)
-    #     self.rec_D = self.netG.decode(rec_encoded_D, self.D)
-    #     self.loss_cycle[self.D] += self.compute_loss('cycle', self.rec_D, self.real_D)
-    #     # Backward
-    #     rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
-    #     self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
-    #     self.rec_T = self.rec_TN
-    #     self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.real_TN,
-    #                                                  loss_name='cycle', criterion_lambda='thermal')
-    #     # endregion
-    #
-    #     # region Cycle loss on Latent Space
-    #     if self.lambda_latent > 0:
-    #         self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
-    #         self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_TN)
-    #     # endregion
-    #
-    #     # region Fusion Loss
-    #     self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.real_TN, self.real_N, self.real_T)
-    #     gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
-    #     self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_T, -gray_N.repeat(1, 3, 1, 1),
-    #                                                loss_name='fus', criterion_lambda='fus')
-    #     self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
-    #                                                loss_name='fus', criterion_lambda='fus')
-    #     # endregion
-    #
-    #     # region Total Variation loss
-    #     self.loss_tv[self.T] += self.compute_loss('tv', self.fake_T)
-    #     self.loss_tv[self.N] += self.compute_loss('tv', self.real_TN)
-    #     self.loss_tv[self.D] += self.compute_loss('tv', self.fake_D)
-    #     # endregion
-    #
-    #     # region Segmentation Distillation Knowledge
-    #     rand_size, seg_IR = self.backward_S()
-    #     # endregion
-    #
-    #     # region ACL
-    #     # First step : Learning to translate Day color traffic lights to Thermal traffic lights
-    #     if self.lambda_trafficlight_l > 0.0:
-    #         self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
-    #         total_mask = segMask_com | contourMask
-    #         encoded_TN, self.TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
-    #                                                                            from_=self.T, align_first=False)
-    #         # self.fake_T_com = self.fake_T * (~total_mask) + self.TN_com * total_mask
-    #         self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
-    #         # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
-    #         self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
-    #         self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
-    #         # self.loss_trafficlight[self.D] += self.compute_loss('cycle', self.rec_TN_com,
-    #         #                                                     self.TN_com,
-    #         #                                                     loss_name='trafficlight',
-    #         #                                                     criterion_lambda='trafficlight_l')
-    #         # self.loss_trafficlight[self.T] += self.compute_loss('cycle', self.rec_TN_com * total_mask,
-    #         #                                                     self.remapped_T * contourMask + self.fake_T_com * segMask_com,
-    #         #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_l')
-    #         # self.loss_trafficlight[self.N] += self.compute_loss('tll', segMask_com, contourMask, self.fake_D_com,
-    #         #                                                     self.rec_D_com, self.D_com, self.fake_T_com, self.TN_com,
-    #         #                                                     self.remapped_T, weights,
-    #         #                                                     loss_name='trafficlight', criterion_lambda='trafficlight_f')
-    #         self.loss_trafficlight[self.N] += self.compute_loss('tll2', self.N_com, self.remapped_T_com, self.TN_com,
-    #                                                             self.rec_TN_com, self.D_com, self.fake_D_com,
-    #                                                             self.fake_T_com,
-    #                                                             segMask_com, contourMask, weights,
-    #                                                             self.segMask_TN_update,
-    #                                                             loss_name='trafficlight',
-    #                                                             criterion_lambda='trafficlight_f')
-    #     # endregion
-    #
-    #     # region Structure-Gradient Alignment loss
-    #     self.loss_sga[self.D] += self.compute_loss('sga', self.edges_D, self.get_gradmag(self.fake_T))
-    #     self.loss_sga[self.D] += self.compute_loss('IRClsDis', self.segMask_D,
-    #                                                self.fake_T.mean(dim=1, keepdim=True),
-    #                                                criterion_lambda='ssim', loss_name='sga')
-    #     self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, self.segMask_TN_update,
-    #                                                self.fake_T, self.real_D, self.remapped_T,
-    #                                                self.rec_D, self.edges_D, self.get_gradmag(self.fake_T),
-    #                                                criterion_lambda='bc', loss_name='sga')
-    #     self.loss_sga[self.T] += self.compute_loss('sga', self.get_gradmag(self.real_TN), self.get_gradmag(self.fake_D))
-    #     self.loss_sga[self.T] += self.compute_loss('IRClsDis', self.segMask_TN_update if
-    #     self.segMask_TN_update is not None else self.segMask_TN,
-    #                                                self.real_TN.mean(dim=1, keepdim=True),
-    #                                                criterion_lambda='ssim', loss_name='sga')
-    #     # endregion
-    #
-    #     # region Scale Robustness Loss
-    #     if self.lambda_scale_robustness > 0.0:
-    #         # scale = float(np.random.randint(0, 4, 1))
-    #         # real_T_s = interpolate(self.real_T, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
-    #         # real_N_s = interpolate(self.real_N, scale_factor=scale or 1 / 2, mode='bilinear', align_corners=False)
-    #         # fake_TN_encoded, fake_fused_IR_s, *_ = self.netG.encode(real_T_s, real_N_s,
-    #         #                                                         from_=self.T, align_first=False)
-    #         # fake_D_s = interpolate(self.netG.decode(fake_TN_encoded, to_=self.D),
-    #         #                        size=self.input_size, mode='bilinear', align_corners=False)
-    #         # fake_D = self.fake_D.detach()
-    #         # fake_fused_IR_s = interpolate(fake_fused_IR_s, size=self.input_size, mode='bilinear', align_corners=False)
-    #         # fake_fused_IR = self.real_TN.detach()
-    #         # self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D_s, fake_D,
-    #         #                                                         loss_name='scale_robustness',
-    #         #                                                         criterion_lambda='scale_robustness')
-    #         # self.loss_scale_robustness[self.N] += self.compute_loss('cycle', fake_fused_IR_s, fake_fused_IR,
-    #         #                                                         loss_name='scale_robustness',
-    #         #                                                         criterion_lambda='scale_robustness')
-    #         size = self.input_size
-    #         h_ds, w_ds = size[0] // 2, size[1] // 2
-    #         random_crop = RandomCrop((h_ds, w_ds))
-    #         real_T_prep = self.real_T[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
-    #         real_N_prep = self.real_N[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
-    #         fake_D_prep = self.fake_D[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
-    #
-    #         input_to_crop = torch.cat([real_T_prep, real_N_prep, fake_D_prep], dim=1)
-    #         real_T_ds, real_N_ds, fake_D_ds = random_crop(input_to_crop).split([3, 3, 3], dim=1)
-    #         fake_TN_encoded, _, *_ = self.netG.encode(real_T_ds, real_N_ds, from_=self.T, align_first=False)
-    #         fake_D = self.netG.decode(fake_TN_encoded, to_=self.D)
-    #         self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D, fake_D_ds,
-    #                                                                 loss_name='scale_robustness',
-    #                                                                 criterion_lambda='scale_robustness')
-    #     # endregion
-    #
-    #     # region Domain-specific losses include CGR loss and ACA loss.
-    #     if self.netS.stage in ['freeze_all', 'trained']:
-    #         self.loss_ds[self.T] += self.compute_loss('cgr', self.fake_D, self.segMask_TN_update,
-    #                                                   self.real_TN, loss_name='ds')
-    #         self.loss_ds[self.D] += self.compute_loss('aca', self.segMask_D_update, encoded_D,
-    #                                                   self.segMask_TN_update, rec_encoded_TN, loss_name='ds',
-    #                                                   criterion_lambda='cgr')
-    #     # endregion
-    #
-    #     # region Attacks stability loss
-    #     if self.lambda_att > 0.0:
-    #         # att_T, att_N = self.att_input(self.real_T, self.real_N, balance=0.5, epsilon=0.25)
-    #         # fake_D_att = self.netG.decode(self.netG.encode(att_T, att_N, from_=self.T, align_first=False)[0],
-    #         #                               to_=self.D)
-    #         # rec_T = self.netG.decode(self.netG.encode(fake_D_att, from_=self.D), to_=self.T)
-    #         # self.loss_att[self.T] += self.compute_loss('att', rec_T, fake_D_att)
-    #         att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1) / 20).repeat(1, 3, 1,
-    #                                                                                                           1)
-    #         self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
-    #         self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att',
-    #                                                    criterion_lambda='att')
-    #     # endregion
-    #
-    #     # region Color/Thermal loss
-    #     self.loss_color[self.T] += self.compute_loss('color', self.fake_D, self.real_N, self.segMask_TN_update,
-    #                                                  weights=self.class_weight)
-    #     self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
-    #                                                  weights=self.class_weight)
-    #     self.loss_thermal[self.T] += self.compute_loss('thermal', self.real_TN, self.remapped_T, self.real_N,
-    #                                                    self.segMask_TN_update, weights=self.class_weight)
-    #     self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
-    #
-    #     if self.real_D_T is not None:
-    #         encoded_TD, _, _, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
-    #         encoded_D = self.netG.encode(real_D, from_=self.D).detach()
-    #         self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
-    #         self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
-    #                                                          criterion_lambda='color_day')
-    #         mask_proj = (real_D.mean(dim=1, keepdim=True) == 0.5).float() * (real_D.std(dim=1, keepdim=True) == 0).float()
-    #         mask_lum = (real_D.mean(dim=1, keepdim=True) < 0.95).float() * (1-mask_proj)
-    #         self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
-    #                                                          real_D*mask_lum, loss_name='color_day',
-    #                                                          criterion_lambda='color_day')
-    #     # endregion
-    #
-    #     # combined loss
-    #     self.sum_losses().backward()
-
     def backward_G(self):
+        self.pred_real_D = self.netD(self.real_D, from_=self.D)
+        self.pred_real_T = self.netD(self.real_T, from_=self.T)
+
         encoded_D = self.netG.encode(self.real_D, from_=self.D)
         encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
                                                                                   from_=self.T, epoch=self.epoch)
-        self.create_TN()
-        self.pred_real_D = self.netD(self.real_D, from_=self.D)
-        self.pred_real_T = self.netD(self.real_TN, from_=self.T)
 
         # region Identity "auto-encode" loss
         if self.lambda_id > 0:
@@ -655,10 +455,10 @@ class Image2ImageGAT_Dual(nn.Module):
         self.fake_T = self.netG.decode(encoded_D, to_=self.T)
         # self.fake_T = self.netG.fusion.thermal_postprocess(self.fake_T)
         self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T),
-                                                 self.real_TN, self.pred_real_T, self.fake_T, False, loss_name='G')
+                                                 self.remapped_T, self.pred_real_T, self.fake_T, False, loss_name='G')
         """D_N(G_N(T))"""
         self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T),
-                                                 self.real_TN, self.pred_real_T, self.fake_TN, False, loss_name='G')
+                                                 self.remapped_T, self.pred_real_T, self.fake_TN, False, loss_name='G')
         """D_D(G_D(T))"""
         self.fake_D = self.netG.decode(encoded_TN, to_=self.D)
         self.loss_G[self.D] += self.compute_loss('gan', partial(self.netD, from_=self.D), self.real_D,
@@ -673,8 +473,9 @@ class Image2ImageGAT_Dual(nn.Module):
         # Backward
         rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
         self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
-        # self.rec_T = self.rec_TN
-        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_TN, self.fake_TN)
+        self.rec_T = self.rec_TN
+        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.fake_TN,
+                                                     loss_name='cycle', criterion_lambda='thermal')
         # endregion
 
         # region Cycle loss on Latent Space
@@ -686,10 +487,10 @@ class Image2ImageGAT_Dual(nn.Module):
         # region Fusion Loss
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
-        self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_TN[:, :1].repeat(1, 3, 1, 1),
-                                                   -gray_N.repeat(1, 3, 1, 1), loss_name='fus', criterion_lambda='fus')
-        self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_TN[:, :1].repeat(1, 3, 1, 1),
-                                                   self.remapped_T, loss_name='fus', criterion_lambda='fus')
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_T, -gray_N.repeat(1, 3, 1, 1),
+                                                   loss_name='fus', criterion_lambda='fus')
+        self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
+                                                   loss_name='fus', criterion_lambda='fus')
         # endregion
 
         # region Total Variation loss
@@ -703,11 +504,15 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region ACL
+        # First step : Learning to translate Day color traffic lights to Thermal traffic lights
         if self.lambda_trafficlight_l > 0.0:
             self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
+            total_mask = segMask_com | contourMask
             encoded_TN, self.TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
                                                                                from_=self.T, align_first=False)
+            # self.fake_T_com = self.fake_T * (~total_mask) + self.TN_com * total_mask
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
+            # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
             self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
             self.loss_trafficlight[self.N] += self.compute_loss('tll2', self.N_com, self.remapped_T_com, self.TN_com,
@@ -722,7 +527,7 @@ class Image2ImageGAT_Dual(nn.Module):
         # region Structure-Gradient Alignment loss
         self.loss_sga[self.D] += self.compute_loss('sga', self.edges_D, self.get_gradmag(self.fake_T))
         self.loss_sga[self.D] += self.compute_loss('IRClsDis', self.segMask_D,
-                                                   self.fake_T[:, :1],
+                                                   self.fake_T.mean(dim=1, keepdim=True),
                                                    criterion_lambda='ssim', loss_name='sga')
         self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, self.segMask_TN_update,
                                                    self.fake_T, self.real_D, self.remapped_T,
@@ -730,8 +535,9 @@ class Image2ImageGAT_Dual(nn.Module):
                                                    criterion_lambda='bc', loss_name='sga')
         self.loss_sga[self.T] += self.compute_loss('sga', self.get_gradmag(self.fake_TN), self.get_gradmag(self.fake_D))
         self.loss_sga[self.T] += self.compute_loss('IRClsDis', self.segMask_TN_update if
-                                                   self.segMask_TN_update is not None else self.segMask_TN,
-                                                   self.fake_TN[:, :1], criterion_lambda='ssim', loss_name='sga')
+        self.segMask_TN_update is not None else self.segMask_TN,
+                                                   self.fake_TN.mean(dim=1, keepdim=True),
+                                                   criterion_lambda='ssim', loss_name='sga')
         # endregion
 
         # region Scale Robustness Loss
@@ -776,7 +582,7 @@ class Image2ImageGAT_Dual(nn.Module):
         # endregion
 
         # region Color/Thermal loss
-        self.loss_color[self.T] += self.compute_loss('color', self.fake_D, self.fake_TN, self.segMask_TN_update,
+        self.loss_color[self.T] += self.compute_loss('color', self.fake_D, self.real_N, self.segMask_TN_update,
                                                      weights=self.class_weight)
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
@@ -784,29 +590,195 @@ class Image2ImageGAT_Dual(nn.Module):
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
 
-        if self.real_D_T is not None and self.lambda_color_day > 0.0:
+        if self.real_D_T is not None:
             encoded_TD, _, _, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
             encoded_D = self.netG.encode(real_D, from_=self.D).detach()
             self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
             self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
                                                              criterion_lambda='color_day')
-            mask_proj = (real_D.mean(dim=1, keepdim=True) == 0.5).float() * (
-                        real_D.std(dim=1, keepdim=True) == 0).float()
-            mask_lum = (real_D.mean(dim=1, keepdim=True) < 0.95).float() * (1 - mask_proj)
-            self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day * mask_lum,
-                                                             real_D * mask_lum, loss_name='color_day',
+            mask_proj = (real_D.mean(dim=1, keepdim=True) == 0.5).float() * (real_D.std(dim=1, keepdim=True) == 0).float()
+            mask_lum = (real_D.mean(dim=1, keepdim=True) < 0.95).float() * (1-mask_proj)
+            self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
+                                                             real_D*mask_lum, loss_name='color_day',
                                                              criterion_lambda='color_day')
         # endregion
-
         # combined loss
         self.sum_losses().backward()
+
+    # def backward_G(self):
+    #     encoded_D = self.netG.encode(self.real_D, from_=self.D)
+    #     encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
+    #                                                                               from_=self.T, epoch=self.epoch)
+    #     self.create_TN()
+    #     self.pred_real_D = self.netD(self.real_D, from_=self.D)
+    #     self.pred_real_T = self.netD(self.real_TN, from_=self.T)
+    #
+    #     # region Identity "auto-encode" loss
+    #     if self.lambda_id > 0:
+    #         # Same encoder and decoder should recreate image
+    #         id_D = self.netG.decode(encoded_D, to_=self.D)
+    #         self.loss_id[self.D] += self.compute_loss('id', id_D, self.real_D)
+    #         id_TN = self.netG.decode(encoded_TN, to_=self.T)
+    #         self.loss_id[self.T] += self.compute_loss('id', id_TN, self.fake_TN)
+    #     # endregion
+    #
+    #     # region GAN loss
+    #     """D_T(G_T(D))"""
+    #     self.fake_T = self.netG.decode(encoded_D, to_=self.T)
+    #     # self.fake_T = self.netG.fusion.thermal_postprocess(self.fake_T)
+    #     self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T),
+    #                                              self.real_TN, self.pred_real_T, self.fake_T, False, loss_name='G')
+    #     """D_N(G_N(T))"""
+    #     self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T),
+    #                                              self.real_TN, self.pred_real_T, self.fake_TN, False, loss_name='G')
+    #     """D_D(G_D(T))"""
+    #     self.fake_D = self.netG.decode(encoded_TN, to_=self.D)
+    #     self.loss_G[self.D] += self.compute_loss('gan', partial(self.netD, from_=self.D), self.real_D,
+    #                                              self.pred_real_D, self.fake_D, False, loss_name='G')
+    #     # endregion
+    #
+    #     # region Cycle loss
+    #     #  Forward
+    #     rec_encoded_D = self.netG.encode(self.fake_T, from_=self.T)
+    #     self.rec_D = self.netG.decode(rec_encoded_D, self.D)
+    #     self.loss_cycle[self.D] += self.compute_loss('cycle', self.rec_D, self.real_D)
+    #     # Backward
+    #     rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
+    #     self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
+    #     # self.rec_T = self.rec_TN
+    #     self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_TN, self.fake_TN)
+    #     # endregion
+    #
+    #     # region Cycle loss on Latent Space
+    #     if self.lambda_latent > 0:
+    #         self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
+    #         self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_TN)
+    #     # endregion
+    #
+    #     # region Fusion Loss
+    #     self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
+    #     gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
+    #     self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_TN[:, :1].repeat(1, 3, 1, 1),
+    #                                                -gray_N.repeat(1, 3, 1, 1), loss_name='fus', criterion_lambda='fus')
+    #     self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_TN[:, :1].repeat(1, 3, 1, 1),
+    #                                                self.remapped_T, loss_name='fus', criterion_lambda='fus')
+    #     # endregion
+    #
+    #     # region Total Variation loss
+    #     self.loss_tv[self.T] += self.compute_loss('tv', self.fake_T)
+    #     self.loss_tv[self.N] += self.compute_loss('tv', self.fake_TN)
+    #     self.loss_tv[self.D] += self.compute_loss('tv', self.fake_D)
+    #     # endregion
+    #
+    #     # region Segmentation Distillation Knowledge
+    #     rand_size, seg_IR = self.backward_S()
+    #     # endregion
+    #
+    #     # region ACL
+    #     if self.lambda_trafficlight_l > 0.0:
+    #         self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
+    #         encoded_TN, self.TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
+    #                                                                            from_=self.T, align_first=False)
+    #         self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
+    #         self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
+    #         self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
+    #         self.loss_trafficlight[self.N] += self.compute_loss('tll2', self.N_com, self.remapped_T_com, self.TN_com,
+    #                                                             self.rec_TN_com, self.D_com, self.fake_D_com,
+    #                                                             self.fake_T_com,
+    #                                                             segMask_com, contourMask, weights,
+    #                                                             self.segMask_TN_update,
+    #                                                             loss_name='trafficlight',
+    #                                                             criterion_lambda='trafficlight_f')
+    #     # endregion
+    #
+    #     # region Structure-Gradient Alignment loss
+    #     self.loss_sga[self.D] += self.compute_loss('sga', self.edges_D, self.get_gradmag(self.fake_T))
+    #     self.loss_sga[self.D] += self.compute_loss('IRClsDis', self.segMask_D,
+    #                                                self.fake_T[:, :1],
+    #                                                criterion_lambda='ssim', loss_name='sga')
+    #     self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, self.segMask_TN_update,
+    #                                                self.fake_T, self.real_D, self.remapped_T,
+    #                                                self.rec_D, self.edges_D, self.get_gradmag(self.fake_T),
+    #                                                criterion_lambda='bc', loss_name='sga')
+    #     self.loss_sga[self.T] += self.compute_loss('sga', self.get_gradmag(self.fake_TN), self.get_gradmag(self.fake_D))
+    #     self.loss_sga[self.T] += self.compute_loss('IRClsDis', self.segMask_TN_update if
+    #                                                self.segMask_TN_update is not None else self.segMask_TN,
+    #                                                self.fake_TN[:, :1], criterion_lambda='ssim', loss_name='sga')
+    #     # endregion
+    #
+    #     # region Scale Robustness Loss
+    #     if self.lambda_scale_robustness > 0.0:
+    #         size = self.input_size
+    #         h_ds, w_ds = size[0] // 2, size[1] // 2
+    #         random_crop = RandomCrop((h_ds, w_ds))
+    #         real_T_prep = self.real_T[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
+    #         real_N_prep = self.real_N[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
+    #         fake_D_prep = self.fake_D[..., size[0] // 5:-size[0] // 5, size[1] // 5:-size[1] // 5] * 0.5 + 0.5
+    #
+    #         input_to_crop = torch.cat([real_T_prep, real_N_prep, fake_D_prep], dim=1)
+    #         real_T_ds, real_N_ds, fake_D_ds = random_crop(input_to_crop).split([3, 3, 3], dim=1)
+    #         fake_TN_encoded, _, *_ = self.netG.encode(real_T_ds, real_N_ds, from_=self.T, align_first=False)
+    #         fake_D = self.netG.decode(fake_TN_encoded, to_=self.D)
+    #         self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D, fake_D_ds,
+    #                                                                 loss_name='scale_robustness',
+    #                                                                 criterion_lambda='scale_robustness')
+    #     # endregion
+    #
+    #     # region Domain-specific losses include CGR loss and ACA loss.
+    #     if self.netS.stage in ['freeze_all', 'trained']:
+    #         self.loss_ds[self.T] += self.compute_loss('cgr', self.fake_D, self.segMask_TN_update,
+    #                                                   self.fake_TN, loss_name='ds')
+    #         self.loss_ds[self.D] += self.compute_loss('aca', self.segMask_D_update, encoded_D,
+    #                                                   self.segMask_TN_update, rec_encoded_TN, loss_name='ds',
+    #                                                   criterion_lambda='cgr')
+    #     # endregion
+    #
+    #     # region Attacks stability loss
+    #     if self.lambda_att > 0.0:
+    #         # att_T, att_N = self.att_input(self.real_T, self.real_N, balance=0.5, epsilon=0.25)
+    #         # fake_D_att = self.netG.decode(self.netG.encode(att_T, att_N, from_=self.T, align_first=False)[0],
+    #         #                               to_=self.D)
+    #         # rec_T = self.netG.decode(self.netG.encode(fake_D_att, from_=self.D), to_=self.T)
+    #         # self.loss_att[self.T] += self.compute_loss('att', rec_T, fake_D_att)
+    #         att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1) / 20).repeat(1, 3, 1,
+    #                                                                                                           1)
+    #         self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
+    #         self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att',
+    #                                                    criterion_lambda='att')
+    #     # endregion
+    #
+    #     # region Color/Thermal loss
+    #     self.loss_color[self.T] += self.compute_loss('color', self.fake_D, self.fake_TN, self.segMask_TN_update,
+    #                                                  weights=self.class_weight)
+    #     self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
+    #                                                  weights=self.class_weight)
+    #     self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
+    #                                                    self.segMask_TN_update, weights=self.class_weight)
+    #     self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
+    #
+    #     if self.real_D_T is not None and self.lambda_color_day > 0.0:
+    #         encoded_TD, _, _, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
+    #         encoded_D = self.netG.encode(real_D, from_=self.D).detach()
+    #         self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
+    #         self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
+    #                                                          criterion_lambda='color_day')
+    #         mask_proj = (real_D.mean(dim=1, keepdim=True) == 0.5).float() * (
+    #                     real_D.std(dim=1, keepdim=True) == 0).float()
+    #         mask_lum = (real_D.mean(dim=1, keepdim=True) < 0.95).float() * (1 - mask_proj)
+    #         self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day * mask_lum,
+    #                                                          real_D * mask_lum, loss_name='color_day',
+    #                                                          criterion_lambda='color_day')
+    #     # endregion
+    #
+    #     # combined loss
+    #     self.sum_losses().backward()
 
     def backward_D(self):
         #  D_Thermal
         D = partial(self.netD, from_=self.T)
         # self.loss_D[self.T] += self.compute_loss('gan', D, self.remapped_T, self.pred_real_T,
         #                                          self.fake_T, True, loss_name='D')
-        self.loss_D[self.T] += self.compute_loss('gan', D, self.real_TN, self.pred_real_T,
+        self.loss_D[self.T] += self.compute_loss('gan', D, self.real_T, self.pred_real_T,
                                                  self.fake_T, True, loss_name='D')
         #  D_Day
         D = partial(self.netD, from_=self.D)
@@ -827,12 +799,8 @@ class Image2ImageGAT_Dual(nn.Module):
             rand_scale = torch.randint(8, 20, (1, 1))
             rand_size = int(rand_scale.item() * self.input_size[0] / 16)
 
-            real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
-            real_TN_s = interpolate(self.real_TN, size=rand_size, mode='bilinear', align_corners=False)
-            fake_T_s = interpolate(self.fake_T, size=rand_size, mode='bilinear', align_corners=False)
-            fake_D_s = interpolate(self.fake_D, size=rand_size, mode='bilinear', align_corners=False)
-
             if stage == 'train':
+                real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
                 segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest')
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
                 self.criterion_seg = self.update_class_criterion(segMask_D_s.long())
@@ -844,14 +812,18 @@ class Image2ImageGAT_Dual(nn.Module):
 
             elif stage == 'update_D':
                 # Start updating D seg labels and train Thermal Seg with pseudo TIR images and Day labels
+                real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
+                fake_D_s = interpolate(self.fake_D, size=rand_size, mode='bilinear', align_corners=False)
+                fake_T_s = interpolate(self.fake_T, size=rand_size, mode='bilinear', align_corners=False)
+                fake_TN_s = interpolate(self.fake_TN, size=rand_size, mode='bilinear', align_corners=False)
                 segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
                 segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
-                real_TN_pred_seg = self.netS(real_TN_s, from_=self.T)
+                fake_TN_pred_seg = self.netS(fake_TN_s, from_=self.T)
                 fake_D_pred_seg_d = self.netS(fake_D_s.detach(), from_=self.D)
                 fake_T_pred_seg_d = self.netS(fake_T_s.detach(), from_=self.T)
 
-                self.segMask_D_update = UpdateVisGT(real_TN_s.detach(), segMask_D_s, 0.25).long()
+                self.segMask_D_update = UpdateVisGT(fake_TN_s.detach(), segMask_D_s, 0.25).long()
                 self.criterion_seg = self.update_class_criterion(self.segMask_D_update)
                 ####
                 self.loss_S[self.D] += self.compute_loss('seg', real_D_pred_seg,
@@ -861,50 +833,54 @@ class Image2ImageGAT_Dual(nn.Module):
                 self.loss_seg[self.D] += self.compute_loss('seg', fake_T_pred_seg_d,
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
-                self.segMask_TN_update = (UpdateIRGTv1(real_TN_pred_seg.detach(), fake_D_pred_seg_d,
-                                                       255 * torch.ones_like(segMask_D_s), real_TN_s) *
+                self.segMask_TN_update = (UpdateIRGTv1(fake_TN_pred_seg.detach(), fake_D_pred_seg_d,
+                                                       255 * torch.ones_like(segMask_D_s), fake_TN_s) *
                                           mask_uncertain + ~mask_uncertain * segMask_TN_s)
                 IR_pred_seg = fake_D_pred_seg_d
 
             elif stage == 'update_TN':
+                real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
+                fake_T_s = interpolate(self.fake_T, size=rand_size, mode='bilinear', align_corners=False)
+                fake_D_s = interpolate(self.fake_D, size=rand_size, mode='bilinear', align_corners=False)
+                fake_TN_s = interpolate(self.fake_TN, size=rand_size, mode='bilinear', align_corners=False)
                 segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
                 segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
-                real_T_pred_seg = self.netS(real_TN_s, from_=self.T)
                 fake_D_pred_seg_d = self.netS(fake_D_s.detach(), from_=self.D)
-                fake_TN_pred_seg_d = self.netS(real_TN_s.detach(), from_=self.T)
-                self.segMask_D_update = UpdateVisGT(real_TN_s.detach(), segMask_D_s, 0.25).long()
+                fake_T_pred_seg_d = self.netS(fake_T_s.detach(), from_=self.T)
+                fake_TN_pred_seg_d = self.netS(fake_TN_s.detach(), from_=self.T)
+                self.segMask_D_update = UpdateVisGT(fake_T_s.detach(), segMask_D_s, 0.25).long()
                 self.criterion_seg = self.update_class_criterion(self.segMask_D_update)
                 self.loss_S[self.D] += self.compute_loss('seg', real_D_pred_seg,
                                                          self.segMask_D_update.squeeze(1), loss_name='S')
                 self.loss_S[self.D] += self.compute_loss('semEdge', real_D_pred_seg,
                                                          self.segMask_D_update.squeeze(1), loss_name='S')
-                self.loss_seg[self.D] += self.compute_loss('seg', fake_TN_pred_seg_d,
+                self.loss_seg[self.D] += self.compute_loss('seg', fake_T_pred_seg_d,
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
                 self.segMask_TN_update = (UpdateIRGTv2(fake_TN_pred_seg_d.detach(), fake_D_pred_seg_d, segMask_TN_s,
-                                                       real_TN_s,
-                                                       prob_th=0.9).long() * mask_uncertain + ~mask_uncertain * segMask_TN_s)
+                                          fake_TN_s, prob_th=0.9).long() * mask_uncertain + ~mask_uncertain * segMask_TN_s)
                 self.criterion_seg = self.update_class_criterion(self.segMask_TN_update)
-                self.loss_seg[self.T] += self.compute_loss('seg', real_T_pred_seg.squeeze(1),
+                self.loss_seg[self.T] += self.compute_loss('seg', fake_TN_pred_seg_d.squeeze(1),
                                                            self.segMask_TN_update.squeeze(1))
                 IR_pred_seg = fake_D_pred_seg_d
 
             else:
+                fake_TN_s = interpolate(self.fake_TN, size=rand_size, mode='bilinear', align_corners=False)
+                fake_D_s = interpolate(self.fake_D, size=rand_size, mode='bilinear', align_corners=False)
                 segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
                 segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
-                real_T_pred_seg = self.netS(real_TN_s, from_=self.T)
                 fake_D_pred_seg = self.netS(fake_D_s, from_=self.D)
-                fake_TN_pred_seg = self.netS(real_TN_s, from_=self.T)
+                fake_TN_pred_seg = self.netS(fake_TN_s, from_=self.T)
                 fake_D_pred_seg_d = self.netS(fake_D_s.detach(), from_=self.D)
 
-                self.segMask_D_update = UpdateVisGT(real_TN_s.detach(), segMask_D_s, 0.25).long()
+                self.segMask_D_update = UpdateVisGT(fake_TN_s.detach(), segMask_D_s, 0.25).long()
                 self.criterion_seg = self.update_class_criterion(self.segMask_D_update)
                 self.loss_seg[self.D] += self.compute_loss('seg', fake_TN_pred_seg,
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
-                self.segMask_TN_update = (UpdateIRGTv2(real_T_pred_seg.detach(), fake_D_pred_seg_d, segMask_TN_s,
-                                                       real_TN_s) * mask_uncertain + ~mask_uncertain * segMask_TN_s)
+                self.segMask_TN_update = (UpdateIRGTv2(fake_TN_pred_seg.detach(), fake_D_pred_seg_d, segMask_TN_s,
+                                                       fake_TN_s) * mask_uncertain + ~mask_uncertain * segMask_TN_s)
                 segMask_TN_update_s = interpolate(self.segMask_TN_update.float(), size=rand_size, mode='nearest').long()
                 self.criterion_seg = self.update_class_criterion(segMask_TN_update_s)
                 self.loss_seg[self.T] = self.compute_loss('seg', fake_D_pred_seg,
@@ -1133,7 +1109,8 @@ class Image2ImageGAT_Dual(nn.Module):
                    'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5 + 0.5),
                    'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_TN * 0.5 + 0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5 + 0.5)}
-        out = {lab: ImageTensor(im[0], colorspace='LAB' if ('fake_T' in lab or 'rec_T' in lab) else 'RGB') for lab, im in visuals.items() if im is not None}
+        out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
+        # out = {lab: ImageTensor(im[0], colorspace='LAB' if ('fake_T' in lab or 'rec_T' in lab) else 'RGB') for lab, im in visuals.items() if im is not None}
         out = self.visualizer.display_current_results(out)
         if save:
             self.visualizer.save_current_results({'Training': out}, self.epoch)
