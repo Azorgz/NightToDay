@@ -21,8 +21,8 @@ model:
   gen:
     downscaling: 2
     input_size: 512
-    hidden_dim: 384
-    n_enc_layers: 4
+    hidden_dim: 256
+    n_enc_layers: 5
     n_shared_layers: 2
     n_dec_layers: 5
     dropout: 0.0
@@ -33,11 +33,11 @@ model:
       hidden_dim: 256
       n_enc_layers: 4
       dropout: 0.25
-      n_downscaling: 2
+      n_downscaling: 3
 
   discr:
     base_dim: 64
-    n_layers: 4
+    n_layers: 5
 
 training:
   checkpoint_dir: '/checkpoints'
@@ -49,9 +49,9 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 75
+  start_epoch: 0
   total_epochs: 100
-  resume: True
+  resume: False
   resume_epoch: latest
 #    G2: 100
 #    G3: 100

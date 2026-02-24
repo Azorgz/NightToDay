@@ -673,8 +673,8 @@ class Image2ImageGAT_Dual(nn.Module):
         # Backward
         rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
         self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
-        self.rec_T = self.rec_TN
-        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.fake_TN,
+        # self.rec_T = self.rec_TN
+        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_TN, self.fake_TN,
                                                      loss_name='cycle', criterion_lambda='thermal')
         # endregion
 
@@ -687,10 +687,10 @@ class Image2ImageGAT_Dual(nn.Module):
         # region Fusion Loss
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
-        self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_T, -gray_N.repeat(1, 3, 1, 1),
-                                                   loss_name='fus', criterion_lambda='fus')
-        self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
-                                                   loss_name='fus', criterion_lambda='fus')
+        self.loss_fus[self.N] += self.compute_loss('cycle', self.rec_T[:, :1].repeat(1, 3, 1, 1),
+                                                   -gray_N.repeat(1, 3, 1, 1), loss_name='fus', criterion_lambda='fus')
+        self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T[:, :1].repeat(1, 3, 1, 1),
+                                                   self.remapped_T, loss_name='fus', criterion_lambda='fus')
         # endregion
 
         # region Total Variation loss

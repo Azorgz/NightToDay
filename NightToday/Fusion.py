@@ -395,7 +395,7 @@ class U_ResNetFusion(nn.Module):
             x_feat = layer(x_feat)
         out = self.final_conv(x_feat) * 50 + 50  # scale to [0,100] range for better visualization
         out = lab_to_rgb(torch.cat([out, AB], dim=1)) * 2 - 1  # combine with AB channels
-        return out, ir, vis_night  # match input channels
+        return self.tanh_n(1)(out), ir, vis_night  # match input channels
 
         # filtered_ir = torch.sqrt(bilateral_blur(ir*0.5+0.5, (3, 3), 0.1, (1.5, 1.5)) + 1e-6)
         # out = torch.sqrt((self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)*0.5+0.5) * filtered_ir + 1e-6) * 2 - 1
