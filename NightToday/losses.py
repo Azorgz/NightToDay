@@ -1243,8 +1243,8 @@ class IlluminationAwareFusionLoss(nn.Module):
         loss_high_light = (torch.relu(mask * (I**2 - 0.8))).mean()
         dx_ir, dy_ir = self.gradient(ir)
         dx_TN, dy_TN = self.gradient(TN)
-        loss_TN_consistency = ((dx_ir - dx_TN) ** 2) * mask[..., 1:, 1:] + ((dy_ir - dy_TN) ** 2) * mask[..., 1:, 1:]
-        return loss_high_light + loss_TN_consistency.sum()
+        loss_TN_consistency = (((dx_ir - dx_TN) ** 2) * mask[..., 1:]).sum() + (((dy_ir - dy_TN) ** 2) * mask[..., 1:, :]).sum()
+        return loss_high_light + loss_TN_consistency/2
 
     def structure_consistency(self, R, ir, mask):
         # ensure ir is single channel
