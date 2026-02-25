@@ -35,6 +35,7 @@ class ThermalPreprocessConfig:
     bins: int
     scene: int
 
+
 @dataclass
 class FusConfig:
     preprocess_thermal: ThermalPreprocessConfig
@@ -42,6 +43,7 @@ class FusConfig:
     n_enc_layers: 4
     dropout: 0.25
     n_downscaling: 2
+    type: Literal['IAware', 'UNet']
 
 
 @dataclass

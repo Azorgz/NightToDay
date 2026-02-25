@@ -34,6 +34,7 @@ model:
       n_enc_layers: 4
       dropout: 0.25
       n_downscaling: 2
+      type: IAware  # 'IAware' # 'UNet'
 
   discr:
     base_dim: 64

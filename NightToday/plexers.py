@@ -143,9 +143,12 @@ class G_Plexer(Plexer):
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
         fus = opt.fus
-        self.fusion = IlluminationAwareFusion(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
+        if opt.fus.type == 'UNet':
+            fusion_module = U_ResNetFusion
+        else:
+            fusion_module = IlluminationAwareFusion
+        self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
                                      n_downscaling=fus.n_downscaling, thermal_preprocessCfg=fus.preprocess_thermal)
-        # U_ResNetFusion
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
         self.networks: list = self.encoders + self.decoders + [self.fusion]

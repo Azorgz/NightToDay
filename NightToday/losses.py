@@ -1238,9 +1238,13 @@ class IlluminationAwareFusionLoss(nn.Module):
         dx, dy = self.gradient(I)
         return (dx ** 2).mean() + (dy ** 2).mean()
 
-    def highlight_suppression(self, I, mask):
+    def highlight_suppression(self, I, ir, TN, mask):
         # penalize illumination in highlight regions
-        return (torch.relu(mask * (I**2 - 0.8))).mean()
+        loss_high_light = (torch.relu(mask * (I**2 - 0.8))).mean()
+        dx_ir, dy_ir = self.gradient(ir)
+        dx_TN, dy_TN = self.gradient(TN)
+        loss_TN_consistency = ((dx_ir - dx_TN) ** 2) * mask[..., 1:] + ((dy_ir - dy_TN) ** 2) * mask[..., 1:, :]
+        return loss_high_light + loss_TN_consistency.sum()
 
     def structure_consistency(self, R, ir, mask):
         # ensure ir is single channel
@@ -1256,10 +1260,10 @@ class IlluminationAwareFusionLoss(nn.Module):
     # Forward
     # ---------------------------------------------------------
 
-    def forward(self, I, R, mask, ir):
+    def forward(self, I, R, mask, ir, TN):
 
         L_smooth = self.illumination_smoothness(I)
-        L_highlight = self.highlight_suppression(I, mask)
+        L_highlight = self.highlight_suppression(I, ir, TN, mask)
         L_structure = self.structure_consistency(R, ir, mask)
 
         return (
