@@ -143,7 +143,9 @@ class G_Plexer(Plexer):
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
         fus = opt.fus
-        if opt.fus.type == 'UNet':
+        if not hasattr(fus, 'type'):
+            fus.type = 'IAware'
+        if fus.type == 'UResNet':
             fusion_module = U_ResNetFusion
         else:
             fusion_module = IlluminationAwareFusion

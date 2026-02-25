@@ -20,7 +20,7 @@ model:
 
   gen:
     downscaling: 2
-    input_size: 512
+    input_size: 256
     hidden_dim: 384
     n_enc_layers: 4
     n_shared_layers: 2
@@ -34,7 +34,7 @@ model:
       n_enc_layers: 4
       dropout: 0.25
       n_downscaling: 2
-      type: IAware  # 'IAware' # 'UNet'
+      type: IAware  # 'IAware' # 'UResNet'
 
   discr:
     base_dim: 64
