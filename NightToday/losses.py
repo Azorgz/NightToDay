@@ -1195,54 +1195,78 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
     return losses
 
 
-def TrafLighLumiLoss(mask, contour, fake_D, rec_D, real_D, fake_T, fused_TN, real_T, weights):
-    "Traffic Light Luminance Loss. fake_img: fake vis image. fake_mask: IR seg mask. real_mask: Vis seg mask."
-    B, _, h, w = rec_D.shape
-    _, _, seg_h, seg_w = mask.shape
-    if (h != seg_h) or (w != seg_w):
-        mask = F.interpolate(mask.float(), size=[h, w], mode='nearest')
-    mask_total = mask | contour
-    labels = connected_components(mask_total.float())
-    uniques, counts = labels.unique(return_counts=True)
-    losses = torch.zeros([B], device=rec_D.device)
+class IlluminationAwareFusionLoss(nn.Module):
+    """
+    Combined loss for unpaired illumination-aware fusion.
 
-    for b in range(B):
-        for label, count in zip(uniques, counts):
-            if label == 0:
-                continue
-            mask_ = (labels[b:b + 1] == label).float() * mask[b:b + 1]
-            contour_ = (labels[b:b + 1] == label).float() * contour[b:b + 1]
-            mask_total_ = mask_ + contour_
-            weight = (weights[b:b + 1] * mask_).sum() / (mask_.sum() + 1e-6)
-            losses[b] += PixelConsistencyLoss(rec_D[b:b + 1], real_D[b:b + 1], mask_) * weight
-            losses[b] += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], mask_) * weight
-            # T_ref = real_T[b:b+1] * contour_ + fake_T[b:b+1] * mask_
-            # losses[b] += PixelConsistencyLoss(fused_TN[b:b+1], T_ref[b:b+1], mask_total_) * 2. * weight
-            # losses[b] += torch.relu(fused_TN[b:b+1].mean(1, keepdim=True)[mask_.bool()].min() -
-            #                         fake_T[b:b+1].mean(1, keepdim=True)[mask_.bool()].min()) * 2. * weight
+    Inputs:
+        I     : Illumination map        (B,1,H,W) in [0,1]
+        R     : Reflectance map         (B,1,H,W) in [-1,1]
+        ir    : Original IR image       (B,3,H,W) or (B,1,H,W) in [-1,1]
+        mask  : Highlight mask          (B,1,H,W) in [0,1]
 
-    return losses.sum()
+    Returns:
+        total_loss, dict_of_components
+    """
 
+    def __init__(
+        self,
+        lambda_structure=7.0,
+        lambda_smooth=1.0,
+        lambda_highlight=1.
+    ):
+        super().__init__()
+        self.lambda_structure = lambda_structure
+        self.lambda_smooth = lambda_smooth
+        self.lambda_highlight = lambda_highlight
 
-# def TrafLighLumiLoss(fake_D, fake_mask, real_N, real_T):
-#     "Traffic Light Luminance Loss. fake_img: fake vis image. fake_mask: IR seg mask. real_mask: Vis seg mask."
-#     _, _, h, w = fake_D.shape
-#     _, _, seg_h, seg_w = fake_mask.shape
-#     if (h != seg_h) or (w != seg_w):
-#         fake_mask = F.interpolate(fake_mask.float(), size=[h, w], mode='nearest').long()
-#
-#     fake_D_norm = (fake_D + 1.0) * 0.5
-#     real_T_norm = (real_T + 1.0) * 0.5
-#     real_N_norm = (real_N + 1.0) * 0.5
-#
-#     fake_vis_Light_DR_Mean, fake_vis_Light_area, fake_vis_Light_BR_Min, _ = \
-#         getLightDarkRegionMean(TRAFFICLIGHT, fake_D_norm, fake_mask, real_T_norm.detach(), real_N_norm.detach())
-#     if fake_vis_Light_area > 100:
-#         losses = F.relu(fake_vis_Light_DR_Mean - fake_vis_Light_BR_Min) / (fake_vis_Light_BR_Min.detach() + 1e-6)
-#     else:
-#         losses = 0.
-#
-#     return losses
+    # ---------------------------------------------------------
+    # Gradient utility
+    # ---------------------------------------------------------
+
+    @staticmethod
+    def gradient(x):
+        dx = x[:, :, :, 1:] - x[:, :, :, :-1]
+        dy = x[:, :, 1:, :] - x[:, :, :-1, :]
+        return dx, dy
+
+    # ---------------------------------------------------------
+    # Loss components
+    # ---------------------------------------------------------
+
+    def illumination_smoothness(self, I):
+        dx, dy = self.gradient(I)
+        return (dx ** 2).mean() + (dy ** 2).mean()
+
+    def highlight_suppression(self, I, mask):
+        # penalize illumination in highlight regions
+        return (torch.relu(mask * (I**2 - 0.8))).mean()
+
+    def structure_consistency(self, R, ir, mask):
+        # ensure ir is single channel
+        if ir.shape[1] == 3:
+            ir = ir.mean(dim=1, keepdim=True)
+
+        dx_r, dy_r = self.gradient(R)
+        dx_ir, dy_ir = self.gradient(ir)
+
+        return (((dx_r - dx_ir) ** 2)*(mask[..., 1:]+1)).mean() + (((dy_r - dy_ir) ** 2)*(mask[..., 1:, :]+1)).mean()
+
+    # ---------------------------------------------------------
+    # Forward
+    # ---------------------------------------------------------
+
+    def forward(self, I, R, mask, ir):
+
+        L_smooth = self.illumination_smoothness(I)
+        L_highlight = self.highlight_suppression(I, mask)
+        L_structure = self.structure_consistency(R, ir, mask)
+
+        return (
+                self.lambda_structure * L_structure +
+                self.lambda_smooth * L_smooth +
+                self.lambda_highlight * L_highlight
+               )
 
 
 def CondGradRepaLoss(fake_img, fake_mask, fake_grad, real_grad):

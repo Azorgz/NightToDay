@@ -9,7 +9,7 @@ from torch import nn
 from torch.nn.functional import interpolate
 
 from . import GenConfig, TrainConfig, SegConfig, DiscrConfig
-from .Fusion import U_ResNetFusion
+from .Fusion import U_ResNetFusion, IlluminationAwareFusion
 from .LETNet import LETNet
 from .discriminators import NLayerDiscriminatorSN
 from .generators import ResnetGenEncoder, ResnetGenDecoder, ResnetBlock
@@ -143,8 +143,9 @@ class G_Plexer(Plexer):
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
         fus = opt.fus
-        self.fusion = U_ResNetFusion(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
+        self.fusion = IlluminationAwareFusion(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
                                      n_downscaling=fus.n_downscaling, thermal_preprocessCfg=fus.preprocess_thermal)
+        # U_ResNetFusion
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
         self.networks: list = self.encoders + self.decoders + [self.fusion]
@@ -166,7 +167,7 @@ class G_Plexer(Plexer):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
         return_im = False
         if len(args) and self.fusion_first:
-            x, ir, n = self.fusion(x, *args, **kwargs)
+            x, ir, n, *other = self.fusion(x, *args, **kwargs)
             return_im = True
         elif len(args) and not self.fusion_first:
             x = torch.cat((x, *args), dim=1)
@@ -187,7 +188,7 @@ class G_Plexer(Plexer):
         output = self.encoders[self.names_domains[from_]](x)
         output = self.shared_encoder(output)
         if return_im:
-            return output, x, ir, n
+            return output, x, ir, n, *other
         return output
 
     def clean_IR(self, ir):

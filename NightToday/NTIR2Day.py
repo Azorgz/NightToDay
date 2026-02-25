@@ -36,7 +36,7 @@ from . import OptImage2ImageGATConfig
 from . import get_config
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
-    ThermalLoss, SharpFusionLoss, TrafLighLumiLoss, PixelConsistencyLoss, \
+    ThermalLoss, SharpFusionLoss, IlluminationAwareFusionLoss, PixelConsistencyLoss, \
     TrafLighLumiLoss_TN, ForegroundContourLoss
 from .modules import LossScheduler, Get_gradmag_gray
 from .plexers import G_Plexer, D_Plexer, S_Plexer
@@ -137,10 +137,9 @@ class Image2ImageGAT_Dual(nn.Module):
             self.criterion_sga = StructuralGradientLoss(8, 0.8)
             self.criterion_IRClsDis = FakeIRPersonLoss
             self.criterion_bc = BiasCorrLoss
-            self.criterion_tll2 = TrafLighLumiLoss_TN
-            self.criterion_tll = TrafLighLumiLoss
-            # self.criterion_tlc = TL_color_loss
+            self.criterion_tll = TrafLighLumiLoss_TN
             self.criterion_tlc = PixelConsistencyLoss
+            self.criterion_illum = IlluminationAwareFusionLoss()
 
             # Losses storage
             self.initialize_losses()
@@ -438,8 +437,8 @@ class Image2ImageGAT_Dual(nn.Module):
         self.pred_real_T = self.netD(self.real_T, from_=self.T)
 
         encoded_D = self.netG.encode(self.real_D, from_=self.D)
-        encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
-                                                                                  from_=self.T, epoch=self.epoch)
+        encoded_TN, self.fake_TN, self.remapped_T, self.real_N, *other = self.netG.encode(self.real_T, self.real_N,
+                                                                                          from_=self.T, epoch=self.epoch)
 
         # region Identity "auto-encode" loss
         if self.lambda_id > 0:
@@ -491,6 +490,9 @@ class Image2ImageGAT_Dual(nn.Module):
                                                    loss_name='fus', criterion_lambda='fus')
         self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
                                                    loss_name='fus', criterion_lambda='fus')
+        if not (None in other):
+            self.loss_fus[self.T] += self.compute_loss('illum', *other, self.remapped_T,
+                                                   loss_name='fus', criterion_lambda='illumination_aware')
         # endregion
 
         # region Total Variation loss
@@ -505,23 +507,23 @@ class Image2ImageGAT_Dual(nn.Module):
 
         # region ACL
         # First step : Learning to translate Day color traffic lights to Thermal traffic lights
-        if self.lambda_trafficlight_l > 0.0:
+        if self.lambda_trafficlight > 0.0:
             self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
             total_mask = segMask_com | contourMask
-            encoded_TN, self.TN_com, self.remapped_T_com, _ = self.netG.encode(self.T_com, self.N_com,
+            encoded_TN, self.TN_com, self.remapped_T_com, *_ = self.netG.encode(self.T_com, self.N_com,
                                                                                from_=self.T, align_first=False)
             # self.fake_T_com = self.fake_T * (~total_mask) + self.TN_com * total_mask
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
             # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
             self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
-            self.loss_trafficlight[self.N] += self.compute_loss('tll2', self.N_com, self.remapped_T_com, self.TN_com,
+            self.loss_trafficlight[self.N] += self.compute_loss('tll', self.N_com, self.remapped_T_com, self.TN_com,
                                                                 self.rec_TN_com, self.D_com, self.fake_D_com,
                                                                 self.fake_T_com,
                                                                 segMask_com, contourMask, weights,
                                                                 self.segMask_TN_update,
                                                                 loss_name='trafficlight',
-                                                                criterion_lambda='trafficlight_f')
+                                                                criterion_lambda='trafficlight')
         # endregion
 
         # region Structure-Gradient Alignment loss
@@ -551,7 +553,7 @@ class Image2ImageGAT_Dual(nn.Module):
 
             input_to_crop = torch.cat([real_T_prep, real_N_prep, fake_D_prep], dim=1)
             real_T_ds, real_N_ds, fake_D_ds = random_crop(input_to_crop).split([3, 3, 3], dim=1)
-            fake_TN_encoded, _, *_ = self.netG.encode(real_T_ds, real_N_ds, from_=self.T, align_first=False)
+            fake_TN_encoded, *_ = self.netG.encode(real_T_ds, real_N_ds, from_=self.T, align_first=False)
             fake_D = self.netG.decode(fake_TN_encoded, to_=self.D)
             self.loss_scale_robustness[self.T] += self.compute_loss('cycle', fake_D, fake_D_ds,
                                                                     loss_name='scale_robustness',
@@ -591,7 +593,7 @@ class Image2ImageGAT_Dual(nn.Module):
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
 
         if self.real_D_T is not None:
-            encoded_TD, _, _, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
+            encoded_TD, _, _, real_D, *_ = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
             encoded_D = self.netG.encode(real_D, from_=self.D).detach()
             self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
             self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',

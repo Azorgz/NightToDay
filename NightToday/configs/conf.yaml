@@ -84,12 +84,12 @@ training:
     lambda_att: [[ 40, ], 0.] # 1.0
     lambda_fus: [[ 0,  2], 5.0]
     lambda_scale_robustness: [[ 75,  ], 1.0] # 1.0
-    lambda_trafficlight_l: [[ 10,  ], 0.1] # 0.01
-    lambda_trafficlight_f: [[ 10,  ], 0.2] # 0.2
+    lambda_trafficlight: [[ 10,  ], 0.2] # 0.2
+    lambda_illumination_aware: [[ 0,  ], 1.0]
     lambda_thermal: [[ 1,  ], 2.0]
     lambda_contour: [[ 20,  ], 2.0]
-    lambda_sharpness: [[ 0,  ], 20.0]
-    lambda_cgr: [[ 5, ], 2.5]  # Conditional Gradient Repair
+    lambda_sharpness: [[ 0,  ], 25.0]
+    lambda_cgr: [[ 5, ], 3.5]  # Conditional Gradient Repair
     lambda_bc: [[ 5, ], 2.0]  # Bias correction Loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
 
