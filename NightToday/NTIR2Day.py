@@ -490,9 +490,9 @@ class Image2ImageGAT_Dual(nn.Module):
                                                    loss_name='fus', criterion_lambda='fus')
         self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
                                                    loss_name='fus', criterion_lambda='fus')
-        # if not (None in other):
-            # self.loss_fus[self.T] += self.compute_loss('illum', *other, self.remapped_T, self.real_N,
-            #                                            self.fake_TN, loss_name='fus', criterion_lambda='illumination_aware')
+        if not (None in other):
+            self.loss_fus[self.T] += self.compute_loss('illum', *other, self.remapped_T, self.real_N,
+                                                       self.fake_TN, loss_name='fus', criterion_lambda='illumination_aware')
         # endregion
 
         # region Total Variation loss
