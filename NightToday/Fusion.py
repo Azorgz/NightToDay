@@ -685,8 +685,8 @@ class IlluminationAwareFusion(nn.Module):
         I = self.illumination_head(decoded_feat)
 
         # Suppress illumination in highlights
-        I = I * (1 - mask)
+        I = I * 2 - 1
 
-        fake_ir = R * (I * 2 - 1)  # combine reflectance and illumination, scale to [-1,1]
+        fake_ir = R * I  # combine reflectance and illumination, scale to [-1,1]
 
         return fake_ir.repeat(1, 3, 1, 1), ir, vis_night, I, R, mask
