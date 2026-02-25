@@ -1267,7 +1267,7 @@ class IlluminationAwareFusionLoss(nn.Module):
 
         L_smooth = self.illumination_smoothness(I)
         L_highlight = self.highlight_suppression(I, T, TN, mask)
-        L_structure = self.structure_consistency(R, T, mask)
+        L_structure = self.structure_consistency(R, T, N, mask)
 
         return (
                 self.lambda_structure * L_structure +
