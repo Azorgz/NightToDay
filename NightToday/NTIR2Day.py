@@ -215,8 +215,8 @@ class NightToDay(nn.Module):
         if self.opt.training.resume or self.opt.model.mode == 'test':
             if checkpoint is None:
                 assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
-                save_filename = f'{epoch}_net_{self.model_name}'
-                path = (os.getcwd() + '/checkpoints/NightToday/') if 'laptop' in socket.gethostname() else \
+                save_filename = f'{epoch}_net_{self.model_name}_{self.opt.model.gen.fus.type}'
+                path = (os.getcwd() + '/checkpoints/download/weights') if 'laptop' in socket.gethostname() else \
                     '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
                 save_path = os.path.join(path, save_filename)
                 checkpoint = torch.load(save_path, weights_only=False, map_location='cpu')

@@ -1212,7 +1212,7 @@ class IlluminationAwareFusionLoss(nn.Module):
     def __init__(
         self,
         lambda_structure=1.0,
-        lambda_smooth=1.0,
+        lambda_smooth=0.5,
         lambda_highlight=5.,
         lambda_gamma=0.2
     ):
@@ -1239,13 +1239,13 @@ class IlluminationAwareFusionLoss(nn.Module):
     def illumination_smoothness(self, I, T):
         dx, dy = self.gradient(I)
         dx_T, dy_T = self.gradient(T)
-        dx = dx * torch.exp(-torch.mean(torch.abs(dx_T), dim=1, keepdim=True))
-        dy = dy * torch.exp(-torch.mean(torch.abs(dy_T), dim=1, keepdim=True))
+        dx = dx * torch.exp(-torch.mean(torch.relu(dx - dx_T), dim=1, keepdim=True))
+        dy = dy * torch.exp(-torch.mean(torch.relu(dy - dy_T), dim=1, keepdim=True))
         return (dx ** 2).mean() + (dy ** 2).mean()
 
     def highlight_suppression(self, I, T, TN, R, mask):
         # penalize illumination in highlight regions
-        loss_high_light = (torch.relu(mask * (R.detach() - I))).mean()
+        loss_high_light = (torch.relu(mask * (R.detach() - I))).sum()
         loss_high_light += (torch.relu(mask * (1 - R))).mean() * 2
         loss_struct = (torch.relu(T * I - TN**2) * mask).mean()
         return loss_high_light + loss_struct
