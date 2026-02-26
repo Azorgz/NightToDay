@@ -1242,9 +1242,8 @@ class IlluminationAwareFusionLoss(nn.Module):
 
     def highlight_suppression(self, I, T, TN, mask):
         # penalize illumination in highlight regions
-        I_n = I ** 2
-        loss_high_light = (torch.relu(mask * (T - I_n))).mean()
-        loss_struct = (torch.relu(T * I_n - TN**2) * mask).mean()
+        loss_high_light = (torch.relu(mask * (I - T.detach()))).mean()
+        loss_struct = (torch.relu(T * I - TN**2) * mask).mean()
         return loss_high_light + loss_struct
 
     def correlation_I_N_gamma(self, I, N, mask):
@@ -1252,17 +1251,13 @@ class IlluminationAwareFusionLoss(nn.Module):
         corr = ((I * C) * (1 - mask)).sum(dim=[1, 2, 3]) / torch.sqrt((I**2 * (1-mask)).sum(dim=[1, 2, 3]) * (C**2 * (1-mask)).sum(dim=[1, 2, 3]) + 1e-6)
         return 1 - corr.mean()
 
-    def structure_consistency(self, R, T, N, mask):
+    def structure_consistency(self, R, T, mask):
         # ensure T is single channel
         if T.shape[1] == 3:
             T = T.mean(dim=1, keepdim=True)
-        if N.shape[1] == 3:
-            N = N.mean(dim=1, keepdim=True)
         dx_r, dy_r = self.gradient(R)
         dx_T, dy_T = self.gradient(T)
-        dx_N, dy_N = self.gradient(N)
         loss_struct = ((torch.relu(dx_T - dx_r))*(mask[..., 1:]+1)).mean() + ((torch.relu(dy_T - dy_r))*(mask[..., 1:, :]+1)).mean() * 0.9
-        loss_struct += ((torch.relu(dx_N - dx_r))*(1-mask[..., 1:])).mean() + ((torch.relu(dy_N - dy_r))*(1-mask[..., 1:, :])).mean() * 0.1
         return loss_struct
 
     # ---------------------------------------------------------
@@ -1273,7 +1268,7 @@ class IlluminationAwareFusionLoss(nn.Module):
 
         L_smooth = self.illumination_smoothness(I)
         L_highlight = self.highlight_suppression(I, T, TN, mask)
-        L_structure = self.structure_consistency(R, T, N, mask)
+        L_structure = self.structure_consistency(R, T, mask)
         L_gamma = self.correlation_I_N_gamma(I, N, mask)
 
         return (
