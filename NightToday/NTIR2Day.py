@@ -212,38 +212,18 @@ class Image2ImageGAT_Dual(nn.Module):
     def load(self, epoch: str | int | dict, return_checkpoint: bool = False,
              checkpoint: dict = None) -> OrderedDict | None:
         if self.opt.training.resume or self.opt.model.mode == 'test':
-            if not self.opt.training.split_weights:
-                if checkpoint is None:
-                    assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
-                    save_filename = f'{epoch}_net_{self.model_name}'
-                    path = (os.getcwd() + '/checkpoints/NightToday/') if 'laptop' in socket.gethostname() else \
-                        '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
-                    save_path = os.path.join(path, save_filename)
-                    checkpoint = torch.load(save_path, weights_only=False, map_location='cpu')
-                    if return_checkpoint:
-                        return checkpoint
-                for net_label in ['G', 'D', 'S'] if self.mode == 'train' else ['G']:
-                    net = getattr(self, f'net{net_label}')
-                    net.load_weights(checkpoint[net_label])
-            else:
-                for net_label in ['G', 'D', 'S'] if self.mode == 'train' else ['G']:
-                    net = getattr(self, f'net{net_label}')
-                    if isinstance(epoch, dict):
-                        epoch_net = {k: e for k, e in epoch.items() if net_label in k}
-                    else:
-                        epoch_net = epoch
-                    self._load_network(net, epoch_net)
-
-    def _load_network(self, network, epoch):
-        if isinstance(epoch, (str, int)):
-            save_filename = f'{epoch}_net_'
-            save_path = os.path.join(self.checkpoint_dir, save_filename)
-        elif isinstance(epoch, dict):
-            save_filename = [f'{e}_net_{network_label}' for network_label, e in epoch.items()]
-            save_path = [os.path.join(self.checkpoint_dir, fn) for fn in save_filename]
-        else:
-            raise ValueError("epoch must be str, int, or dict.")
-        network.load_split_weights(save_path)
+            if checkpoint is None:
+                assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
+                save_filename = f'{epoch}_net_{self.model_name}'
+                path = (os.getcwd() + '/checkpoints/NightToday/') if 'laptop' in socket.gethostname() else \
+                    '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
+                save_path = os.path.join(path, save_filename)
+                checkpoint = torch.load(save_path, weights_only=False, map_location='cpu')
+                if return_checkpoint:
+                    return checkpoint
+            for net_label in ['G', 'D', 'S'] if self.mode == 'train' else ['G']:
+                net = getattr(self, f'net{net_label}')
+                net.load_weights(checkpoint[net_label])
 
     def set_partial_train(self):
         if self.opt.training.split_optimizers is False:
