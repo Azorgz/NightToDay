@@ -563,7 +563,7 @@ def gradient(x):
     return dx, dy
 
 
-def highlight_mask(vis, threshold=0.9, softness=15.0):
+def highlight_mask(vis, threshold=1.25, softness=10.0):
     # vis in [-1,1] → convert to [0,1]
     vis = (vis + 1) * 0.5
     lum = 0.299 * vis[:, 0:1] + \
