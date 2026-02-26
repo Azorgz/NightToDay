@@ -48,12 +48,12 @@ from .visualizers import Visualizer
 # ------------------------ Main GAT Class ------------------------ #
 
 
-class Image2ImageGAT_Dual(nn.Module):
+class NightToDay(nn.Module):
     """
     Full training-ready module for thermal+night -> day translation.
     """
     _partial_train_net: dict[str, list[int]]
-    model_name = 'ResNet'
+    model_name = 'NightToDay'
 
     def __init__(self, opt: OptImage2ImageGATConfig | str | Path | dict | None = None,
                  *args, trainable: bool = False, **kwargs):
@@ -66,6 +66,7 @@ class Image2ImageGAT_Dual(nn.Module):
         self.opt.model.gen.fusion_first = self.opt.model.fusion_first
         self.opt.model.discr.fusion_first = self.opt.model.fusion_first
         self.opt.model.seg.fusion_first = self.opt.model.fusion_first
+        self.model_name += f"_{self.opt.model.gen.fus.type}"
 
         if self.mode == 'test':
             self.opt.model.gen.input_size = -1

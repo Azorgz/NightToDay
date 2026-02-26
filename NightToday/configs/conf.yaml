@@ -79,7 +79,7 @@ training:
     lambda_seg:  [[ 1, ], 1.0]
     lambda_semEdge:  [[ 1,  ], .5]
     lambda_gan:  [[ 0,  ], 1.0]
-    lambda_tv:  [[ 1,  ], 5.0]
+    lambda_tv:  [[ 1,  ], 3.0]
     lambda_sga: [[ 40,  ], 1.0]
     lambda_latent: [[ 0, 1], 0.1]
     lambda_att: [[ 40, ], 0.] # 1.0
