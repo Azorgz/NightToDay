@@ -1255,14 +1255,15 @@ class IlluminationAwareFusionLoss(nn.Module):
         corr = ((I * C) * (1 - mask)).sum(dim=[1, 2, 3]) / torch.sqrt((I**2 * (1-mask)).sum(dim=[1, 2, 3]) * (C**2 * (1-mask)).sum(dim=[1, 2, 3]) + 1e-6)
         return 1 - corr.mean()
 
-    def structure_consistency(self, R, T, mask):
+    def structure_consistency(self, R, T, N, mask):
         # ensure T is single channel
         if T.shape[1] == 3:
             T = T.mean(dim=1, keepdim=True)
         dx_r, dy_r = self.gradient(R)
         dx_T, dy_T = self.gradient(T)
-        loss_struct = ((torch.relu(dx_T - dx_r)*(mask[..., 1:])).mean() +
-                       (torch.relu(dy_T - dy_r)*(mask[..., 1:, :])).mean())
+        dx_N, dy_N = self.gradient(N)
+        loss_struct = torch.relu(dx_T - dx_r).mean() + torch.relu(dy_T - dy_r).mean()
+        loss_struct += (torch.relu(dx_N - dx_r) * mask[..., 1:]).mean() + (torch.relu(dy_N - dy_r)*mask[..., 1:, :]).mean()
         return loss_struct
 
     # ---------------------------------------------------------
