@@ -3,7 +3,7 @@ os.environ["PYTORCH_CUDA_ALLOC_CONF"] = "expandable_segments:True"
 import torch
 from tqdm import tqdm
 from NightToday import build_train_data_from_config
-from NightToday.NTIR2Day import Image2ImageGAT_Dual
+from NightToday.NTIR2Day import NightToDay
 
 
 if __name__ == "__main__":
@@ -11,7 +11,7 @@ if __name__ == "__main__":
     displayed_errors = ['color', 'trafficlight']
 
     # Build model from config  (Default: NightToday/NightToday.yaml)
-    model = Image2ImageGAT_Dual(trainable=True)
+    model = NightToDay(trainable=True)
     train_dataloaders, test_dataloaders, opt = build_train_data_from_config()
     total_steps = 0
     batch_size = opt.data.loader.batch_size
