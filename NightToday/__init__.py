@@ -175,7 +175,9 @@ def get_config(path=None) -> OptImage2ImageGATConfig:
         with open(path, 'r') as f:
             conf = yaml.safe_load(f)
     else:
-        with open(os.getcwd() + '/NightToday/configs/conf.yaml', 'r') as f:
+        BASE_DIR = Path(__file__).resolve().parent
+        path = BASE_DIR / 'configs' / 'conf.yaml'
+        with open(path, 'r') as f:
             conf = yaml.safe_load(f)
 
     # Model Config

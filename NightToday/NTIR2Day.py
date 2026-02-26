@@ -350,7 +350,7 @@ class Image2ImageGAT_Dual(nn.Module):
         inputs = (thermal * 2 - 1, night * 2 - 1) if night is not None else (thermal * 2 - 1,)
         outputs = self.netG.encode(*inputs, from_=self.T, align_first=align_first)
         if len(inputs) == 2:
-            encoded_TN, fused_IR, _, _ = outputs
+            encoded_TN, fused_IR, *_ = outputs
         else:
             encoded_TN = outputs
             fused_IR = None

@@ -1,5 +1,6 @@
 import os
 import socket
+from pathlib import Path
 from typing import Literal
 
 import torch
@@ -15,8 +16,14 @@ warnings.filterwarnings("ignore", category=UserWarning)
 
 def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
     model = CrossRAFT(adapter=True)
-    path = os.getcwd() + '/NightToday/CrossRAFT/checkpoints/' if 'laptop' in socket.gethostname() else \
-        '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/CrossRAFT/'
+    BASE_DIR = Path(__file__).resolve().parent
+
+    if 'laptop' in socket.gethostname():
+        path = BASE_DIR / 'checkpoints' / 'checkpoint-10000.ckpt'
+    else:
+        path = Path('/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/CrossRAFT/checkpoint-10000.ckpt')
+
+    path = str(path)
     state_dict = torch.load(path + 'checkpoint-10000.ckpt', weights_only=True)['state_dict']
     model.load_state_dict(state_dict)
 
