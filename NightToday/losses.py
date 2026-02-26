@@ -1240,11 +1240,145 @@ class IlluminationAwareFusionLoss(nn.Module):
         dx, dy = self.gradient(I)
         return (dx ** 2).mean() + (dy ** 2).mean()
 
-    def highlight_suppression(self, I, T, TN, mask):
-        # penalize illumination in highlight regions
-        loss_high_light = (torch.relu(mask * (1 - I))).mean()
-        loss_struct = (torch.relu(T * I - TN**2) * mask).mean()
-        return loss_high_light + loss_struct
+    def highlight_suppression(self, I, T, TN, R, mask):
+        # # penalize illumination in highlight regions
+        # loss_high_light = (torch.relu(mask * (R - I))).mean()
+        # loss_struct = (torch.relu(T * I - TN**2) * mask).mean()
+        # return loss_high_light + loss_struct
+        if T.shape[1] == 3:
+            T = T.mean(dim=1, keepdim=True)
+        if TN.shape[1] == 3:
+            TN = TN.mean(dim=1, keepdim=True)
+
+            # -------------------------------
+            # 1️⃣ Structure preservation
+            # -------------------------------
+        dx_T, dy_T = self.gradient(T)
+        dx_TN, dy_TN = self.gradient(TN)
+
+        structure_loss = (
+                                 ((dx_T - dx_TN) ** 2) * mask[..., :, 1:]
+                         ).mean() + (
+                                 ((dy_T - dy_TN) ** 2) * mask[..., 1:, :]
+                         ).mean()
+
+        # -------------------------------
+        # 2️⃣ Illumination flattening
+        # -------------------------------
+        mean_high = (TN * mask).sum(dim=[2, 3], keepdim=True) / (mask.sum(dim=[2, 3], keepdim=True) + 1e-6)
+        flatten_loss = (((TN - mean_high) * mask) ** 2).mean()
+
+        # -------------------------------
+        # 3️⃣ Remove dark collapse
+        # -------------------------------
+        # Force highlight region to match nearby non-highlight statistics
+        inv_mask = 1 - mask
+        mean_non = (TN * inv_mask).sum(dim=[2, 3], keepdim=True) / (inv_mask.sum(dim=[2, 3], keepdim=True) + 1e-6)
+
+        intensity_match = ((mean_high - mean_non) ** 2).mean()
+
+        return structure_loss + 2.0 * flatten_loss + 0.5 * intensity_match
+
+    class AdvancedHighlightSuppression(nn.Module):
+        def __init__(self, scales=(1, 2, 4)):
+            super().__init__()
+            self.scales = scales
+
+        # ---------------------------------------------------------
+        # Utilities
+        # ---------------------------------------------------------
+
+        @staticmethod
+        def gradient(x):
+            dx = x[:, :, :, 1:] - x[:, :, :, :-1]
+            dy = x[:, :, 1:, :] - x[:, :, :-1, :]
+            return dx, dy
+
+        def multiscale_gradient_loss(self, T, TN, mask):
+            loss = 0.0
+            for s in self.scales:
+                if s > 1:
+                    T_s = F.avg_pool2d(T, s)
+                    TN_s = F.avg_pool2d(TN, s)
+                    mask_s = F.avg_pool2d(mask, s)
+                else:
+                    T_s, TN_s, mask_s = T, TN, mask
+
+                dx_T, dy_T = self.gradient(T_s)
+                dx_TN, dy_TN = self.gradient(TN_s)
+
+                loss += (
+                        ((dx_T - dx_TN) ** 2) * mask_s[..., :, 1:]
+                ).mean()
+
+                loss += (
+                        ((dy_T - dy_TN) ** 2) * mask_s[..., 1:, :]
+                ).mean()
+
+            return loss / len(self.scales)
+
+        def edge_aware_flattening(self, TN, T, mask):
+            """
+            Remove illumination variation while preserving strong edges.
+            """
+
+            dx_T, dy_T = self.gradient(T)
+            edge_weight = torch.exp(-10 * (dx_T.abs() + dy_T.abs()))
+
+            mean_high = (TN * mask).sum(dim=[2, 3], keepdim=True) / (mask.sum(dim=[2, 3], keepdim=True) + 1e-6)
+
+            flatten_loss = (((TN - mean_high) ** 2) * mask * edge_weight).mean()
+
+            return flatten_loss
+
+        def reflectance_constraint(self, TN, R, mask):
+            """
+            Enforce TN reflectance similarity inside highlight.
+            Physically: TN ≈ R in highlight since illumination is corrupted.
+            """
+
+            if R.shape[1] == 3:
+                R = R.mean(dim=1, keepdim=True)
+
+            reflect_loss = ((TN - R) ** 2 * mask).mean()
+            return reflect_loss
+
+        def intensity_equalization(self, TN, mask):
+            """
+            Match highlight region intensity with surrounding region.
+            """
+
+            inv_mask = 1 - mask
+
+            mean_high = (TN * mask).sum(dim=[2, 3], keepdim=True) / (mask.sum(dim=[2, 3], keepdim=True) + 1e-6)
+            mean_non = (TN * inv_mask).sum(dim=[2, 3], keepdim=True) / (inv_mask.sum(dim=[2, 3], keepdim=True) + 1e-6)
+
+            return ((mean_high - mean_non) ** 2).mean()
+
+        # ---------------------------------------------------------
+        # Forward
+        # ---------------------------------------------------------
+
+        def forward(self, T, TN, R, mask):
+
+            if T.shape[1] == 3:
+                T = T.mean(dim=1, keepdim=True)
+            if TN.shape[1] == 3:
+                TN = TN.mean(dim=1, keepdim=True)
+
+            L_ms_struct = self.multiscale_gradient_loss(T, TN, mask)
+            L_flat = self.edge_aware_flattening(TN, T, mask)
+            L_reflect = self.reflectance_constraint(TN, R, mask)
+            L_intensity = self.intensity_equalization(TN, mask)
+
+            total = (
+                    1.5 * L_ms_struct +
+                    2.0 * L_flat +
+                    1.0 * L_reflect +
+                    0.5 * L_intensity
+            )
+
+            return total
 
     def correlation_I_N_gamma(self, I, N, mask):
         C = (N.max(1, keepdim=True)[0] - N.min(1, keepdim=True)[0])
@@ -1267,7 +1401,7 @@ class IlluminationAwareFusionLoss(nn.Module):
     def forward(self, I, R, mask, T, N, TN):
 
         L_smooth = self.illumination_smoothness(I)
-        L_highlight = self.highlight_suppression(I, T, TN, mask)
+        L_highlight = self.AdvancedHighlightSuppression()(I, T, TN, R, mask)
         L_structure = self.structure_consistency(R, T, mask)
         L_gamma = self.correlation_I_N_gamma(I, N, mask)
 
@@ -1276,7 +1410,6 @@ class IlluminationAwareFusionLoss(nn.Module):
                 self.lambda_smooth * L_smooth +
                 self.lambda_highlight * L_highlight +
                 self.lambda_gamma * L_gamma
-
                )
 
 
