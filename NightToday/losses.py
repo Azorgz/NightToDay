@@ -1159,11 +1159,9 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 target_color = torch.tensor([1.0, 1.0, 0.0], device=N.device).view(1, 3, 1, 1)
                 color_fake_D = fake_D[:, :2].mean(1, keepdim=True) - fake_D[:, 2:3]  # [-2:2]
 
-            luminosity_loss = torch.relu(
-                2. - (color_fake_D * HL_region[b:b + 1] + 2 - 2 * HL_region[b:b + 1])).sum() / (
-                                      HL_region[b:b + 1].sum() + 1e-6) + \
-                              torch.relu(-(TN[b:b + 1] * (mask_lighted_area[b:b + 1].float() - HL_region[b:b + 1].float())).sum() / (
-                                      (mask_lighted_area[b:b + 1].float() - HL_region[b:b + 1].float()).sum() + 1e-6) + mean_T_light_region)
+            luminosity_loss = (torch.relu(
+                2. - (color_fake_D * HL_region[b:b + 1] + 2 - 2 * HL_region[b:b + 1])).sum()
+                               / (HL_region[b:b + 1].sum() + 1e-6))
             color_dist = ImageTensor(fake_D[b:b + 1] * 0.5 + 0.5).color_distance(
                 ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device)))
             color_loss = ((color_dist * HL_region[b:b + 1]).sum() / (HL_region[b:b + 1].sum() + 1e-6) +
@@ -1178,7 +1176,8 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
-            std_loss = (fake_D[b:b + 1] * (mask_ - HL_region)).std(1).mean()
+            std_loss = ((fake_D[b:b + 1] * (mask_ - HL_region)).std(1).mean() +
+                        (fake_D[b:b + 1].mean(1) * (mask_ - HL_region)).std(dim=[1, 2]))
             # grad_loss to enhance the gradient of traffic light region
             grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
