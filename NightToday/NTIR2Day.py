@@ -192,14 +192,10 @@ class NightToDay(nn.Module):
                       'config': self.opt}
         for net_label in ['G', 'D', 'S']:
             net = getattr(self, f'net{net_label}')
-            if self.opt.training.split_weights:
-                self.save_network(net, epoch)
-            else:
-                checkpoint[net_label] = self.get_weights(net)
-        if not self.opt.training.split_weights:
-            save_filename = f'{epoch}_net_{self.model_name}'
-            save_path = os.path.join(self.checkpoint_dir, save_filename)
-            torch.save(checkpoint, save_path)
+            checkpoint[net_label] = self.get_weights(net)
+        save_filename = f'{epoch}_net_{self.model_name}'
+        save_path = os.path.join(self.checkpoint_dir, save_filename)
+        torch.save(checkpoint, save_path)
 
     def save_network(self, network, epoch):
         save_filename = f'{epoch}_net_'

@@ -1030,7 +1030,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
         lower_area = sky_mask[:, :, H // 4:].sum(dim=[1, 2, 3])
         gradient_horizon = torch.arange(H // 4 - H // 5, device=device).view(1, 1, H // 4 - H // 5, 1).repeat(1, 1, 1,
                                                                                                               W) / (
-                                       H // 4 - H // 5) * veg_min
+                                   H // 4 - H // 5) * veg_min
         gradient_horizon_region = gradient_horizon * mid_sky_mask
         if up_area:
             sky_loss[valid_veg] += F.relu(upper_sky_mask).sum(dim=[1, 2, 3]) / up_area * 0.1
@@ -1072,7 +1072,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     ############ Thermal Channel equality loss
     # thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
 
-    total_loss = ABC_losses + CBC_losses + sky_loss.sum() * 0.2 # + thermal_eq_loss
+    total_loss = ABC_losses + CBC_losses + sky_loss.sum() * 0.2  # + thermal_eq_loss
     return total_loss
 
 
@@ -1123,9 +1123,9 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                                    torch.ones(3, 3, device=mask.device))
             HL_region_N = (N_gray * total_ > mean_N_light_region).float()
             HL_region = HL_region_T * HL_region_N
-            if HL_region.sum() == 0: # and HL_region_N.sum() > 0:
-            #     HL_region = HL_region_N
-            # elif HL_region_N.sum() == 0:
+            if HL_region.sum() == 0:  # and HL_region_N.sum() > 0:
+                #     HL_region = HL_region_N
+                # elif HL_region_N.sum() == 0:
                 continue
             else:
                 pass
@@ -1161,7 +1161,10 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
 
             luminosity_loss = torch.relu(
                 2. - (color_fake_D * HL_region[b:b + 1] + 2 - 2 * HL_region[b:b + 1])).sum() / (
-                                      HL_region[b:b + 1].sum() + 1e-6)
+                                      HL_region[b:b + 1].sum() + 1e-6) + \
+                              torch.relu(-(TN[b:b + 1] * (mask_lighted_area[b:b + 1] - HL_region[b:b + 1])).sum() / (
+                                      (mask_lighted_area[b:b + 1] - HL_region[
+                                                                    b:b + 1]).sum() + 1e-6) + mean_T_light_region)
             color_dist = ImageTensor(fake_D[b:b + 1] * 0.5 + 0.5).color_distance(
                 ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device)))
             color_loss = ((color_dist * HL_region[b:b + 1]).sum() / (HL_region[b:b + 1].sum() + 1e-6) +
@@ -1181,7 +1184,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
             grad_loss = (nn.L1Loss()(grad_fake_D, grad_TN) * total_[b:b + 1]).sum() / (
-                        total_[b:b + 1].sum() + 1e-6) * 2
+                    total_[b:b + 1].sum() + 1e-6) * 2
             sky_contour = sky_mask * contour[b:b + 1]
             if sky_contour.sum() > 0:
                 sky_mean_fake_D = (sky_mask * fake_D[b:b + 1]).sum() / (3 * sky_mask.sum() + 1e-6)
@@ -1210,11 +1213,11 @@ class IlluminationAwareFusionLoss(nn.Module):
     """
 
     def __init__(
-        self,
-        lambda_structure=1.0,
-        lambda_smooth=0.5,
-        lambda_highlight=5.,
-        lambda_gamma=0.2
+            self,
+            lambda_structure=1.0,
+            lambda_smooth=0.5,
+            lambda_highlight=5.,
+            lambda_gamma=0.2
     ):
         super().__init__()
         self.lambda_structure = lambda_structure
@@ -1247,12 +1250,13 @@ class IlluminationAwareFusionLoss(nn.Module):
         # penalize illumination in highlight regions
         loss_high_light = (torch.relu(mask * (R.detach() - I))).sum()
         loss_high_light += (torch.relu(mask * (1 - R))).mean() * 2
-        loss_struct = (torch.relu(T * I - TN**2) * mask).mean()
+        loss_struct = (torch.relu(T * I - TN ** 2) * mask).mean()
         return loss_high_light + loss_struct
 
     def correlation_I_N_gamma(self, I, N, mask):
         C = (N.max(1, keepdim=True)[0] - N.min(1, keepdim=True)[0])
-        corr = ((I * C) * (1 - mask)).sum(dim=[1, 2, 3]) / torch.sqrt((I**2 * (1-mask)).sum(dim=[1, 2, 3]) * (C**2 * (1-mask)).sum(dim=[1, 2, 3]) + 1e-6)
+        corr = ((I * C) * (1 - mask)).sum(dim=[1, 2, 3]) / torch.sqrt(
+            (I ** 2 * (1 - mask)).sum(dim=[1, 2, 3]) * (C ** 2 * (1 - mask)).sum(dim=[1, 2, 3]) + 1e-6)
         return 1 - corr.mean()
 
     def structure_consistency(self, R, T, N, mask):
@@ -1263,7 +1267,8 @@ class IlluminationAwareFusionLoss(nn.Module):
         dx_T, dy_T = self.gradient(T)
         dx_N, dy_N = self.gradient(N)
         loss_struct = torch.relu(dx_T - dx_r).mean() + torch.relu(dy_T - dy_r).mean()
-        loss_struct += (torch.relu(dx_N - dx_r) * mask[..., 1:]).mean() + (torch.relu(dy_N - dy_r)*mask[..., 1:, :]).mean()
+        loss_struct += (torch.relu(dx_N - dx_r) * mask[..., 1:]).mean() + (
+                    torch.relu(dy_N - dy_r) * mask[..., 1:, :]).mean()
         return loss_struct
 
     # ---------------------------------------------------------
@@ -1271,7 +1276,6 @@ class IlluminationAwareFusionLoss(nn.Module):
     # ---------------------------------------------------------
 
     def forward(self, I, R, mask, T, N, TN):
-
         L_smooth = self.illumination_smoothness(I, T)
         L_highlight = self.highlight_suppression(I, T, TN, R, mask)
         L_structure = self.structure_consistency(R, T, N, mask)
@@ -1282,7 +1286,7 @@ class IlluminationAwareFusionLoss(nn.Module):
                 self.lambda_smooth * L_smooth +
                 self.lambda_highlight * L_highlight +
                 self.lambda_gamma * L_gamma
-               )
+        )
 
 
 def CondGradRepaLoss(fake_img, fake_mask, fake_grad, real_grad):
