@@ -454,6 +454,10 @@ class NightToDay(nn.Module):
                                                      loss_name='cycle', criterion_lambda='thermal')
         # endregion
 
+        # region Segmentation Distillation Knowledge
+        rand_size, seg_IR = self.backward_S()
+        # endregion
+
         # region Cycle loss on Latent Space
         if self.lambda_latent > 0:
             self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
@@ -469,17 +473,14 @@ class NightToDay(nn.Module):
                                                    loss_name='fus', criterion_lambda='fus')
         if not (None in other):
             self.loss_fus[self.T] += self.compute_loss('illum', *other, self.remapped_T, self.real_N,
-                                                       self.fake_TN, loss_name='fus', criterion_lambda='illumination_aware')
+                                                       self.fake_TN, self.segMask_TN_update,
+                                                       loss_name='fus', criterion_lambda='illumination_aware')
         # endregion
 
         # region Total Variation loss
         self.loss_tv[self.T] += self.compute_loss('tv', self.fake_T)
         self.loss_tv[self.N] += self.compute_loss('tv', self.fake_TN)
         self.loss_tv[self.D] += self.compute_loss('tv', self.fake_D)
-        # endregion
-
-        # region Segmentation Distillation Knowledge
-        rand_size, seg_IR = self.backward_S()
         # endregion
 
         # region ACL

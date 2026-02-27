@@ -1215,13 +1215,15 @@ class IlluminationAwareFusionLoss(nn.Module):
             lambda_structure=1.0,
             lambda_smooth=0.5,
             lambda_highlight=5.,
-            lambda_gamma=0.2
+            lambda_gamma=0.2,
+            lambda_sky_veg_consistency = 0.1
     ):
         super().__init__()
         self.lambda_structure = lambda_structure
         self.lambda_smooth = lambda_smooth
         self.lambda_highlight = lambda_highlight
         self.lambda_gamma = lambda_gamma
+        self.lambda_sky_veg_consistency = lambda_sky_veg_consistency
 
     # ---------------------------------------------------------
     # Gradient utility
@@ -1270,21 +1272,38 @@ class IlluminationAwareFusionLoss(nn.Module):
                     torch.relu(dy_N - dy_r) * mask[..., 1:, :]).mean()
         return loss_struct
 
+    def sky_veg_consistency(self, I, mask_seg):
+        sky_mask = (mask_seg == SKY).float()
+        veg_mask = (mask_seg == VEG).float()
+        loss = torch.zeros(I.size(0), device=I.device)
+        for b in range(I.size(0)):
+            if sky_mask[b].sum() > 0:
+                loss[b] += (I[b] * sky_mask[b]).sum() / (sky_mask[b].sum() + 1e-6)
+            if veg_mask[b].sum() > 0:
+                loss[b] += torch.relu(0.5 - I[b] * veg_mask[b]).sum() / (veg_mask[b].sum() + 1e-6)
+            if sky_mask[b].sum() > 0 and veg_mask[b].sum() > 0:
+                sky_mean = (I[b] * sky_mask[b]).sum() / (sky_mask[b].sum() + 1e-6)
+                veg_mean = (I[b] * veg_mask[b]).sum() / (veg_mask[b].sum() + 1e-6)
+                loss[b] += F.relu(sky_mean - veg_mean + 0.2)
+        return loss.mean()
+
     # ---------------------------------------------------------
     # Forward
     # ---------------------------------------------------------
 
-    def forward(self, I, R, mask, T, N, TN):
+    def forward(self, I, R, mask, T, N, TN, mask_seg):
         L_smooth = self.illumination_smoothness(I, T)
         L_highlight = self.highlight_suppression(I, T, TN, R, mask)
         L_structure = self.structure_consistency(R, T, N, mask)
         L_gamma = self.correlation_I_N_gamma(I, N, mask)
+        L_sky_veg = self.sky_veg_consistency(I, mask_seg)
 
         return (
                 self.lambda_structure * L_structure +
                 self.lambda_smooth * L_smooth +
                 self.lambda_highlight * L_highlight +
-                self.lambda_gamma * L_gamma
+                self.lambda_gamma * L_gamma +
+                self.lambda_sky_veg_consistency * L_sky_veg
         )
 
 
