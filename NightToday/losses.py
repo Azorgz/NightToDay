@@ -1177,7 +1177,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             if HL_common.sum() > 0:
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
             std_loss = ((fake_D[b:b + 1] * (mask_ - HL_region)).std(1).mean() +
-                        (fake_D[b:b + 1].mean(1) * (mask_ - HL_region)).std(dim=[1, 2, 3])).mean()
+                        (fake_D[b:b + 1].mean(1) * (mask_ - HL_region)).std(dim=[1, 2, 3])).sum()
             # grad_loss to enhance the gradient of traffic light region
             grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
             grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
