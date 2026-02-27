@@ -1246,6 +1246,7 @@ class IlluminationAwareFusionLoss(nn.Module):
 
     def highlight_suppression(self, I, T, TN, R, mask):
         # penalize illumination in highlight regions
+        R = R - 1
         loss_high_light = (torch.relu(mask * (R.detach() - I))).sum()
         loss_high_light += (torch.relu(mask * (1 - R))).mean() * 2
         loss_struct = (torch.relu(T * I - TN ** 2) * mask).mean()
