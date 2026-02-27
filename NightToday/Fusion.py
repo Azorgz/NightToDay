@@ -650,7 +650,7 @@ class IlluminationAwareFusion(nn.Module):
 
         self.illumination_head = nn.Sequential(
             nn.Conv2d(base_dim, 1, 7, padding=3, padding_mode='reflect'),
-            nn.Tanh()
+            nn.Sigmoid()
         )
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
@@ -681,9 +681,9 @@ class IlluminationAwareFusion(nn.Module):
 
         decoded_feat = self.dec(bottleneck)
 
-        R = self.reflectance_head(decoded_feat) * 0.5 + 1
+        R = self.reflectance_head(decoded_feat) * 0.5 + 1.5
         I = self.illumination_head(decoded_feat) * 0.5 + 1
 
-        fake_ir = R * I - 1.25  # combine reflectance and illumination, scale to [-1,1]
+        fake_ir = R * I - 1.0  # combine reflectance and illumination, scale to [-1,1]
 
         return fake_ir.repeat(1, 3, 1, 1), ir, vis_night, I, R, mask
