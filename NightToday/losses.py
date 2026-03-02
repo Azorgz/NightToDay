@@ -1216,7 +1216,7 @@ class IlluminationAwareFusionLoss(nn.Module):
             lambda_smooth=0.5,
             lambda_highlight=5.,
             lambda_gamma=0.2,
-            lambda_sky_veg_consistency = 0.1
+            lambda_sky_veg_consistency=0.1
     ):
         super().__init__()
         self.lambda_structure = lambda_structure
