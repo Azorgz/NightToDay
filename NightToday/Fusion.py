@@ -569,6 +569,8 @@ def highlight_mask(vis, threshold=0.95, softness=25.0):
     lum = 0.299 * vis[:, 0:1] + \
           0.587 * vis[:, 1:2] + \
           0.114 * vis[:, 2:3]
+    col = torch.max(vis, dim=1, keepdim=True)[0] - torch.min(vis, dim=1, keepdim=True)[0]
+    lum = lum * (1 - col)  # boost saturated highlights
     return torch.sigmoid((lum - threshold) * softness)
 
 
@@ -681,8 +683,8 @@ class IlluminationAwareFusion(nn.Module):
 
         decoded_feat = self.dec(bottleneck)
 
-        R = self.reflectance_head(decoded_feat) * 0.5 + 1.5
-        I = self.illumination_head(decoded_feat) * 0.5 + 1
+        R = self.reflectance_head(decoded_feat) * 0.5 + 1.5  # [1, 2]
+        I = self.illumination_head(decoded_feat)  # [0, 1]
 
         fake_ir = R * I - 1.0  # combine reflectance and illumination, scale to [-1,1]
 
