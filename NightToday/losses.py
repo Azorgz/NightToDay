@@ -1070,9 +1070,9 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
     CBC_losses = rec_losses.sum()
 
     ############ Thermal Channel equality loss
-    # thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
+    thermal_eq_loss = torch.max(torch.max(fake_IR, 1)[0] - torch.min(fake_IR, 1)[0])
 
-    total_loss = ABC_losses + CBC_losses + sky_loss.sum() * 0.2  # + thermal_eq_loss
+    total_loss = ABC_losses + CBC_losses + thermal_eq_loss
     return total_loss
 
 
