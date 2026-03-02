@@ -1216,7 +1216,7 @@ class IlluminationAwareFusionLoss(nn.Module):
             lambda_smooth=0.5,
             lambda_highlight=5.,
             lambda_gamma=0.2,
-            lambda_sky_veg_consistency=0.25
+            lambda_sky_veg_consistency=2.
     ):
         super().__init__()
         self.lambda_structure = lambda_structure
@@ -1284,7 +1284,7 @@ class IlluminationAwareFusionLoss(nn.Module):
             if sky_mask[b].sum() > 0 and veg_mask[b].sum() > 0:
                 sky_mean = (I[b] * sky_mask[b]).sum() / (sky_mask[b].sum() + 1e-6)
                 veg_mean = (I[b] * veg_mask[b]).sum() / (veg_mask[b].sum() + 1e-6)
-                loss[b] += F.relu(sky_mean - veg_mean + 0.2)
+                loss[b] += F.relu(sky_mean - veg_mean.detach() + 0.2)
         return loss.mean()
 
     # ---------------------------------------------------------
