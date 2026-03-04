@@ -1488,4 +1488,4 @@ def Intensity_corr_loss(inputs_img, GT_img, ROI_mask):
     if valid_idx.any():
         losses[valid_idx] = 1 - corr[valid_idx]
 
-    return losses
+    return losses.mean()
