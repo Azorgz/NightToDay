@@ -1273,7 +1273,7 @@ class IlluminationAwareFusionLoss(nn.Module):
         loss_struct = torch.relu(dx_T - dx_r).mean() + torch.relu(dy_T - dy_r).mean()
         loss_struct += (torch.relu(dx_N - dx_r) * mask[..., 1:]).mean() + (
                     torch.relu(dy_N - dy_r) * mask[..., 1:, :]).mean()
-        loss_struct += Intensity_corr_loss(I, R, mask)
+        loss_struct += Intensity_corr_loss(I, R.detach(), mask)
         return loss_struct
 
     def sky_veg_consistency(self, I, mask_seg):
@@ -1281,9 +1281,13 @@ class IlluminationAwareFusionLoss(nn.Module):
         sky_mask = (mask_seg == SKY).float().detach()
         veg_mask = (mask_seg == VEG).float().detach()
         loss = torch.zeros(I.size(0), device=I.device)
+        gradient_I_x, gradient_I_y = self.gradient(I)
         for b in range(I.size(0)):
             if sky_mask[b].sum() > 0:
+                sky_contour = (sky_mask[b:b+1] * (1 - F.max_pool2d(sky_mask[b:b+1], kernel_size=3, stride=1, padding=1))).float()
                 loss[b] += (I[b] * sky_mask[b]).sum() / (sky_mask[b].sum() + 1e-6)
+                loss[b] += -((gradient_I_x[b] * sky_contour) + (gradient_I_y[b] * sky_contour)).mean()
+                loss[b] += erosion(sky_mask[b], kernel=torch.ones([3, 3])) * (gradient_I_x[b] ** 2 + gradient_I_y[b] ** 2).mean()
             if veg_mask[b].sum() > 0:
                 loss[b] += torch.relu(0.5 - I[b] * veg_mask[b]).sum() / (veg_mask[b].sum() + 1e-6)
             if sky_mask[b].sum() > 0 and veg_mask[b].sum() > 0:
