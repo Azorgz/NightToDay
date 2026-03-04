@@ -1171,7 +1171,10 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             # losses rec D consistency
             rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b + 1], T[b:b + 1],
                                                         total_[b:b + 1] * sky_mask[b:b + 1]) + \
-                                   PixelConsistencyLoss(rec_T[b:b + 1], TN[b:b + 1], mask_[b:b + 1])
+                                   PixelConsistencyLoss(rec_T[b:b + 1], TN[b:b + 1], mask_[b:b + 1]) + \
+                                   Intensity_corr_loss(fake_D[b:b + 1], -TN[b:b + 1], mask_[b:b + 1])
+
+
             HL_fake_T = (fake_T < fake_T[b:b + 1, :, y0_mask:y1_mask, x0_mask:x1_mask].mean()) * mask_
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
@@ -1470,5 +1473,19 @@ def PixelConsistencyLoss(inputs_img, GT_img, ROI_mask):
                                          criterionSSIM((input_masked + 1) / 2, (GT_masked.detach() + 1) / 2))
     else:
         losses = 0.0
+
+    return losses
+
+
+def Intensity_corr_loss(inputs_img, GT_img, ROI_mask):
+    "Intensity Correlation Loss. inputs_img and GT_img are 4D tensors range [-1, 1], while ROI_mask is a 3D tensor."
+    input_masked = inputs_img * ROI_mask
+    GT_masked = GT_img * ROI_mask
+    area_ROI = torch.sum(ROI_mask, dim=[1, 2, 3])  # per batch
+    corr = ((input_masked * GT_masked).sum(dim=[1, 2, 3]) / (torch.sqrt((input_masked ** 2).sum(dim=[1, 2, 3])) * torch.sqrt((GT_masked ** 2).sum(dim=[1, 2, 3])) + 1e-6))
+    losses = torch.zeros(inputs_img.size(0), device=inputs_img.device)
+    valid_idx = area_ROI > 0
+    if valid_idx.any():
+        losses[valid_idx] = 1 - corr[valid_idx]
 
     return losses
