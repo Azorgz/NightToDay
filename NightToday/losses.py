@@ -1285,10 +1285,10 @@ class IlluminationAwareFusionLoss(nn.Module):
         for b in range(I.size(0)):
             if sky_mask[b].sum() > 0:
                 sky_contour = (sky_mask[b:b+1] * (1 - F.max_pool2d(sky_mask[b:b+1], kernel_size=3, stride=1, padding=1))).float()
-                loss[b] += (I[b] * sky_mask[b]).sum() / (sky_mask[b].sum() + 1e-6)
+                loss[b] += (I[b] * sky_mask[b]).sum() / (sky_mask[b].sum() + 1e-6) * 2.
                 loss[b] += -(gradient_I_x[b] * sky_contour[..., 1:]).mean() - (gradient_I_y[b] * sky_contour[..., 1:, :]).mean()
                 loss[b] += (erosion(sky_mask[b:b+1, :, 1:, 1:], kernel=torch.ones([3, 3]).to(sky_mask.device)) *
-                            (gradient_I_x[b, :, 1:] ** 2 + gradient_I_y[b, :, :, 1:] ** 2)).mean()
+                            torch.relu(torch.sqrt(gradient_I_x[b, :, 1:] ** 2 + gradient_I_y[b, :, :, 1:] ** 2 + 1e-8) - 0.01)).mean()
             if veg_mask[b].sum() > 0:
                 loss[b] += torch.relu(0.5 - I[b] * veg_mask[b]).sum() / (veg_mask[b].sum() + 1e-6)
             if sky_mask[b].sum() > 0 and veg_mask[b].sum() > 0:
