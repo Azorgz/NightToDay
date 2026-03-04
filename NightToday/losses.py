@@ -1252,7 +1252,7 @@ class IlluminationAwareFusionLoss(nn.Module):
     def highlight_suppression(self, I, T, TN, R, mask):
         # penalize illumination in highlight regions
         R = R - 1
-        loss_high_light = (torch.relu(mask * (R.detach() - I))).sum()
+        loss_high_light = (torch.relu(mask * (T - I))).sum()
         loss_high_light += (torch.relu(mask * (0.5 - R))).mean() * 2
         loss_struct = (torch.relu(T * I - TN ** 2) * mask).mean()
         return loss_high_light + loss_struct
@@ -1263,7 +1263,7 @@ class IlluminationAwareFusionLoss(nn.Module):
             (I ** 2 * (1 - mask)).sum(dim=[1, 2, 3]) * (C ** 2 * (1 - mask)).sum(dim=[1, 2, 3]) + 1e-6)
         return 1 - corr.mean()
 
-    def structure_consistency(self, R, T, N, mask):
+    def structure_consistency(self, R, T, N, I, mask):
         # ensure T is single channel
         if T.shape[1] == 3:
             T = T.mean(dim=1, keepdim=True)
@@ -1273,6 +1273,7 @@ class IlluminationAwareFusionLoss(nn.Module):
         loss_struct = torch.relu(dx_T - dx_r).mean() + torch.relu(dy_T - dy_r).mean()
         loss_struct += (torch.relu(dx_N - dx_r) * mask[..., 1:]).mean() + (
                     torch.relu(dy_N - dy_r) * mask[..., 1:, :]).mean()
+        loss_struct += Intensity_corr_loss(I, R, mask)
         return loss_struct
 
     def sky_veg_consistency(self, I, mask_seg):
@@ -1298,7 +1299,7 @@ class IlluminationAwareFusionLoss(nn.Module):
     def forward(self, I, R, mask, T, N, TN, mask_seg):
         L_smooth = self.illumination_smoothness(I, T)
         L_highlight = self.highlight_suppression(I, T, TN, R, mask)
-        L_structure = self.structure_consistency(R, T, N, mask)
+        L_structure = self.structure_consistency(R, T, N, I, mask)
         L_gamma = self.correlation_I_N_gamma(I, N, mask)
         L_sky_veg = self.sky_veg_consistency(I, mask_seg)
 
