@@ -1273,6 +1273,7 @@ class IlluminationAwareFusionLoss(nn.Module):
         return loss_struct
 
     def sky_veg_consistency(self, I, mask_seg):
+        mask_seg = F.interpolate(mask_seg.float(), size=I.shape[-2:], mode='nearest').long()
         sky_mask = (mask_seg == SKY).float().detach()
         veg_mask = (mask_seg == VEG).float().detach()
         loss = torch.zeros(I.size(0), device=I.device)
