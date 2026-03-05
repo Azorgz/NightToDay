@@ -938,7 +938,7 @@ def FakeIRPersonLoss(Seg_mask: torch.Tensor, fake_IR: torch.Tensor) -> torch.Ten
     return loss.sum()
 
 
-def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges, fake_gradmap):
+def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, rec_vis, real_edges, fake_gradmap):
     """
     Bias correction loss including artifact and color bias correction.
 
@@ -947,7 +947,6 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, real_IR, rec_vis, real_edges,
         Seg_TN:  (B,1,H_seg,W_seg) segmentation mask from TN input
         fake_IR:    (B,3,H,W) fake IR image
         real_vis:   (B,3,H,W) real visible image
-        real_IR:    (B,3,H,W) real IR image
         rec_vis:    (B,3,H,W) reconstructed visible image
         real_edges: (B,1,H,W) edge map from real visible
         fake_gradmap: (B,1,H,W) gradient map from fake IR

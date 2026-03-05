@@ -478,6 +478,7 @@ class NightToDay(nn.Module):
             self.loss_fus[self.T] += self.compute_loss('illum', *other, self.remapped_T, self.real_N,
                                                        self.fake_TN, self.segMask_TN_update,
                                                        loss_name='fus', criterion_lambda='illumination_aware')
+
         # endregion
 
         # region Total Variation loss
@@ -513,9 +514,8 @@ class NightToDay(nn.Module):
                                                    self.fake_T.mean(dim=1, keepdim=True),
                                                    criterion_lambda='ssim', loss_name='sga')
         self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, self.segMask_TN_update,
-                                                   self.fake_T, self.real_D, self.remapped_T,
-                                                   self.rec_D, self.edges_D, self.get_gradmag(self.fake_T),
-                                                   criterion_lambda='bc', loss_name='sga')
+                                                   self.fake_T, self.real_D, self.rec_D, self.edges_D,
+                                                   self.get_gradmag(self.fake_T), criterion_lambda='bc', loss_name='sga')
         self.loss_sga[self.T] += self.compute_loss('sga', self.get_gradmag(self.fake_TN), self.get_gradmag(self.fake_D))
         self.loss_sga[self.T] += self.compute_loss('IRClsDis', self.segMask_TN_update if
         self.segMask_TN_update is not None else self.segMask_TN,
@@ -587,7 +587,7 @@ class NightToDay(nn.Module):
         # endregion
 
         # region VGG loss
-        self.loss_vgg[self.T] += self.compute_loss('vgg', self.rec_T, self.fake_D)
+        self.loss_vgg[self.T] += self.compute_loss('vgg', self.remapped_T, self.real_N, self.fake_D)
         # endregion
         # combined loss
         self.sum_losses().backward()
