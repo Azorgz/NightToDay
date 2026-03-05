@@ -207,94 +207,6 @@
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
     </task>
-    <task id="LOCAL-00289" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771838449209</created>
-      <option name="number" value="00289" />
-      <option name="presentableId" value="LOCAL-00289" />
-      <option name="project" value="LOCAL" />
-      <updated>1771838449209</updated>
-    </task>
-    <task id="LOCAL-00290" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771840647228</created>
-      <option name="number" value="00290" />
-      <option name="presentableId" value="LOCAL-00290" />
-      <option name="project" value="LOCAL" />
-      <updated>1771840647228</updated>
-    </task>
-    <task id="LOCAL-00291" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771840872976</created>
-      <option name="number" value="00291" />
-      <option name="presentableId" value="LOCAL-00291" />
-      <option name="project" value="LOCAL" />
-      <updated>1771840872976</updated>
-    </task>
-    <task id="LOCAL-00292" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771841875221</created>
-      <option name="number" value="00292" />
-      <option name="presentableId" value="LOCAL-00292" />
-      <option name="project" value="LOCAL" />
-      <updated>1771841875221</updated>
-    </task>
-    <task id="LOCAL-00293" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771844558967</created>
-      <option name="number" value="00293" />
-      <option name="presentableId" value="LOCAL-00293" />
-      <option name="project" value="LOCAL" />
-      <updated>1771844558967</updated>
-    </task>
-    <task id="LOCAL-00294" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771845199613</created>
-      <option name="number" value="00294" />
-      <option name="presentableId" value="LOCAL-00294" />
-      <option name="project" value="LOCAL" />
-      <updated>1771845199613</updated>
-    </task>
-    <task id="LOCAL-00295" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771850153603</created>
-      <option name="number" value="00295" />
-      <option name="presentableId" value="LOCAL-00295" />
-      <option name="project" value="LOCAL" />
-      <updated>1771850153603</updated>
-    </task>
-    <task id="LOCAL-00296" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771850578795</created>
-      <option name="number" value="00296" />
-      <option name="presentableId" value="LOCAL-00296" />
-      <option name="project" value="LOCAL" />
-      <updated>1771850578795</updated>
-    </task>
-    <task id="LOCAL-00297" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771851085002</created>
-      <option name="number" value="00297" />
-      <option name="presentableId" value="LOCAL-00297" />
-      <option name="project" value="LOCAL" />
-      <updated>1771851085002</updated>
-    </task>
-    <task id="LOCAL-00298" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771851277012</created>
-      <option name="number" value="00298" />
-      <option name="presentableId" value="LOCAL-00298" />
-      <option name="project" value="LOCAL" />
-      <updated>1771851277012</updated>
-    </task>
-    <task id="LOCAL-00299" summary="Update of the FLIR dataset loading">
-      <option name="closed" value="true" />
-      <created>1771851529963</created>
-      <option name="number" value="00299" />
-      <option name="presentableId" value="LOCAL-00299" />
-      <option name="project" value="LOCAL" />
-      <updated>1771851529963</updated>
-    </task>
     <task id="LOCAL-00300" summary="Update of the FLIR dataset loading">
       <option name="closed" value="true" />
       <created>1771852678494</created>
@@ -599,7 +511,95 @@
       <option name="project" value="LOCAL" />
       <updated>1772458753040</updated>
     </task>
-    <option name="localTasksCounter" value="338" />
+    <task id="LOCAL-00338" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772611660811</created>
+      <option name="number" value="00338" />
+      <option name="presentableId" value="LOCAL-00338" />
+      <option name="project" value="LOCAL" />
+      <updated>1772611660812</updated>
+    </task>
+    <task id="LOCAL-00339" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772614538906</created>
+      <option name="number" value="00339" />
+      <option name="presentableId" value="LOCAL-00339" />
+      <option name="project" value="LOCAL" />
+      <updated>1772614538906</updated>
+    </task>
+    <task id="LOCAL-00340" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772614907361</created>
+      <option name="number" value="00340" />
+      <option name="presentableId" value="LOCAL-00340" />
+      <option name="project" value="LOCAL" />
+      <updated>1772614907361</updated>
+    </task>
+    <task id="LOCAL-00341" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772619522862</created>
+      <option name="number" value="00341" />
+      <option name="presentableId" value="LOCAL-00341" />
+      <option name="project" value="LOCAL" />
+      <updated>1772619522862</updated>
+    </task>
+    <task id="LOCAL-00342" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772632556623</created>
+      <option name="number" value="00342" />
+      <option name="presentableId" value="LOCAL-00342" />
+      <option name="project" value="LOCAL" />
+      <updated>1772632556623</updated>
+    </task>
+    <task id="LOCAL-00343" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772632693437</created>
+      <option name="number" value="00343" />
+      <option name="presentableId" value="LOCAL-00343" />
+      <option name="project" value="LOCAL" />
+      <updated>1772632693437</updated>
+    </task>
+    <task id="LOCAL-00344" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772632793917</created>
+      <option name="number" value="00344" />
+      <option name="presentableId" value="LOCAL-00344" />
+      <option name="project" value="LOCAL" />
+      <updated>1772632793917</updated>
+    </task>
+    <task id="LOCAL-00345" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772632836246</created>
+      <option name="number" value="00345" />
+      <option name="presentableId" value="LOCAL-00345" />
+      <option name="project" value="LOCAL" />
+      <updated>1772632836246</updated>
+    </task>
+    <task id="LOCAL-00346" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772632893595</created>
+      <option name="number" value="00346" />
+      <option name="presentableId" value="LOCAL-00346" />
+      <option name="project" value="LOCAL" />
+      <updated>1772632893595</updated>
+    </task>
+    <task id="LOCAL-00347" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772632972118</created>
+      <option name="number" value="00347" />
+      <option name="presentableId" value="LOCAL-00347" />
+      <option name="project" value="LOCAL" />
+      <updated>1772632972118</updated>
+    </task>
+    <task id="LOCAL-00348" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1772634565429</created>
+      <option name="number" value="00348" />
+      <option name="presentableId" value="LOCAL-00348" />
+      <option name="project" value="LOCAL" />
+      <updated>1772634565429</updated>
+    </task>
+    <option name="localTasksCounter" value="349" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

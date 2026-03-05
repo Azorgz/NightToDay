@@ -25,6 +25,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
+from ImagesCameras.Metrics.Metrics import VGG
 from kornia.augmentation import RandomCrop
 from kornia.color import rgb_to_lab, lab_to_rgb
 from kornia.contrib import connected_components
@@ -141,6 +142,7 @@ class NightToDay(nn.Module):
             self.criterion_tll = TrafLighLumiLoss_TN
             self.criterion_tlc = PixelConsistencyLoss
             self.criterion_illum = IlluminationAwareFusionLoss()
+            self.criterion_vgg = VGG(device=self.device)
 
             # Losses storage
             self.initialize_losses()
@@ -294,6 +296,7 @@ class NightToDay(nn.Module):
         setattr(self, 'loss_sharpness', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_trafficlight', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_contour', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_vgg', {k: 0. for k in self.names_domains})
 
     def set_pedestrians_color(self):
         if self.pedestrian_color[0] is None:
@@ -581,6 +584,10 @@ class NightToDay(nn.Module):
             self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
                                                              real_D*mask_lum, loss_name='color_day',
                                                              criterion_lambda='color_day')
+        # endregion
+
+        # region VGG loss
+        self.loss_vgg[self.T] += self.compute_loss('vgg', self.rec_T, self.fake_D)
         # endregion
         # combined loss
         self.sum_losses().backward()
