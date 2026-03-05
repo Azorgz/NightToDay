@@ -779,7 +779,7 @@ class AttackImages(nn.Module):
         perturbed_images = []
         for image in images:
             perturbed_image = self._perturb(image.detach(), epsilon=epsilon)
-            perturbed_images.append(perturbed_image.to(image.device))
+            perturbed_images.append(perturbed_image.to(image.device).detach())
         return perturbed_images if len(perturbed_images) > 1 else perturbed_images[0]
 
     def _perturb_gaussian(self, image, epsilon):

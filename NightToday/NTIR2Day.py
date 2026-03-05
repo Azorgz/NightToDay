@@ -552,11 +552,6 @@ class NightToDay(nn.Module):
 
         # region Attacks stability loss
         if self.lambda_att > 0.0:
-            # att_T, att_N = self.att_input(self.real_T, self.real_N, balance=0.5, epsilon=0.25)
-            # fake_D_att = self.netG.decode(self.netG.encode(att_T, att_N, from_=self.T, align_first=False)[0],
-            #                               to_=self.D)
-            # rec_T = self.netG.decode(self.netG.encode(fake_D_att, from_=self.D), to_=self.T)
-            # self.loss_att[self.T] += self.compute_loss('att', rec_T, fake_D_att)
             att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1) / 20).repeat(1, 3, 1,
                                                                                                               1)
             self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
