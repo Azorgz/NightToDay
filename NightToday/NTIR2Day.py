@@ -582,7 +582,7 @@ class NightToDay(nn.Module):
         # endregion
 
         # region VGG loss
-        self.loss_vgg[self.T] += self.compute_loss('vgg', self.remapped_T, self.real_N, self.fake_D)
+        self.loss_vgg[self.T] += self.compute_loss('vgg', self.fake_D, self.rec_T)
         # endregion
         # combined loss
         self.sum_losses().backward()
