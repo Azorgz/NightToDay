@@ -411,11 +411,11 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     # building_mask = (GT_resized <= 2).float()
     # area_building = building_mask.sum(dim=[1, 2, 3])
     # valid_building = area_building > 200
-    thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
+    # thermal_diff_low = ReLU()(TN - T + 0.1)  # only penalize higher values
     thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
-    T_filtered = median_blur(T.mean(1, keepdim=True), kernel_size=3)
-    N_filtered = median_blur(-N.mean(1, keepdim=True), kernel_size=3)
-    min_values = torch.min(torch.cat([T_filtered, N_filtered], dim=1), dim=1, keepdim=True)[0]
+    # T_filtered = median_blur(T.mean(1, keepdim=True), kernel_size=3)
+    # N_filtered = median_blur(-N.mean(1, keepdim=True), kernel_size=3)
+    # min_values = torch.min(torch.cat([T_filtered, N_filtered], dim=1), dim=1, keepdim=True)[0]
 
     # losses init
     sky_loss = torch.zeros([B, ], device=device)
@@ -424,9 +424,9 @@ def ThermalLoss(TN, T, N, GT_seg, weights=None):
     # blobs_loss = torch.zeros([B, ], device=image_target.device)
 
     #  Thermal correction losses per classes
-    mask_up_low = (T[:, :, ::2] < -0.85).float()
-    sky_loss[valid_sky] += ((thermal_diff_low[:, :, ::2] * mask_up_low).sum(dim=[1, 2, 3])
-                            / (mask_up_low.sum(dim=[1, 2, 3]) + 1e-6) * 2)
+    # mask_up_low = (T[:, :, ::2] < -0.85).float()
+    # sky_loss[valid_sky] += ((thermal_diff_low[:, :, ::2] * mask_up_low).sum(dim=[1, 2, 3])
+    #                         / (mask_up_low.sum(dim=[1, 2, 3]) + 1e-6) * 2)
     # sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[
     #     valid_sky] * 5
     # sky_loss[valid_sky] += (thermal_diff_low * sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6)
@@ -1320,14 +1320,14 @@ class IlluminationAwareFusionLoss(nn.Module):
         L_highlight = self.highlight_suppression(I, T, TN, R, mask)
         L_structure = self.structure_consistency(R, T, N, I, mask)
         L_gamma = self.correlation_I_N_gamma(I, N, mask)
-        L_sky_veg = self.sky_veg_consistency(I, mask_seg)
+        # L_sky_veg = self.sky_veg_consistency(I, mask_seg)
 
         return (
                 self.lambda_structure * L_structure +
                 self.lambda_smooth * L_smooth +
                 self.lambda_highlight * L_highlight +
-                self.lambda_gamma * L_gamma +
-                self.lambda_sky_veg_consistency * L_sky_veg
+                self.lambda_gamma * L_gamma
+                # self.lambda_sky_veg_consistency * L_sky_veg
         )
 
 
