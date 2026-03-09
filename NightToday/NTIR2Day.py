@@ -38,7 +38,7 @@ from . import get_config
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
     ThermalLoss, SharpFusionLoss, IlluminationAwareFusionLoss, PixelConsistencyLoss, \
-    TrafLighLumiLoss_TN, ForegroundContourLoss
+    TrafLighLumiLoss_TN, ForegroundContourLoss, sky_loss
 from .modules import LossScheduler, Get_gradmag_gray
 from .plexers import G_Plexer, D_Plexer, S_Plexer
 from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_disk_kernel, \
@@ -143,6 +143,7 @@ class NightToDay(nn.Module):
             self.criterion_tlc = PixelConsistencyLoss
             self.criterion_illum = IlluminationAwareFusionLoss()
             self.criterion_vgg = VGG(device=self.device)
+            self.criterion_sky = sky_loss
 
             # Losses storage
             self.initialize_losses()
@@ -297,6 +298,7 @@ class NightToDay(nn.Module):
         setattr(self, 'loss_trafficlight', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_contour', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_vgg', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_sky', {k: 0. for k in self.names_domains})
 
     def set_pedestrians_color(self):
         if self.pedestrian_color[0] is None:
@@ -567,6 +569,7 @@ class NightToDay(nn.Module):
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_D, self.segMask_TN_update)
+        self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D_day, self.segMask_TN_update)
 
         if self.real_D_T is not None:
             encoded_TD, _, _, real_D, *_ = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)

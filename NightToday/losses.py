@@ -11,15 +11,14 @@ from ImagesCameras import ImageTensor
 from kornia import create_meshgrid
 from kornia.color import rgb_to_lab, rgb_to_hsv
 from kornia.contrib import connected_components
-from kornia.filters import sobel, laplacian, get_gaussian_kernel2d, median_blur, bilateral_blur
-from kornia.morphology import erosion, closing, dilation
-from torch.nn import LeakyReLU, ReLU
+from kornia.filters import sobel, laplacian, get_gaussian_kernel2d, median_blur
+from kornia.morphology import erosion, dilation
+from torch.nn import ReLU
 from torchmetrics.functional.image import image_gradients
-from torchvision.transforms.v2 import GaussianBlur
 
 from .ssim import SSIM
 from .utilities import ClsMeanPixelValue, GetFeaMatrixCenter, bhw_to_onehot, determine_color_N, \
-    center_of_mass, detect_TL_blobs_mask_free, getLightDarkRegionMean, RefineLightMask, detect_TL_colorblobs_mask_free, \
+    RefineLightMask, detect_TL_colorblobs_mask_free, \
     get_disk_kernel
 
 ROAD = 0
@@ -200,7 +199,7 @@ class ColorConsistencyLoss(nn.Module):
         super(ColorConsistencyLoss, self).__init__()
         self.lambda_saturation = 1.
         self.lambda_lab_edge = 0.1
-        self.lambda_l1 = 0.1
+        self.lambda_l1 = 0.01
 
     def forward(self, fake_color: torch.Tensor, real_color: torch.Tensor, mask_high_color) -> torch.Tensor:
         """
@@ -290,6 +289,22 @@ def cycle_loss(real, fake):
     hsv_fake = rgb_to_hsv(fake)
     loss = nn.SmoothL1Loss(beta=0.5)(hsv_fake, hsv_real.detach()) + SSIM()(real, fake) * 5
     return loss
+
+
+def sky_loss(fake, GT_seg_fake):
+    """
+    Sky loss that focuses on sky regions in the image.
+    """
+    sky_mask = (GT_seg_fake == SKY).float()
+    dx, dy = image_gradients(fake)
+    valid = sky_mask.sum(dim=[1, 2, 3]) > 100
+    if not valid.any():
+        return torch.tensor(0., device=fake.device)
+    loss_grad = torch.sqrt(dx[valid] ** 2 + dy[valid] ** 2 + 1e-6) * sky_mask[valid]
+    loss_color = (((torch.relu(fake[valid][:, 1:2] - fake[valid][:, 2:3]) +
+                   torch.relu(fake[valid][:, 0:1] - fake[valid][:, 2:3])) * sky_mask[valid]).sum(dim=[1, 2, 3]) /
+                  (sky_mask[valid].sum(dim=[1, 2, 3]) + 1e-6))
+    return loss_grad.mean() * 0.5 + loss_color * 0.5
 
 
 def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, weights=None):

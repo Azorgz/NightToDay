@@ -93,6 +93,7 @@ training:
     lambda_cgr: [[ 5, ], 3.5]  # Conditional Gradient Repair
     lambda_bc: [[ 5, ], 2.0]  # Bias correction Loss
     lambda_vgg: [[ 20,  ], 1.0]  # VGG perceptual loss
+    lambda_sky: [[ 20,  ], 1.0]  # sky color loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
 
 data:
