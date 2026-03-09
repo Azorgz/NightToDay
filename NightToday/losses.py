@@ -295,7 +295,7 @@ def sky_loss(fake, GT_seg_fake):
     """
     Sky loss that focuses on sky regions in the image.
     """
-    sky_mask = (GT_seg_fake == SKY).float()
+    sky_mask = F.interpolate((GT_seg_fake == SKY).float(), size=fake.shape[-2:], mode='nearest')
     dx, dy = image_gradients(fake)
     valid = sky_mask.sum(dim=[1, 2, 3]) > 100
     if not valid.any():
