@@ -687,5 +687,6 @@ class IlluminationAwareFusion(nn.Module):
         I = self.illumination_head(decoded_feat)  # [0, 1]
 
         fake_ir = R * I - 1.0  # combine reflectance and illumination, scale to [-1,1]
-
+        ir_ = ir.mean(1, keepdim=True) * 0.5 + 1
+        fake_ir = fake_ir * ir_
         return fake_ir.repeat(1, 3, 1, 1), ir, vis_night, I, R, mask

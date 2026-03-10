@@ -97,7 +97,8 @@ class NightToDay(nn.Module):
                                          Tensor(mcolors.to_rgb(mcolors.CSS4_COLORS[p_color[1]])))
             else:
                 self.pedestrian_color = (None, None)
-            self.checkpoint_dir = self.opt.training.checkpoint_dir if 'laptop' in socket.gethostname() else '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
+            self.checkpoint_dir = self.opt.training.checkpoint_dir if 'laptop' in socket.gethostname() else \
+                '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
             os.makedirs(self.checkpoint_dir, exist_ok=True)
             self.visualize_dir = self.opt.training.visualize_dir
             os.makedirs(self.visualize_dir, exist_ok=True)
@@ -215,7 +216,7 @@ class NightToDay(nn.Module):
             if checkpoint is None:
                 assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
                 save_filename = f'{epoch}_net_{self.model_name}_{self.opt.model.gen.fus.type}'
-                path = (os.getcwd() + '/checkpoints/download/weights') if 'laptop' in socket.gethostname() else \
+                path = (os.getcwd() + '/checkpoints/download/') if 'laptop' in socket.gethostname() else \
                     '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
                 save_path = os.path.join(path, save_filename)
                 checkpoint = torch.load(save_path, weights_only=False, map_location='cpu')
