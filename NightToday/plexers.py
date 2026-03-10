@@ -174,6 +174,8 @@ class G_Plexer(Plexer):
         return_im = False
         if len(args) and self.fusion_first:
             x, ir, n, *other = self.fusion(x, *args, **kwargs)
+            ir_ = ir.mean(1, keepdim=True) * 0.5 + 1
+            x = x * ir_
             return_im = True
         elif len(args) and not self.fusion_first:
             x = torch.cat((x, *args), dim=1)
