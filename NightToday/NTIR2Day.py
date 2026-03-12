@@ -579,9 +579,11 @@ class NightToDay(nn.Module):
             self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
                                                              criterion_lambda='color_day')
             mask_proj = (real_D.mean(dim=1, keepdim=True) == 0.5).float() * (real_D.std(dim=1, keepdim=True) == 0).float()
-            mask_lum = (real_D.mean(dim=1, keepdim=True) < 0.95).float() * (1-mask_proj)
+            mask_lum = (real_D.mean(dim=1, keepdim=True) < 0.90).float() * (1-mask_proj)
             self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
                                                              real_D*mask_lum, loss_name='color_day',
+                                                             criterion_lambda='color_day')
+            self.loss_color_day[self.D] += self.compute_loss('sharpness', self.fake_D_day, real_D, self.real_D_T,
                                                              criterion_lambda='color_day')
         # endregion
 
