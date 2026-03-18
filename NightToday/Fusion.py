@@ -598,6 +598,26 @@ class CrossModalAttention(nn.Module):
         return out
 
 
+class SelfAttention(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.query = nn.Conv2d(dim, dim, 1)
+        self.key   = nn.Conv2d(dim, dim, 1)
+        self.value = nn.Conv2d(dim, dim, 1)
+        self.gamma = nn.Parameter(torch.zeros(1))
+
+    def forward(self, feat):
+        Q = self.query(feat)
+        K = self.key(feat)
+        V = self.value(feat)
+
+        attn = torch.softmax(
+            torch.sum(Q * K, dim=1, keepdim=True), dim=-1
+        )
+        out = feat + self.gamma * attn * V
+        return out
+
+
 # -----------------------------------------------------------
 # Illumination Aware Fusion Network
 # -----------------------------------------------------------

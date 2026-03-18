@@ -184,8 +184,13 @@ class PositionalEncoding2D(nn.Module):
         self.pe = nn.Parameter(torch.randn(1, dim, height, width))
 
     def forward(self, x):
+        if x.shape[-2] != self.pe.shape[-2] or x.shape[-1] != self.pe.shape[-1]:
+            # If input spatial size doesn't match, interpolate the positional encoding
+            pe = F.interpolate(self.pe, size=x.shape[-2:], mode='bilinear', align_corners=False)
+        else:
+            pe = self.pe
         # x: (B, D, H, W)
-        return x + self.pe
+        return x + pe
 
 
 class RopePositionalEncoding2D(nn.Module):
@@ -195,6 +200,7 @@ class RopePositionalEncoding2D(nn.Module):
         self.dim = dim
         inv_freq = 1.0 / (10 ** (torch.arange(0, dim, 2).float() / dim))
         self.register_buffer("inv_freq", inv_freq)
+        self.pe = PositionalEncoding2D(dim, 64, 64)
 
     def forward(self, x):
         # x: (B, D, H, W)
@@ -210,7 +216,7 @@ class RopePositionalEncoding2D(nn.Module):
         pos_emb[..., 0::2] = pos_emb_y.unsqueeze(1).unsqueeze(0).repeat(B, 1, W, 1)
         pos_emb[..., 1::2] = pos_emb_x.unsqueeze(0).unsqueeze(0).repeat(B, H, 1, 1)
         pos_emb = pos_emb.permute(0, 3, 1, 2)
-        return x + pos_emb
+        return x + pos_emb + self.pe(x)
 
 
 # region -------------------- Modules --------------------

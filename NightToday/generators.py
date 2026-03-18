@@ -44,16 +44,22 @@ class TransformerEncoderDual(nn.Module):
         self.fusion_L = CrossAttentionFusion(dim)
         self.fusion_AB = CrossAttentionFusion(dim)
 
-    def forward(self, x, y, *args):
-        x_struct, x_appear = x, y  # x_struct: (B,3,H,W), x_appear: (B,3,H,W)
+    def forward(self, x, y=None, *args):
+        x_struct = x
+        x_appear = y  # x_struct: (B,3,H,W), x_appear: (B,3,H,W)
         feat_L = self.embed_T(x_struct)  # (B, D, H', W')
-        feat_LAB = self.embed_N(x_appear)  # (B, 2*D + 2, H', W')
+        if x_appear is not None:
+            feat_LAB = self.embed_N(x_appear)  # (B, 2*D + 2, H', W')
         B, D, Hs, Ws = feat_L.shape
 
         seq_L = feat_L.flatten(2).permute(2, 0, 1)  # (seq, B, D + 2)
-        seq_LAB = feat_LAB.flatten(2).permute(2, 0, 1)  # (seq, B, 2D + 2)
-        first_part = (self.norm_N(seq_LAB[:, :, :D]) + self.norm_T(seq_L)) / 2
-        second_part = seq_LAB[:, :, D + 2:]
+        if x_appear is not None:
+            seq_LAB = feat_LAB.flatten(2).permute(2, 0, 1)  # (seq, B, 2D + 2)
+            first_part = (self.norm_N(seq_LAB[:, :, :D]) + self.norm_T(seq_L)) / 2
+            second_part = seq_LAB[:, :, D + 2:]
+        else:
+            first_part = self.norm_T(seq_L)
+            second_part = torch.zeros(*seq_L.shape[:2], 2*D+2, device=seq_L.device)
         seq_LAB = torch.cat([first_part, second_part], dim=2)
 
         for layer in self.encoder_T:
@@ -66,7 +72,7 @@ class TransformerEncoderDual(nn.Module):
 
         feat_L = self.fusion_L(feat_L, feat_LAB[:, :D])
         feat_AB = self.fusion_AB(feat_LAB[:, D:], feat_L)
-        return feat_L, feat_AB
+        return torch.cat([feat_L, feat_AB], dim=1)
 
 
 class TransformerEncoderMono(nn.Module):
@@ -116,7 +122,7 @@ class TransformerEncoderMono(nn.Module):
 
         feat_L = self.fusion_L(feat_L, feat_LAB[:, :D])
         feat_AB = self.fusion_AB(feat_LAB[:, D:], feat_L)
-        return feat_L, feat_AB
+        return torch.cat([feat_L, feat_AB], dim=1)
 
 
 class TransformerDecoder(nn.Module):
@@ -136,7 +142,7 @@ class TransformerDecoder(nn.Module):
 
     def forward(self, feats):
         # --- Transformer Decoder ---
-        feat_L, feat_AB = feats  # (B, D, H, W)
+        feat_L, feat_AB = feats.split(feats.shape[1]//2, 1)  # (B, D, H, W)
         B, D, Hs, Ws = feat_L.shape
         seq_L = feat_L.flatten(2).permute(2, 0, 1)
         seq_AB = feat_AB.flatten(2).permute(2, 0, 1)
