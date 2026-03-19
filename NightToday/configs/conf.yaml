@@ -71,7 +71,7 @@ training:
     D: [0.5, 0.999]
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
-    lambda_color: [[ 20,  ], 5.0]
+    lambda_color: [[ 20,  ], 5.1]
     lambda_color_day: [[ 20,  ], 1.]
     lambda_id: [[ 0, 2 ], 0.1]
     lambda_cycle:  [[ 0,  ], 5.0]
@@ -87,11 +87,11 @@ training:
     lambda_scale_robustness: [[ 75,  ], 1.0] # 1.0
     lambda_trafficlight: [[ 10,  ], 0.1] # 0.2
     lambda_illumination_aware: [[ 0,  ], 0.0]
-    lambda_thermal: [[ 1,  ], 2.5]
+    lambda_thermal: [[ 1,  ], 2.3]
     lambda_contour: [[ 20,  ], 2.0]
     lambda_sharpness: [[ 0,  ], 25.0]
-    lambda_cgr: [[ 5, ], 3.5]  # Conditional Gradient Repair
-    lambda_bc: [[ 5, ], 2.0]  # Bias correction Loss
+    lambda_cgr: [[ 5, ], 4.5]  # Conditional Gradient Repair
+    lambda_bc: [[ 5, ], 2.2]  # Bias correction Loss
     lambda_vgg: [[ 20,  ], 0.5]  # VGG perceptual loss
     lambda_sky: [[ 20,  ], 0.2]  # sky color loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
