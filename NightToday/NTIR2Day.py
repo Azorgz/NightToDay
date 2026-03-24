@@ -21,13 +21,12 @@ from functools import partial
 from pathlib import Path
 
 import matplotlib.colors as mcolors
-import numpy as np
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
-from ImagesCameras.Metrics.Metrics import VGG, QYang, nMI, VIF, NIQE
+from ImagesCameras.Metrics.Metrics import VGG, QYang, Qabf
 from kornia.augmentation import RandomCrop
-from kornia.color import rgb_to_lab, lab_to_rgb
+from kornia.color import rgb_to_lab
 from kornia.contrib import connected_components
 from kornia.morphology import dilation
 from torch import Tensor
@@ -145,7 +144,7 @@ class NightToDay(nn.Module):
             self.criterion_illum = IlluminationAwareFusionLoss()
             self.criterion_vgg = VGG(device=self.device)
             self.criterion_qyang = QYang(device=self.device)
-            self.criterion_vif = NIQE(device=self.device)
+            self.criterion_vif = Qabf(device=self.device)
             self.criterion_sky = sky_loss
 
             # Losses storage
