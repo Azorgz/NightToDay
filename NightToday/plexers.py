@@ -69,11 +69,11 @@ class Plexer(nn.Module):
     def init_optimizers(self, opt, lr, betas):
         if self.split_optimizers:
 
-            optimizers = {name: opt(net.parameters(), lr=lr)#, betas=betas)
+            optimizers = {name: opt(net.parameters(), lr=lr, betas=betas)
                           for name, net in zip(self.names, self.networks)}
         else:
             optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-                              lr=lr, betas=betas)]
+                              lr=lr)]#, betas=betas)]
         setattr(self, 'optimizers', optimizers)
 
     def zero_grads(self, *args):
