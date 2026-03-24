@@ -8,6 +8,7 @@ from typing import Literal
 import torch
 from torch import nn
 from torch.nn.functional import interpolate
+from ultralytics.optim import MuSGD
 
 from . import GenConfig, TrainConfig, SegConfig, DiscrConfig
 from .Fusion import U_ResNetFusion, IlluminationAwareFusion
@@ -167,7 +168,8 @@ class G_Plexer(Plexer):
         self.to(self.device)
         self.ori_shape = None
         self.train()
-        self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
+        self.init_optimizers(MuSGD, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
+        # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
 
     def encode(self, x, *args, from_: str = None, **kwargs):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
@@ -230,7 +232,8 @@ class D_Plexer(Plexer):
         self.names = [f'D_{dom}' for dom in self.names_domains]
         self.apply(weights_init)
         self.to(self.device)
-        self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_D, betas=training_cfg.betas_D)
+        self.init_optimizers(MuSGD, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
+        # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_D, betas=training_cfg.betas_D)
 
     def forward(self, x, from_: str = None):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
@@ -270,7 +273,8 @@ class S_Plexer(Plexer):
                 path = f'/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/{name}.pth'
             net.load_state_dict(torch.load(path), strict=False)
         self.to(self.device)
-        self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_S, betas=training_cfg.betas_D)
+        self.init_optimizers(MuSGD, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
+        # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_S, betas=training_cfg.betas_D)
         self.freeze = True
 
     def forward(self, x, *args, from_: str = None):
