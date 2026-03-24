@@ -25,7 +25,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
-from ImagesCameras.Metrics.Metrics import VGG, QYang, nMI
+from ImagesCameras.Metrics.Metrics import VGG, QYang, nMI, VIF
 from kornia.augmentation import RandomCrop
 from kornia.color import rgb_to_lab, lab_to_rgb
 from kornia.contrib import connected_components
@@ -145,7 +145,7 @@ class NightToDay(nn.Module):
             self.criterion_illum = IlluminationAwareFusionLoss()
             self.criterion_vgg = VGG(device=self.device)
             self.criterion_qyang = QYang(device=self.device)
-            self.criterion_nMI = nMI(device=self.device)
+            self.criterion_vif = VIF(device=self.device)
             self.criterion_sky = sky_loss
 
             # Losses storage
@@ -592,7 +592,7 @@ class NightToDay(nn.Module):
         # region VGG loss, MI loss and QYang Loss
         self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) -
                                   self.compute_loss('qyang', self.remapped_T, self.real_N, self.fake_D) -
-                                  self.compute_loss('mi', self.remapped_T, self.real_N, self.fake_D))
+                                  self.compute_loss('vif', self.remapped_T, self.real_N, self.fake_D))
         # endregion
         # combined loss
         self.sum_losses().backward()
