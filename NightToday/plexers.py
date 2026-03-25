@@ -181,6 +181,7 @@ class G_Plexer(Plexer):
             fake_TN = torch.tanh(fake_TN * ir_)
             fake_TN = self._resize(fake_TN)
             output = self.encoders[self.names_domains[from_]](fake_TN)
+            output = self.shared_encoder(output)
         elif self.enc_type == 'IAware' and len(args):
             x = self._resize(x)
             output, ir, n = self.encoders[self.names_domains[from_]](x, *args, **kwargs)
