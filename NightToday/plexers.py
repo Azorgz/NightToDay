@@ -142,7 +142,7 @@ class G_Plexer(Plexer):
         decoders = [ResnetGenDecoder] * 2  # for _ in range(len(self.names_domains))]
         enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
                     (fus.preprocess_thermal if fus.type == 'IAware' else 3,
-                     fus.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
+                     opt.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
                      fus.n_enc_layers if fus.type == 'IAware' else opt.n_enc_layers,
                      fus.dropout if fus.type == 'IAware' else opt.dropout,
                      fus.n_downscaling if fus.type == 'IAware' else opt.downscaling)]

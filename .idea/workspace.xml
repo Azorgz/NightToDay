@@ -4,16 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Update of TL sample merging">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/generators.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/generators.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/modules.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/modules.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/utilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/utilities.py" afterDir="false" />
-    </list>
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Update of TL sample merging" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -61,7 +52,7 @@
     "Python.encoders.executor": "Debug",
     "Python.manual_labeling_flir_night.executor": "Run",
     "Python.test.executor": "Run",
-    "Python.train.executor": "Run",
+    "Python.train.executor": "Debug",
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "SHARE_PROJECT_CONFIGURATION_FILES": "true",
     "git-widget-placeholder": "main",
@@ -215,14 +206,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00312" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1772110915241</created>
-      <option name="number" value="00312" />
-      <option name="presentableId" value="LOCAL-00312" />
-      <option name="project" value="LOCAL" />
-      <updated>1772110915241</updated>
     </task>
     <task id="LOCAL-00313" summary="Update of TL sample merging">
       <option name="closed" value="true" />
@@ -608,7 +591,15 @@
       <option name="project" value="LOCAL" />
       <updated>1773933000631</updated>
     </task>
-    <option name="localTasksCounter" value="361" />
+    <task id="LOCAL-00361" summary="Update of TL sample merging">
+      <option name="closed" value="true" />
+      <created>1774427669388</created>
+      <option name="number" value="00361" />
+      <option name="presentableId" value="LOCAL-00361" />
+      <option name="project" value="LOCAL" />
+      <updated>1774427669388</updated>
+    </task>
+    <option name="localTasksCounter" value="362" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -645,9 +636,9 @@
           <option name="timeStamp" value="220" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/NightToday/plexers.py</url>
-          <line>139</line>
-          <option name="timeStamp" value="224" />
+          <url>file://$PROJECT_DIR$/NightToday/NTIR2Day.py</url>
+          <line>221</line>
+          <option name="timeStamp" value="229" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>
