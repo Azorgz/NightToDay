@@ -34,7 +34,7 @@ model:
       n_enc_layers: 4
       dropout: 0.25
       n_downscaling: 2
-      type: IAware  # 'IAware' # 'UResNet'
+      type: UResNet  # 'IAware' # 'UResNet'
 
   discr:
     base_dim: 64
