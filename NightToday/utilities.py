@@ -283,7 +283,7 @@ def ClsMeanPixelValue(input_tensor, SegMask, num_class, exclude_classes=None):
         if i in exclude_classes:
             continue  # Binary mask for class i
         class_mask = (mask_flat == i).float()  # (B,1,N)
-        class_count = class_mask.sum(dim=2)  # (B,1)
+        class_count = class_mask.sum(dim=2).squeeze(1)  # (B,)
         total_count = H * W  # Only compute if class exists in at least one batch element
         if (class_count > 0).any():
             out_cls_tensor[class_count > 0, i] = 1.0

@@ -441,34 +441,6 @@ class SmoothLayer(nn.Module):
         x = self.conv(self.down(x))
         return self.act(x)
 
-
-# -----------------------------
-# Color Guidance Module (CGM)
-# -----------------------------
-class ColorGuidanceModule(nn.Module):
-    """
-    Le CGM prend une image visible nocturne (ex: 3 canaux) et produit
-    une représentation couleur (feature map) qui sera utilisée pour guider
-    le générateur. Le CGM est entraîné conjointement.
-    """
-    def __init__(self, in_ch=3, feat_ch=64):
-        super().__init__()
-        self.encoder = nn.Sequential(
-        ConvBlock(in_ch, feat_ch, kernel=7, padding=3),
-        nn.AvgPool2d(2),
-        ConvBlock(feat_ch, feat_ch*2),
-        nn.AvgPool2d(2),
-        ConvBlock(feat_ch*2, feat_ch*4)
-        )
-        # projection finale -> carte de guidage couleur
-        self.proj = nn.Conv2d(feat_ch*4, 3, kernel_size=1)
-
-    def forward(self, x):
-        f = self.encoder(x)
-        color_map = self.proj(f)
-        return color_map  # même spatial size réduite
-
-
 class _ASPPModule(nn.Module):
     def __init__(self, inplanes, planes, kernel_size, padding, dilation, norm_layer):
         super(_ASPPModule, self).__init__()

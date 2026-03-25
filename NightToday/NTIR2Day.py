@@ -217,7 +217,7 @@ class NightToDay(nn.Module):
             if checkpoint is None:
                 assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
                 save_filename = f'{epoch}_net_{self.model_name}_{self.opt.model.gen.fus.type}'
-                path = (os.getcwd() + '/checkpoints/download/') if 'laptop' in socket.gethostname() else \
+                path = (os.getcwd() + '/checkpoints/NightToday/') if 'laptop' in socket.gethostname() else \
                     '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
                 save_path = os.path.join(path, save_filename)
                 checkpoint = torch.load(save_path, weights_only=False, map_location='cpu')
@@ -421,16 +421,15 @@ class NightToDay(nn.Module):
         self.pred_real_T = self.netD(self.real_T, from_=self.T)
 
         encoded_D = self.netG.encode(self.real_D, from_=self.D)
-        encoded_TN, self.fake_TN, self.remapped_T, self.real_N, *other = self.netG.encode(self.real_T, self.real_N,
-                                                                                          from_=self.T, epoch=self.epoch)
-
+        encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
+                                                                                  from_=self.T)
         # region Identity "auto-encode" loss
         if self.lambda_id > 0:
             # Same encoder and decoder should recreate image
             id_D = self.netG.decode(encoded_D, to_=self.D)
             self.loss_id[self.D] += self.compute_loss('id', id_D, self.real_D)
-            id_TN = self.netG.decode(encoded_TN, to_=self.T)
-            self.loss_id[self.T] += self.compute_loss('id', id_TN, self.fake_TN)
+            # id_TN = self.netG.decode(encoded_TN, to_=self.T)
+            # self.loss_id[self.T] += self.compute_loss('id', id_TN, self.fake_TN)
         # endregion
 
         # region GAN loss
@@ -478,11 +477,6 @@ class NightToDay(nn.Module):
                                                    loss_name='fus', criterion_lambda='fus')
         self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
                                                    loss_name='fus', criterion_lambda='fus')
-        if not (None in other):
-            self.loss_fus[self.T] += self.compute_loss('illum', *other, self.remapped_T, self.real_N,
-                                                       self.fake_TN, self.segMask_TN_update,
-                                                       loss_name='fus', criterion_lambda='illumination_aware')
-
         # endregion
 
         # region Total Variation loss
@@ -574,7 +568,7 @@ class NightToDay(nn.Module):
         self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update)
 
         if self.real_D_T is not None:
-            encoded_TD, _, _, real_D, *_ = self.netG.encode(self.real_D_T, self.real_D, from_=self.T, epoch=self.epoch)
+            encoded_TD, *_, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T)
             encoded_D = self.netG.encode(real_D, from_=self.D).detach()
             self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
             self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
@@ -590,7 +584,7 @@ class NightToDay(nn.Module):
 
         # region VGG loss, MI loss and QYang Loss
         self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) -
-                                  self.compute_loss('qyang', self.remapped_T, self.real_N, self.fake_D) -
+                                  self.compute_loss('qyang', self.remapped_T, -self.real_N, self.real_TN) -
                                   self.compute_loss('vif', self.remapped_T, self.real_N, self.fake_D))
         # endregion
         # combined loss

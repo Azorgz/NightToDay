@@ -10,7 +10,7 @@ import torch
 from torch import nn
 
 from .modules import LABToRGB_dEmbed, TransformerDecoderBlock, CrossAttentionFusion, TransformerEncoderBlock, \
-    RGBToLAB_Embed, PatchEmbed, ResnetBlock, FeaturesFusionModule, Upsample, SmoothLayer
+    RGBToLAB_Embed, PatchEmbed, ResnetBlock
 from .utilities import get_norm_layer
 
 
@@ -209,6 +209,6 @@ class ResnetGenDecoder(nn.Module):
 
         self.model = nn.Sequential(*model)
 
-    def forward(self, x):
+    def forward(self, x, *args, **kwargs):
         return self.model(x)
 

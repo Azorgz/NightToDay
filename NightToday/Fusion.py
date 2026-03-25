@@ -402,7 +402,7 @@ class U_ResNetFusion(nn.Module):
         # out = torch.sqrt((self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)*0.5+0.5) * filtered_ir + 1e-6) * 2 - 1
         # out = self.thermal_postprocess(self.tanh_n(1)(out), p_low=0, p_high=100)
         # return out, ir, vis_night  # match input channels
-        return self.tanh_n(1)(out).repeat(1, 3, 1, 1), ir, vis_night, None  # match input channels
+        return self.tanh_n(1)(out).repeat(1, 3, 1, 1), ir, vis_night
 
     def train(self, mode: bool = True) -> None:
         super().train(mode)
@@ -432,7 +432,7 @@ class MonotonicThermalLUT(nn.Module):
         self.scene_selection = SceneSelector()
         self.scene_idx = None
 
-    def forward(self, x, *args, p_low=2., p_high=100, epoch=0):
+    def forward(self, x, *args, p_low=0.5, p_high=100):
         """
         x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
            assumed normalized to [0,1]
@@ -629,82 +629,130 @@ class IlluminationAwareFusion(nn.Module):
         fake_ir, reflectance, illumination
     """
 
-    def __init__(self, thermal_preprocessCfg: ThermalPreprocessConfig, input_channels=6, hidden_dim=256,
+    def __init__(self, thermal_preprocessCfg: ThermalPreprocessConfig, hidden_dim=256,
                  n_enc_layers=4, dropout=0.25, n_downscaling=2):
         super().__init__()
+        norm_layer = get_norm_layer('instance')
         base_dim = hidden_dim // (2 ** n_downscaling)
         # Encoder
-        enc1 = nn.Sequential(
-            nn.Conv2d(input_channels + 1, base_dim, 7, padding=3, padding_mode='reflect'),
+        enc_th = nn.Sequential(
+            nn.Conv2d(1, base_dim, 7, padding=3, padding_mode='reflect'),
             nn.InstanceNorm2d(base_dim),
             nn.ReLU(inplace=True)
         )
-        self.enc = [enc1]
+        enc_vis = nn.Sequential(
+            nn.Conv2d(4, base_dim, 7, padding=3, padding_mode='reflect'),
+            nn.InstanceNorm2d(base_dim),
+            nn.ReLU(inplace=True)
+        )
+        self.enc_th = nn.ModuleList([enc_th])
+        self.enc_vis = nn.ModuleList([enc_vis])
+        self.attn_th, self.attn_vis = nn.ModuleList([SelfAttention(base_dim)]), nn.ModuleList([SelfAttention(base_dim)])
         mult = 1
         for i in range(n_downscaling):
             mult = 2 ** (i + 1)
-            self.enc.append(nn.Sequential(
+            self.enc_th.append(nn.Sequential(
                 nn.Conv2d(base_dim * mult // 2, base_dim * mult, kernel_size=3, stride=2, padding=1),
                 nn.InstanceNorm2d(base_dim * mult),
                 nn.ReLU(inplace=True)
             ))
-        self.enc = nn.Sequential(*self.enc)
-
-        # Cross modal attention at bottleneck
-        self.attn = CrossModalAttention(base_dim * mult)
-
-        # Decoder
-        self.dec = []
-        for i in range(n_downscaling):
-            mult = 2 ** (n_downscaling - i)
-            self.dec.append(nn.Sequential(
-                nn.ConvTranspose2d(base_dim * mult, base_dim * mult // 2, 4, stride=2, padding=1),
-                nn.InstanceNorm2d(base_dim * mult // 2),
+            self.enc_vis.append(nn.Sequential(
+                nn.Conv2d(base_dim * mult // 2, base_dim * mult, kernel_size=3, stride=2, padding=1),
+                nn.InstanceNorm2d(base_dim * mult),
                 nn.ReLU(inplace=True)
             ))
-        self.dec = nn.Sequential(*self.dec)
+            self.attn_th.append(CrossModalAttention(base_dim * mult))
+            self.attn_vis.append(CrossModalAttention(base_dim * mult))
+        # self.enc = nn.Sequential(*self.enc)
+
+        # Cross modal attention at bottleneck
+        # self.cross_attn = CrossModalAttention(base_dim * mult)
+        # self.self_attn_th = SelfAttention(base_dim * mult)
+        # self.self_attn_vis = SelfAttention(base_dim * mult)
+        #
+        # # Decoder
+        # self.dec = []
+        # for i in range(n_downscaling):
+        #     mult = 2 ** (n_downscaling - i)
+        #     self.dec.append(nn.Sequential(
+        #         nn.ConvTranspose2d(base_dim * mult, base_dim * mult // 2, 4, stride=2, padding=1),
+        #         nn.InstanceNorm2d(base_dim * mult // 2),
+        #         nn.ReLU(inplace=True)
+        #     ))
+        # self.dec = nn.Sequential(*self.dec)
 
         # Dual heads
+        hidden_dim = base_dim * mult
         self.reflectance_head = nn.Sequential(
-            nn.Conv2d(base_dim, 1, 7, padding=3, padding_mode='reflect'),
-            nn.Tanh()
+            nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1, padding_mode='reflect'),
+            nn.InstanceNorm2d(hidden_dim),
+            nn.ReLU(inplace=True)
         )
 
         self.illumination_head = nn.Sequential(
-            nn.Conv2d(base_dim, 1, 7, padding=3, padding_mode='reflect'),
-            nn.Sigmoid()
+            nn.Conv2d(2 * hidden_dim, hidden_dim, 3, padding=1, padding_mode='reflect'),
+            nn.InstanceNorm2d(hidden_dim),
+            nn.ReLU(inplace=True)
         )
+        self.intern_illum_head = nn.Sequential(
+            nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1, padding_mode='reflect'),
+            nn.InstanceNorm2d(hidden_dim),
+            nn.ReLU(inplace=True)
+        )
+        self.resnet = nn.Sequential(*([ResnetBlock(hidden_dim, norm_layer=norm_layer, dropout=dropout)]*n_enc_layers))
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
 
     # -------------------------------------------------------
 
-    def forward(self, ir, vis_night, align_first=True, **kwargs):
+    def forward(self, ir, vis=None, align_first=True, **kwargs):
         """
         ir, vis_night ∈ [-1,1]
         """
-
         # Highlight awareness
         ir = self.thermal_preprocess(ir, **kwargs)
-        if align_first:
-            vis_night = self.spatial_aligner(vis_night, ir).detach()
-        mask = highlight_mask(vis_night)
+        if align_first and vis is not None:
+            vis = self.spatial_aligner(vis, ir).detach()
+        mask = highlight_mask(vis) if vis is not None else None
 
-        # Concatenate mask explicitly
-        x = torch.cat([ir, vis_night, mask], dim=1)
+        # First convs
+        ir_feats = self.attn_th[0](self.enc_th[0](ir.mean(dim=1, keepdim=True)))  # convert to grayscale
+        vis_feats = self.attn_vis[0](self.enc_vis[0](torch.cat([vis, mask], dim=1))) if vis is not None else None
 
-        feat = self.enc(x)
-        # Split IR and VIS features for attention
-        ir_feat = feat
-        vis_feat = feat.detach()  # prevent visible highlight domination
+        # layers
+        for i in range(1, len(self.enc_th)):
+            ir_feats = self.enc_th[i](ir_feats)
+            if vis is not None:
+                vis_feats = self.enc_vis[i](vis_feats)
+                # cross attention
+                ir_feats = self.attn_th[i](ir_feats, vis_feats)
+                vis_feats = self.attn_vis[i](vis_feats, ir_feats)
 
-        bottleneck = self.attn(ir_feat, vis_feat)
+        # Head work
+        R = self.reflectance_head(ir_feats)  # [-1, 1]
+        if vis is not None:
+            I = self.illumination_head(torch.cat([ir_feats, vis_feats], dim=1)) + 0.5
+            I_d = self.intern_illum_head((ir_feats + vis_feats)/2)/2
+        else:
+            I = self.illumination_head(torch.cat([ir_feats, 1 - ir_feats], dim=1)) + 0.5
+            I_d = self.intern_illum_head(ir_feats)/2
+        # x = torch.cat([ir, vis_night, mask], dim=1)
+        #
+        # feat = self.enc(x)
+        # # Split IR and VIS features for attention
+        # ir_feat = feat
+        # vis_feat = feat.detach()  # prevent visible highlight domination
+        #
+        # bottleneck = self.attn(ir_feat, vis_feat)
+        #
+        # decoded_feat = self.dec(bottleneck)
+        #
+        # R = self.reflectance_head(decoded_feat) * 0.5 + 1.5  # [1, 2]
+        # I = self.illumination_head(decoded_feat)  # [0, 1]
 
-        decoded_feat = self.dec(bottleneck)
-
-        R = self.reflectance_head(decoded_feat) * 0.5 + 1.5  # [1, 2]
-        I = self.illumination_head(decoded_feat)  # [0, 1]
-
-        fake_ir = R * I - 1.0  # combine reflectance and illumination, scale to [-1,1]
-        return fake_ir.repeat(1, 3, 1, 1), ir, vis_night, I, R, mask
+        feats = self.resnet(R * I + I_d)  # combine reflectance and illumination, scale to [-1,1]
+        if vis is not None:
+            return feats, ir, vis
+        else:
+            return feats

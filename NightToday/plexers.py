@@ -47,8 +47,8 @@ class Plexer(nn.Module):
             #         p.requires_grad = True
             # else:
             net.train(mode=False)
-                # for p in net.parameters():
-                #     p.requires_grad = False
+            # for p in net.parameters():
+            #     p.requires_grad = False
         for arg in args if args else range(len(self.networks)):
             if arg < len(self.networks):
                 self.networks[arg].train(mode=mode)
@@ -73,7 +73,7 @@ class Plexer(nn.Module):
                           for name, net in zip(self.names, self.networks)}
         else:
             optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-                              lr=lr)]#, betas=betas)]
+                              lr=lr)]  #, betas=betas)]
         setattr(self, 'optimizers', optimizers)
 
     def zero_grads(self, *args):
@@ -136,28 +136,30 @@ class G_Plexer(Plexer):
         self.input_size = opt.input_size
         self.fusion_first = opt.fusion_first
         self.opt = opt
-        encoders = [ResnetGenEncoder] * 2
+        fus = opt.fus
+        self.enc_type = fus.type if fus.type in ['IAware', 'UResNet'] else 'UResNet'
+        encoders = [ResnetGenEncoder, IlluminationAwareFusion if fus.type == 'IAware' else ResnetGenEncoder]
         decoders = [ResnetGenDecoder] * 2  # for _ in range(len(self.names_domains))]
         enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
-                    (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling)]
+                    (fus.preprocess_thermal if fus.type == 'IAware' else 3,
+                     fus.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
+                     fus.n_enc_layers if fus.type == 'IAware' else opt.n_enc_layers,
+                     fus.dropout if fus.type == 'IAware' else opt.dropout,
+                     fus.n_downscaling if fus.type == 'IAware' else opt.downscaling)]
         dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
                     (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
-        fus = opt.fus
-        if not hasattr(fus, 'type'):
-            fus.type = 'IAware'
-        if fus.type == 'UResNet':
-            fusion_module = U_ResNetFusion
-        else:
-            fusion_module = IlluminationAwareFusion
-        self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
-                                     n_downscaling=fus.n_downscaling, thermal_preprocessCfg=fus.preprocess_thermal)
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
-        self.networks: list = self.encoders + self.decoders + [self.fusion]
+        self.networks: list = self.encoders + self.decoders
         self.names = ([f'GenEnc_{dom}' for dom, i in zip(self.names_domains, range(2))] +
-                      [f'GenDec_{dom}' for dom, i in zip(self.names_domains, range(2))] + ['Fusion'])
+                      [f'GenDec_{dom}' for dom, i in zip(self.names_domains, range(2))])
+        if fus.type == 'UResNet':
+            self.fusion = U_ResNetFusion(fus.preprocess_thermal, 6,
+                                         fus.hidden_dim, fus.n_enc_layers, fus.dropout, fus.n_downscaling)
+            self.networks += [self.fusion]
+            self.names += ['Fusion']
 
         if opt.n_shared_layers > 0:
             self.shared_encoder = Sequential(*[block_shared(*shenc_args[1:])] * shenc_args[0])
@@ -173,33 +175,34 @@ class G_Plexer(Plexer):
 
     def encode(self, x, *args, from_: str = None, **kwargs):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
-        return_im = False
-        if len(args) and self.fusion_first:
-            x, ir, n, *other = self.fusion(x, *args, **kwargs)
+        if self.enc_type == 'UResNet' and len(args):
+            fake_TN, ir, n = self.fusion(x, *args, **kwargs)
             ir_ = torch.abs(ir.mean(1, keepdim=True)) * 0.5 + 1
-            x = torch.tanh(x * ir_)
-            return_im = True
-        elif len(args) and not self.fusion_first:
-            x = torch.cat((x, *args), dim=1)
-            n = args[0]
-            return_im = True
+            fake_TN = torch.tanh(fake_TN * ir_)
+            fake_TN = self._resize(fake_TN)
+            output = self.encoders[self.names_domains[from_]](fake_TN)
+        elif self.enc_type == 'IAware' and len(args):
+            x = self._resize(x)
+            output, ir, n = self.encoders[self.names_domains[from_]](x, *args, **kwargs)
+            output = self.shared_encoder(output)
+            fake_TN = self.decoders[self.names_domains[from_]](output)
+        else:
+            output = self.encoders[self.names_domains[from_]](x, *args, **kwargs)
+            return self.shared_encoder(output)
+        return output, fake_TN, ir, n
+
+    def _resize(self, x):
         self.ori_shape = x.shape
-        scale = 2**self.opt.downscaling
-        # input_size = self.input_size if isinstance(self.input_size, (list, tuple)) else (self.input_size, self.input_size)
+        scale = 2 ** self.opt.downscaling
         input_size = (-1, -1)
         if input_size[0] < 0:
-            input_size = self.ori_shape[-2]//scale*scale, self.ori_shape[-1]//scale*scale
+            input_size = self.ori_shape[-2] // scale * scale, self.ori_shape[-1] // scale * scale
         else:
             if input_size[0] / scale != input_size[0] // scale:
                 input_size[0] = input_size[0] // scale * scale
             if input_size[1] / scale != input_size[1] // scale:
                 input_size[1] = input_size[1] // scale * scale
-        x = interpolate(x, size=input_size, mode='bilinear', align_corners=False)
-        output = self.encoders[self.names_domains[from_]](x)
-        output = self.shared_encoder(output)
-        if return_im:
-            return output, x, ir, n, *other
-        return output
+        return interpolate(x, size=input_size, mode='bilinear', align_corners=False)
 
     def clean_IR(self, ir):
         return self.fusion.thermal_preprocess(ir)
