@@ -728,15 +728,17 @@ class IlluminationAwareFusion(nn.Module):
                 # cross attention
                 ir_feats = self.attn_th[i](ir_feats, vis_feats)
                 vis_feats = self.attn_vis[i](vis_feats, ir_feats)
+            else:
+                ir_feats = self.attn_th[i](ir_feats, 1 - ir_feats)
 
         # Head work
         R = self.reflectance_head(ir_feats)  # [-1, 1]
         if vis is not None:
-            I = self.illumination_head(torch.cat([ir_feats, vis_feats], dim=1)) + 0.5
-            I_d = self.intern_illum_head((ir_feats + vis_feats)/2)/2
+            I = self.illumination_head(torch.cat([ir_feats, vis_feats], dim=1))
+            I_d = self.intern_illum_head((ir_feats + vis_feats)/2)
         else:
-            I = self.illumination_head(torch.cat([ir_feats, 1 - ir_feats], dim=1)) + 0.5
-            I_d = self.intern_illum_head(ir_feats)/2
+            I = self.illumination_head(torch.cat([ir_feats, 1 - ir_feats], dim=1))
+            I_d = self.intern_illum_head(ir_feats)
         # x = torch.cat([ir, vis_night, mask], dim=1)
         #
         # feat = self.enc(x)
