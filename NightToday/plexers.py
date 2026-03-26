@@ -145,7 +145,7 @@ class G_Plexer(Plexer):
                      opt.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
                      fus.n_enc_layers if fus.type == 'IAware' else opt.n_enc_layers,
                      fus.dropout if fus.type == 'IAware' else opt.dropout,
-                     fus.n_downscaling if fus.type == 'IAware' else opt.downscaling)]
+                     opt.downscaling if fus.type == 'IAware' else opt.downscaling)]
         dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
                     (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
         block_shared = ResnetBlock
