@@ -33,7 +33,7 @@ model:
       hidden_dim: 256
       n_enc_layers: 4
       dropout: 0.25
-      n_downscaling: 2
+      n_downscaling: 3
       type: UResNet  # 'IAware' # 'UResNet'
 
   discr:
@@ -50,7 +50,7 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 40
+  start_epoch: 75
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -120,5 +120,4 @@ data:
 #        sampling: 1
 #        augmentations:
 #          hflip: False
-
 

@@ -362,7 +362,7 @@ class MultiResGANEncoder(nn.Module):
     def train(self, mode: bool = True) -> nn.Module:
         """Override the default train() to freeze the backbone."""
         super().train(mode)
-        # self.patch_encoder.eval()
-        # for param in self.patch_encoder.parameters():
-        #     param.requires_grad = False
+        self.patch_encoder.eval()
+        for param in self.patch_encoder.parameters():
+            param.requires_grad = False
         return self
