@@ -66,14 +66,13 @@ class Plexer(nn.Module):
         for net in self.networks:
             net.apply(func)
 
-    def init_optimizers(self, opt, lr, betas):
-        if self.split_optimizers:
-
-            optimizers = {name: opt(net.parameters(), lr=lr, betas=betas)
-                          for name, net in zip(self.names, self.networks)}
-        else:
-            optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-                              lr=lr)]  #, betas=betas)]
+    def init_optimizers(self, lr, betas):
+        # opt = MuSGD
+        # optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
+        #                   lr=lr)]
+        opt = torch.optim.Adam
+        optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
+                              lr=lr, betas=betas)]
         setattr(self, 'optimizers', optimizers)
 
     def zero_grads(self, *args):
@@ -170,7 +169,7 @@ class G_Plexer(Plexer):
         self.to(self.device)
         self.ori_shape = None
         self.train()
-        self.init_optimizers(MuSGD, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
+        self.init_optimizers(lr=training_cfg.lr_G, betas=training_cfg.betas_G)
         # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
 
     def encode(self, x, *args, from_: str = None, **kwargs):
@@ -236,7 +235,7 @@ class D_Plexer(Plexer):
         self.names = [f'D_{dom}' for dom in self.names_domains]
         self.apply(weights_init)
         self.to(self.device)
-        self.init_optimizers(MuSGD, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
+        self.init_optimizers(lr=training_cfg.lr_G, betas=training_cfg.betas_G)
         # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_D, betas=training_cfg.betas_D)
 
     def forward(self, x, from_: str = None):
@@ -277,7 +276,7 @@ class S_Plexer(Plexer):
                 path = f'/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/{name}.pth'
             net.load_state_dict(torch.load(path), strict=False)
         self.to(self.device)
-        self.init_optimizers(MuSGD, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
+        self.init_optimizers(lr=training_cfg.lr_G, betas=training_cfg.betas_G)
         # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_S, betas=training_cfg.betas_D)
         self.freeze = True
 
