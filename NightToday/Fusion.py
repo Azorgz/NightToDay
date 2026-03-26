@@ -575,9 +575,9 @@ def highlight_mask(vis, threshold=0.95, softness=25.0):
 class CrossModalAttention(nn.Module):
     def __init__(self, dim):
         super().__init__()
-        self.query = nn.Conv2d(dim, dim, 3, padding=1)
-        self.key   = nn.Conv2d(dim, dim, 3, padding=1)
-        self.value = nn.Conv2d(dim, dim, 3, padding=1)
+        self.query = nn.Conv2d(dim, dim, 1)
+        self.key   = nn.Conv2d(dim, dim, 1)
+        self.value = nn.Conv2d(dim, dim, 1)
         self.gamma = nn.Parameter(torch.zeros(1))
 
     def forward(self, ir_feat, vis_feat):
@@ -595,9 +595,9 @@ class CrossModalAttention(nn.Module):
 class SelfAttention(nn.Module):
     def __init__(self, dim):
         super().__init__()
-        self.query = nn.Conv2d(dim, dim, 3, padding=1)
-        self.key   = nn.Conv2d(dim, dim, 3, padding=1)
-        self.value = nn.Conv2d(dim, dim, 3, padding=1)
+        self.query = nn.Conv2d(dim, dim, 1)
+        self.key   = nn.Conv2d(dim, dim, 1)
+        self.value = nn.Conv2d(dim, dim, 1)
         self.gamma = nn.Parameter(torch.zeros(1))
 
     def forward(self, feat):
