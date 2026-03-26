@@ -428,8 +428,8 @@ class NightToDay(nn.Module):
             # Same encoder and decoder should recreate image
             id_D = self.netG.decode(encoded_D, to_=self.D)
             self.loss_id[self.D] += self.compute_loss('id', id_D, self.real_D)
-            # id_TN = self.netG.decode(encoded_TN, to_=self.T)
-            # self.loss_id[self.T] += self.compute_loss('id', id_TN, self.fake_TN)
+            id_TN = self.netG.decode(encoded_TN, to_=self.T)
+            self.loss_id[self.T] += self.compute_loss('id', id_TN, self.fake_TN)
         # endregion
 
         # region GAN loss

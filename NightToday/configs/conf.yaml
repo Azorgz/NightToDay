@@ -34,7 +34,7 @@ model:
       n_enc_layers: 4
       dropout: 0.25
       n_downscaling: 2
-      type: IAware  # 'IAware' # 'UResNet'
+      type: UResNet  # 'IAware' # 'UResNet'
 
   discr:
     base_dim: 64
@@ -43,14 +43,14 @@ model:
 training:
   checkpoint_dir: '/checkpoints'
   checkpoint_freq: 1  # epochs
-  checkpoint_save_latest: 500  # steps
+  checkpoint_save_latest: 1000  # steps
   pedestrian_color: #[red, black] #[black, red] # color of pedestrian in fake D images (color, contour)
   split_optimizers: False
   split_weights: False
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 10
+  start_epoch: 40
   total_epochs: 100
   resume: True
   resume_epoch: latest
