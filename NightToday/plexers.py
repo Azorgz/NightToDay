@@ -139,12 +139,12 @@ class G_Plexer(Plexer):
         self.enc_type = fus.type if fus.type in ['IAware', 'UResNet'] else 'UResNet'
         encoders = [IlluminationAwareFusion if fus.type == 'IAware' else ResnetGenEncoder] * 2
         decoders = [ResnetGenDecoder] * 2  # for _ in range(len(self.names_domains))]
-        enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
-                    (fus.preprocess_thermal if fus.type == 'IAware' else 3,
+        # enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
+        enc_args = [(fus.preprocess_thermal if fus.type == 'IAware' else 3,
                      opt.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
                      fus.n_enc_layers if fus.type == 'IAware' else opt.n_enc_layers,
                      fus.dropout if fus.type == 'IAware' else opt.dropout,
-                     opt.downscaling if fus.type == 'IAware' else opt.downscaling)]
+                     opt.downscaling if fus.type == 'IAware' else opt.downscaling)] * 2
         dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
                     (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
         block_shared = ResnetBlock
