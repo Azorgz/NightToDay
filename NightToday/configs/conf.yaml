@@ -19,8 +19,8 @@ model:
       updateGT_TN_start_epoch: 15
 
   gen:
-    downscaling: 2
-    input_size: 512
+    downscaling: 3
+    input_size: 256
     hidden_dim: 384
     n_enc_layers: 4
     n_shared_layers: 2
@@ -52,7 +52,7 @@ training:
   test_freq: 0  # epochs
   start_epoch: 0
   total_epochs: 100
-  resume: False
+  resume: True
   resume_epoch: latest
 #    G2: 100
 #    G3: 100
@@ -78,27 +78,27 @@ training:
     lambda_ssim:  [[ 0,  ], 2.5]
     lambda_seg:  [[ 1, ], 1.0]
     lambda_semEdge:  [[ 1,  ], .5]
-    lambda_gan:  [[ 0,  ], 2.0]
+    lambda_gan:  [[ 0,  ], 1.0]
     lambda_tv:  [[ 1,  ], 3.0]
     lambda_sga: [[ 40,  ], 1.0]
     lambda_latent: [[ 0, 1], 0.1]
     lambda_att: [[ 40, ], 0.] # 1.0
     lambda_fus: [[ 0,  2], 5.0]
     lambda_scale_robustness: [[ 75,  ], 1.0] # 1.0
-    lambda_trafficlight: [[ 10,  ], 0.1] # 0.2
+    lambda_trafficlight: [[ 20,  ], 0.1] # 0.2
     lambda_illumination_aware: [[ 0,  ], 0.0]
     lambda_thermal: [[ 1,  ], 2.3]
     lambda_contour: [[ 20,  ], 2.0]
-    lambda_sharpness: [[ 0,  ], 25.0]
+    lambda_sharpness: [[ 0,  ], 10.0]
     lambda_cgr: [[ 5, ], 4.5]  # Conditional Gradient Repair
     lambda_bc: [[ 5, ], 2.2]  # Bias correction Loss
-    lambda_vgg: [[ 20,  ], 1.]  # VGG perceptual loss
+    lambda_vgg: [[ 10,  ], 1.]  # VGG perceptual loss
     lambda_sky: [[ 20,  ], 0.2]  # sky color loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
 
 data:
   loader:
-    batch_size: 1
+    batch_size: 4
     num_workers: 1
     shuffle: True
     resize_and_crop: True

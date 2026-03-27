@@ -137,7 +137,7 @@ class G_Plexer(Plexer):
         self.opt = opt
         fus = opt.fus
         self.enc_type = fus.type if fus.type in ['IAware', 'UResNet'] else 'UResNet'
-        encoders = [ResnetGenEncoder, IlluminationAwareFusion if fus.type == 'IAware' else ResnetGenEncoder]
+        encoders = [IlluminationAwareFusion if fus.type == 'IAware' else ResnetGenEncoder] * 2
         decoders = [ResnetGenDecoder] * 2  # for _ in range(len(self.names_domains))]
         enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
                     (fus.preprocess_thermal if fus.type == 'IAware' else 3,
