@@ -1,6 +1,6 @@
 PROJECT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
-mkdir -p "${PROJECT_DIR}/checkpoints/download/test"
+mkdir -p "${PROJECT_DIR}/checkpoints/download/conf_server"
 mkdir -p "${PROJECT_DIR}/checkpoints/download/weights"
 mkdir -p "${PROJECT_DIR}/checkpoints/download/visuals"
 

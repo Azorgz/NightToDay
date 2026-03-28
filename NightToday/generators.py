@@ -29,42 +29,37 @@ class TransformerEncoderDual(nn.Module):
         super().__init__()
         self.patch_size = patch_size
         # Embeddings
-        self.embed_T = PatchEmbed(3, dim, patch_size)
-        self.embed_N = RGBToLAB_Embed(dim, patch_size)
+        self.embed_S = PatchEmbed(3, dim, patch_size)
+        self.embed_C = RGBToLAB_Embed(dim, patch_size)
 
         # Positional encodings (assume input size multiples are known; we'll support dynamic by conv -> flatten)
         # For safety, do not create fixed pos enc; use layernorm instead for stability
-        self.norm_T = nn.LayerNorm(dim)
-        self.norm_N = nn.LayerNorm(dim)
+        self.norm_S = nn.LayerNorm(dim)
+        self.norm_C = nn.LayerNorm(dim)
 
         # Transformer stacks
-        self.encoder_T = nn.ModuleList([TransformerEncoderBlock(dim, n_heads) for _ in range(n_enc_layers)])
-        self.encoder_N = nn.ModuleList([TransformerEncoderBlock(2*dim, n_heads) for _ in range(n_enc_layers)])
+        self.encoder_S = nn.ModuleList([TransformerEncoderBlock(dim, n_heads) for _ in range(n_enc_layers)])
+        self.encoder_C = nn.ModuleList([TransformerEncoderBlock(2*dim, n_heads) for _ in range(n_enc_layers)])
 
         self.fusion_L = CrossAttentionFusion(dim)
         self.fusion_AB = CrossAttentionFusion(dim)
 
     def forward(self, x, y=None, *args):
         x_struct = x
-        x_appear = y  # x_struct: (B,3,H,W), x_appear: (B,3,H,W)
-        feat_L = self.embed_T(x_struct)  # (B, D, H', W')
-        if x_appear is not None:
-            feat_LAB = self.embed_N(x_appear)  # (B, 2*D + 2, H', W')
+        x_appear = y if y is not None else x  # x_struct: (B,3,H,W), x_appear: (B,3,H,W)
+        feat_L = self.embed_S(x_struct)  # (B, D, H', W')
+        feat_LAB = self.embed_C(x_appear)  # (B, 2*D + 2, H', W')
         B, D, Hs, Ws = feat_L.shape
 
         seq_L = feat_L.flatten(2).permute(2, 0, 1)  # (seq, B, D + 2)
-        if x_appear is not None:
-            seq_LAB = feat_LAB.flatten(2).permute(2, 0, 1)  # (seq, B, 2D + 2)
-            first_part = (self.norm_N(seq_LAB[:, :, :D]) + self.norm_T(seq_L)) / 2
-            second_part = seq_LAB[:, :, D + 2:]
-        else:
-            first_part = self.norm_T(seq_L)
-            second_part = torch.zeros(*seq_L.shape[:2], 2*D+2, device=seq_L.device)
+        seq_LAB = feat_LAB.flatten(2).permute(2, 0, 1)  # (seq, B, 2D + 2)
+        first_part = (self.norm_C(seq_LAB[:, :, :D]) + self.norm_S(seq_L)) / 2
+        second_part = seq_LAB[:, :, D + 2:]
         seq_LAB = torch.cat([first_part, second_part], dim=2)
 
-        for layer in self.encoder_T:
+        for layer in self.encoder_S:
             seq_L = layer(seq_L)
-        for layer in self.encoder_N:
+        for layer in self.encoder_C:
             seq_LAB = layer(seq_LAB)
 
         feat_L = seq_L[..., :-2].permute(1, 2, 0).reshape(B, D, Hs, Ws)
