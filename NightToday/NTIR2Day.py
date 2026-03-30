@@ -568,7 +568,7 @@ class NightToDay(nn.Module):
         self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update)
 
         if self.real_D_T is not None:
-            encoded_TD, *_, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T)
+            encoded_TD, fake_T_day, _, real_D = self.netG.encode(self.real_D_T, self.real_D, from_=self.T)
             encoded_D = self.netG.encode(real_D, from_=self.D).detach()
             self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
             self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
@@ -577,6 +577,9 @@ class NightToDay(nn.Module):
             mask_lum = (real_D.mean(dim=1, keepdim=True) < 0.90).float() * (1-mask_proj)
             self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
                                                              real_D*mask_lum, loss_name='color_day',
+                                                             criterion_lambda='color_day')
+            self.loss_color_day[self.D] += self.compute_loss('cycle', fake_T_day,
+                                                             self.real_D_T, loss_name='color_day',
                                                              criterion_lambda='color_day')
             self.loss_color_day[self.D] += self.compute_loss('sharpness', self.fake_D_day, real_D, self.real_D_T,
                                                              criterion_lambda='color_day')
