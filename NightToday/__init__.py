@@ -40,10 +40,10 @@ class ThermalPreprocessConfig:
 class FusConfig:
     preprocess_thermal: ThermalPreprocessConfig
     hidden_dim: 256
-    n_enc_layers: 4
     dropout: 0.25
     n_downscaling: 2
     type: Literal['IAware', 'UResNet']
+    n_enc_layers: list[int]
 
 
 @dataclass

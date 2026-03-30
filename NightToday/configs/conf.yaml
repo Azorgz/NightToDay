@@ -19,7 +19,7 @@ model:
       updateGT_TN_start_epoch: 15
 
   gen:
-    downscaling: 3
+    downscaling: 2
     input_size: 256
     hidden_dim: 384
     n_enc_layers: 4
@@ -31,10 +31,10 @@ model:
         bins: 2048
         scene: 1
       hidden_dim: 256
-      n_enc_layers: 4
+      n_enc_layers: [1, 1, 4]
       dropout: 0.25
-      n_downscaling: 3
-      type: IAware  # 'IAware' # 'UResNet'
+      n_downscaling: 2
+      type: UResNet  # 'IAware' # 'UResNet'
 
   discr:
     base_dim: 64
@@ -50,7 +50,7 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 0
+  start_epoch: 75
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -72,7 +72,7 @@ training:
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
     lambda_color: [[ 20,  ], 5.1]
-    lambda_color_day: [[ 20,  ], 3.]
+    lambda_color_day: [[ 20,  ], 1.]
     lambda_id: [[ 0, 2 ], 0.1]
     lambda_cycle:  [[ 0,  ], 5.0]
     lambda_ssim:  [[ 0,  ], 2.5]
@@ -89,7 +89,7 @@ training:
     lambda_illumination_aware: [[ 0,  ], 0.0]
     lambda_thermal: [[ 1,  ], 2.3]
     lambda_contour: [[ 20,  ], 2.0]
-    lambda_sharpness: [[ 0,  ], 10.0]
+    lambda_sharpness: [[ 0,  ], 15.0]
     lambda_cgr: [[ 5, ], 4.5]  # Conditional Gradient Repair
     lambda_bc: [[ 5, ], 2.2]  # Bias correction Loss
     lambda_vgg: [[ 10,  ], 1.]  # VGG perceptual loss
@@ -98,7 +98,7 @@ training:
 
 data:
   loader:
-    batch_size: 4
+    batch_size: 1
     num_workers: 1
     shuffle: True
     resize_and_crop: True

@@ -315,11 +315,12 @@ class U_ResNetFusion(nn.Module):
     """
 
     def __init__(self, thermal_preprocessCfg: ThermalPreprocessConfig, input_channel=6, hidden_dim=256,
-                 n_enc_layers=4, dropout=0.25, n_downscaling=2, norm_layer='instance', use_bias=True):
+                 n_enc_layers: list = 4, dropout=0.25, n_downscaling=2, norm_layer='instance', use_bias=True):
         super(U_ResNetFusion, self).__init__()
         self.input_channel = input_channel
         norm_layer = get_norm_layer(norm_layer)
         base_dim = hidden_dim // (2 ** n_downscaling)
+        assert len(n_enc_layers) == n_downscaling + 1, "n_enc_layers should have the same length as n_downscaling"
         self.hook = []
         model = [nn.ReflectionPad2d(3),
                  nn.Conv2d(input_channel, base_dim, kernel_size=7, padding=0, bias=use_bias),
@@ -334,11 +335,11 @@ class U_ResNetFusion(nn.Module):
                 norm_layer(base_dim * mult * 2),
                 nn.ReLU()]
             self.hook.append(len(model) - 2)  # store index of norm for skip connection
-            self.res_skip.append(nn.Sequential(ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
-                                                           dropout=dropout, use_bias=use_bias)))
+            self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
+                                                           dropout=dropout, use_bias=use_bias)]*n_enc_layers[i]))
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
-        for _ in range(n_enc_layers):
+        for _ in range(n_enc_layers[-1]):
             model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
         self.encoder = nn.ModuleList(model)
         for i, idx in enumerate(self.hook):

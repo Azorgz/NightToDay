@@ -690,6 +690,7 @@ class SharpFusionLoss(torch.nn.Module):
                                                                                                        1] == 3 else I_vi * 0.5 + 0.5
         I_ir = (0.299 * I_ir[:, 0:1] + 0.587 * I_ir[:, 1:2] + 0.114 * I_ir[:, 2:3]) * 0.5 + 0.5 if I_ir.shape[
                                                                                                        1] == 3 else I_ir * 0.5 + 0.5
+        weigths = 1.5 - I_vi
         # -------- Gradient Loss --------
         G_f = sobel(I_f).abs()
         G_vi = sobel(I_vi).abs()
