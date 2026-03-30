@@ -570,7 +570,7 @@ def highlight_mask(vis, threshold=0.95, softness=25.0):
 
 
 # -----------------------------------------------------------
-# Cross Modal Attention Block
+# Attention Blocks
 # -----------------------------------------------------------
 
 class CrossModalAttention(nn.Module):

@@ -52,7 +52,7 @@ training:
   test_freq: 0  # epochs
   start_epoch: 75
   total_epochs: 100
-  resume: True
+  resume: False
   resume_epoch: latest
 #    G2: 100
 #    G3: 100

@@ -1,9 +1,12 @@
 import os
 import socket
+from pathlib import Path
+
 from ImagesCameras import ImageTensor
 from torch import Tensor
 from .DatasetBase import TrainDataset, TestDataset
 
+ROOT_DIR = Path(__file__).resolve().parent
 
 class FLIR(TrainDataset):
     """
@@ -11,8 +14,8 @@ class FLIR(TrainDataset):
     """
     name = 'FLIR'
     root = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/datasets/FLIR/' \
-        if not 'laptop'in socket.gethostname() else \
-        '/home/godeta/PycharmProjects/TIR2VIS/datasets/FLIR/'
+        if not ('laptop'in socket.gethostname() or 'workstation' in socket.gethostname()) else \
+        f'{str(ROOT_DIR)}/FLIR/'
 
 
     def __init__(self, opt):
