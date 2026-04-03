@@ -6,7 +6,8 @@ from ImagesCameras import ImageTensor
 from torch import Tensor
 from .DatasetBase import TrainDataset, TestDataset
 
-ROOT_DIR = Path(__file__).resolve().parent
+ROOT_DIR = '/home/godeta/PycharmProjects/TIR2VIS/datasets/'
+# ROOT_DIR = Path(__file__).resolve().parent
 
 class FLIR(TrainDataset):
     """

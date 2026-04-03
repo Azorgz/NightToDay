@@ -421,7 +421,8 @@ class NightToDay(nn.Module):
         self.pred_real_T = self.netD(self.real_T, from_=self.T)
 
         encoded_D = self.netG.encode(self.real_D, from_=self.D)
-        encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
+        encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T,
+                                                                                  self.real_N,
                                                                                   from_=self.T)
         # region Identity "auto-encode" loss
         if self.lambda_id > 0:
