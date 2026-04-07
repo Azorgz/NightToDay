@@ -88,7 +88,7 @@ training:
     lambda_scale_robustness: [[ 75,  ], 2.0] # 1.0
     lambda_trafficlight: [[ 20,  ], 0.1] # 0.2
     lambda_illumination_aware: [[ 0,  ], 0.0]
-    lambda_thermal: [[ 1,  ], 2.5]
+    lambda_thermal: [[ 1,  ], 2.2]
     lambda_contour: [[ 20,  ], 2.0]
     lambda_sharpness: [[ 0,  ], 17.5]
     lambda_cgr: [[ 5, ], 4.5]  # Conditional Gradient Repair
