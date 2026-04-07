@@ -146,6 +146,7 @@ class NightToDay(nn.Module):
             self.criterion_structuralCorrelationDifference = StructuralCorrelationDifference(device=self.device)
             self.criterion_qabf = Qabf(device=self.device)
             self.criterion_sky = sky_loss
+            self.criterion_mean = lambda x, y: self.L1(x.mean(dim=[1, 2, 3]), y.mean(dim=[1, 2, 3])).mean()
 
             # Losses storage
             self.initialize_losses()
@@ -478,6 +479,7 @@ class NightToDay(nn.Module):
                                                    loss_name='fus', criterion_lambda='fus')
         self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
                                                    loss_name='fus', criterion_lambda='fus')
+        self.loss_fus[self.T] += self.compute_loss('mean', self.remapped_T, self.fake_TN, loss_name='fus', criterion_lambda='mean')
         # endregion
 
         # region Total Variation loss
