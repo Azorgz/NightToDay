@@ -210,7 +210,9 @@ class G_Plexer(Plexer):
     def decode(self, encoded, to_: str = None):
         assert to_ in self.names_domains, f"Unknown target domain: {to_}"
         out = self.decoders[self.names_domains[to_]](encoded)
-        return interpolate(out, size=self.ori_shape[-2:], mode='bilinear', align_corners=False)
+        out = interpolate(out, size=self.ori_shape[-2:], mode='bilinear', align_corners=False)
+        out_ = out.view(out.shape[0], -1)
+        return (out - out_.min(dim=1)[0]) / (out_.max(dim=1)[0] - out_.min(dim=1)[0] + 1e-8)
 
     def __repr__(self):
         e, d = self.encoders[0], self.decoders[0]
