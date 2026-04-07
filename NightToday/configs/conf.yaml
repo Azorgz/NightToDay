@@ -90,11 +90,11 @@ training:
     lambda_illumination_aware: [[ 0,  ], 0.0]
     lambda_thermal: [[ 1,  ], 2.2]
     lambda_contour: [[ 20,  ], 2.0]
-    lambda_sharpness: [[ 0,  ], 17.5]
+    lambda_sharpness: [[ 0,  ], 20.0]
     lambda_cgr: [[ 5, ], 4.5]  # Conditional Gradient Repair
     lambda_bc: [[ 5, ], 2.2]  # Bias correction Loss
-    lambda_vgg: [[ 10,  ], 1.8]  # VGG perceptual loss
-    lambda_sky: [[ 20,  ], 0.2]  # sky color loss
+    lambda_vgg: [[ 10,  ], 1.2]  # VGG perceptual loss
+    lambda_sky: [[ 20,  ], 0.5]  # sky color loss
   gan_type: "lsgan"  # ['lsgan', 'hinge', 'wgan-gp', 'ralsgan']
 
 data:
