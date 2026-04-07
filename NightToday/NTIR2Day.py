@@ -146,7 +146,7 @@ class NightToDay(nn.Module):
             self.criterion_structuralCorrelationDifference = StructuralCorrelationDifference(device=self.device)
             self.criterion_qabf = Qabf(device=self.device)
             self.criterion_sky = sky_loss
-            self.criterion_mean = lambda x, y: self.L1(x.mean(dim=[1, 2, 3]), y.mean(dim=[1, 2, 3])).mean()
+            self.criterion_mean = lambda x, y: torch.relu(torch.abs(x.mean(dim=[1, 2, 3]) - y.mean(dim=[1, 2, 3])) - 1e-2).mean()
 
             # Losses storage
             self.initialize_losses()
