@@ -319,7 +319,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
     # color distance function
     color_dist = im_fake.color_distance(im_target)  # shape (B,1,H,W) or (B,H,W)
     hsv_target = im_target.HSV()
-    color_magn = hsv_target[:, 1:2, :, :] * hsv_target[:, 2:3, :, :]
+    color_magn = (hsv_target[:, 1:2, :, :] + 1) * hsv_target[:, 2:3, :, :]
     target_l, target_ab = rgb_to_lab(im_target.to_tensor()).split([1, 2], 1)  # L channel
     low_lum = target_l < th_low * 100
     high_lum = target_l > th_high * 100
@@ -1070,7 +1070,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, rec_vis, real_edges, fake_gra
         loss_sga_light[valid_idx] = 0.5 * (
                 F.relu(0.8 * EM_masked[valid_idx] - fake_grad_norm).sum(dim=[1, 2, 3]) / edge_sum[valid_idx])
 
-    ABC_losses = SLight_loss.sum() + loss_sga_light.sum()  #+ TLight_loss.sum() * 5
+    ABC_losses = SLight_loss.sum() + loss_sga_light.sum() + sky_loss.sum() * 2
 
     # ########## Color Bias Correction
     # Masks
