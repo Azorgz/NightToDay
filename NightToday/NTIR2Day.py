@@ -479,7 +479,8 @@ class NightToDay(nn.Module):
                                                    loss_name='fus', criterion_lambda='fus')
         self.loss_fus[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T,
                                                    loss_name='fus', criterion_lambda='fus')
-        self.loss_fus[self.T] += self.compute_loss('mean', self.remapped_T, self.fake_TN, loss_name='fus', criterion_lambda='mean')
+        self.loss_fus[self.T] += self.compute_loss('mean', self.remapped_T, self.fake_TN, loss_name='fus',
+                                                   criterion_lambda='mean')
         # endregion
 
         # region Total Variation loss
