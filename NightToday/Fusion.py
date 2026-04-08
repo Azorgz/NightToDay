@@ -359,6 +359,11 @@ class U_ResNetFusion(nn.Module):
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
+        # self.vis_preprocess = nn.Sequential(nn.Conv2d(base_dim//2, base_dim//2, kernel_size=3, padding=1),
+        #                                     nn.ReLU(),
+        #                                     SelfAttention(base_dim//2),
+        #                                     nn.ReLU())
+        # self.cross_attention = CrossModalAttention(base_dim//2)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -386,6 +391,7 @@ class U_ResNetFusion(nn.Module):
         ir = self.thermal_preprocess(ir, **kwargs)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
+
         # AB = rgb_to_lab(vis_night)[:, 1:] / 128  # extract AB channels and normalize to [-1,1]
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
         for layer in self.encoder:
@@ -429,8 +435,7 @@ class MonotonicThermalLUT(nn.Module):
         self.conv = nn.Sequential(nn.Conv2d(1, 32, 3, padding=1),
                                   nn.ReLU(),
                                   nn.Conv2d(32, 32, 3, padding=1),
-                                  nn.ReLU(),
-                                  nn.AdaptiveAvgPool2d(1))
+                                  nn.ReLU())
         self.deconv = nn.Sequential(nn.Conv2d(32, 32, 3, padding=1),
                                     nn.ReLU(),
                                     nn.Conv2d(32, 1, 3, padding=1),

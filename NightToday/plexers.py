@@ -176,8 +176,6 @@ class G_Plexer(Plexer):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
         if self.enc_type == 'UResNet' and len(args):
             fake_TN, ir, n = self.fusion(x, *args, **kwargs)
-            # ir_ = torch.abs(ir.mean(1, keepdim=True)) * 0.5 + 1
-            # fake_TN = torch.tanh(fake_TN * ir_)
             fake_TN = self._resize(fake_TN)
             output = self.encoders[self.names_domains[from_]](fake_TN)
             output = self.shared_encoder(output)
