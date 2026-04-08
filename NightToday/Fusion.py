@@ -461,7 +461,7 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        y_ = self.attn(self.conv(y))
+        y_ = self.deconv(self.attn(self.conv(y)))
         y = torch.tanh(y + y_)
         return y.repeat(1, 3, 1, 1)
 
