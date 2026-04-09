@@ -431,14 +431,12 @@ class MonotonicThermalLUT(nn.Module):
         init_delta = torch.ones(scene, bins) * 1.0
         self.delta = nn.Parameter(init_delta)
         self.scene_selection = SceneSelector()
-        self.attn = SelfAttention(32)
-        self.conv = nn.Sequential(nn.Conv2d(1, 32, 3, padding=1),
-                                  nn.ReLU(),
-                                  nn.Conv2d(32, 32, 3, padding=1),
+        self.attn = SelfAttention(256)
+        self.conv = nn.Sequential(nn.Conv2d(1, 256, kernel_size=16, stride=16),
                                   nn.ReLU())
-        self.deconv = nn.Sequential(nn.Conv2d(32, 32, 3, padding=1),
+        self.deconv = nn.Sequential(nn.ConvTranspose2d(256, 1, kernel_size=16, stride=16),
                                     nn.ReLU(),
-                                    nn.Conv2d(32, 1, 3, padding=1),
+                                    nn.Conv2d(1, 1, 3, padding=1),
                                     nn.Tanh())
         self.scene_idx = None
 
@@ -466,7 +464,7 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        y_ = self.deconv(self.attn(self.conv(y)))
+        y_ = F.interpolate(self.deconv(self.attn(self.conv(F.interpolate(y, (512, 512))))), (y.shape[-2], y.shape[-1]))
         y = torch.tanh(y + y_)
         return y.repeat(1, 3, 1, 1)
 
