@@ -822,9 +822,11 @@ class Perturb_Lightness(nn.Module):
         super().__init__()
 
     def forward(self, img_vis):
+        if img_vis.min() < 0:
+            img_vis = (img_vis + 1) / 2  # scale to [0,1]
         night_level = self.night_scale[torch.randint(0, self.night_levels, (1,)).item()]
         img_vis_noised = self._process_day(img_vis, night_level)
-        return img_vis_noised
+        return img_vis_noised * 2 - 1  # scale back to [-1,1]
 
     def _process_day(self, img_vis, night_level):
         # decrease luminance of the visible image according to the night level
