@@ -104,6 +104,8 @@ def GetFeaMatrixCenter(fea_array, cluster_num, max_iter):
         num_clusters=cluster_num,
         distance='cosine',
         device=fea_array.device,
+        iter_limit=max_iter,
+        tqdm_flag=False
     )
     return centers.to(fea_array.device)
 
