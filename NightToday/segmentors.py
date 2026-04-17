@@ -221,4 +221,4 @@ class SegmentorHeadv2(nn.Module):
 
     def forward(self, x):
         outs, seg_fea = self.model(torch.cat((x, self.csg(x)), 1))
-        return outs #, seg_fea
+        return outs

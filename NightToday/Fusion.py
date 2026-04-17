@@ -3,7 +3,7 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from kornia.color import rgb_to_lab, lab_to_rgb
+from kornia.color import rgb_to_lab, lab_to_rgb, rgb_to_hsv, hsv_to_rgb
 from kornia.filters import median_blur, bilateral_blur
 from torch import conv2d
 from torch.nn import ModuleList
@@ -330,12 +330,12 @@ class U_ResNetFusion(nn.Module):
         self.count_skip = 0
         for i in range(n_downscaling):
             mult = 2 ** i
+            self.hook.append(len(model) - 1)  # store index of norm for skip connection
             model += [
                 nn.Conv2d(base_dim * mult, base_dim * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
                 norm_layer(base_dim * mult * 2),
                 nn.ReLU()]
-            self.hook.append(len(model) - 2)  # store index of norm for skip connection
-            self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
+            self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult, norm_layer=norm_layer,
                                                            dropout=dropout, use_bias=use_bias)]*n_enc_layers[i]))
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
@@ -352,18 +352,14 @@ class U_ResNetFusion(nn.Module):
                                                                 padding=1, output_padding=0,
                                                                 bias=use_bias), self.tanh_n(mult * 2, mult)))
 
-        self.layers.append(nn.Conv2d(int(base_dim * mult // 2), 1,
+        self.layers.append(nn.Conv2d(base_dim, 1,
                                      kernel_size=7, padding=3, padding_mode='reflect'))
         self.final_conv = nn.Sequential(nn.Conv2d(1, 1,
                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
-        # self.vis_preprocess = nn.Sequential(nn.Conv2d(base_dim//2, base_dim//2, kernel_size=3, padding=1),
-        #                                     nn.ReLU(),
-        #                                     SelfAttention(base_dim//2),
-        #                                     nn.ReLU())
-        # self.cross_attention = CrossModalAttention(base_dim//2)
+        self.vis_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins, 1)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -387,21 +383,21 @@ class U_ResNetFusion(nn.Module):
 
         return tanh_n(n1, n2 or n1)
 
-    def forward(self, ir, vis_night, align_first=True, **kwargs):
+    def forward(self, ir, vis_night, align_first=False, **kwargs):
         ir = self.thermal_preprocess(ir, **kwargs)
+        vis_night = self.vis_preprocess(vis_night, **kwargs)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
-
-        # AB = rgb_to_lab(vis_night)[:, 1:] / 128  # extract AB channels and normalize to [-1,1]
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
         for layer in self.encoder:
             x_feat = layer(x_feat)
         for i, layer in enumerate(self.layers):
+            x_feat = layer(x_feat)
             if i < len(self.layers) - 1:
                 hook_output = getattr(self, f'encoder_hook_{self.hook[-(i + 1)]}')
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
-            x_feat = layer(x_feat)
-        out = self.tanh_n(1)(self.final_conv(x_feat))
+
+        out = self.final_conv(x_feat)
         # return out, ir, vis_night  # match input channels
         return out.repeat(1, 3, 1, 1), ir, vis_night
 
@@ -431,13 +427,13 @@ class MonotonicThermalLUT(nn.Module):
         init_delta = torch.ones(scene, bins) * 1.0
         self.delta = nn.Parameter(init_delta)
         self.scene_selection = SceneSelector()
-        self.attn = SelfAttention(256)
-        self.conv = nn.Sequential(nn.Conv2d(1, 256, kernel_size=16, stride=16),
-                                  nn.ReLU())
-        self.deconv = nn.Sequential(nn.ConvTranspose2d(256, 1, kernel_size=16, stride=16),
-                                    nn.ReLU(),
-                                    nn.Conv2d(1, 1, 3, padding=1),
-                                    nn.Tanh())
+        # self.attn = nn.Sequential(*[SelfAttention(256)] * 4)
+        # self.conv = nn.Sequential(nn.Conv2d(1, 256, kernel_size=16, stride=16),
+        #                           nn.ReLU())
+        # self.deconv = nn.Sequential(nn.ConvTranspose2d(256, 1, kernel_size=16, stride=16),
+        #                             nn.ReLU(),
+        #                             nn.Conv2d(1, 1, 3, padding=1),
+        #                             nn.Tanh())
         self.scene_idx = None
 
     def forward(self, x, *args, p_low=0.5, p_high=100):
@@ -447,7 +443,10 @@ class MonotonicThermalLUT(nn.Module):
         args: complementary modality for scene selection
         """
         if x.shape[1] == 3:
-            x = x.mean(dim=1, keepdim=True)  # convert to grayscale
+            HS, x = rgb_to_hsv(x * 0.5 + 0.5).split([2, 1], dim=1)
+            x = x * 2 - 1  # normalize to [-1,1]
+        else:
+            HS = None
         # Robust normalization to [0,1]
         x = self.robust_norm(x, p_low=p_low, p_high=p_high, eps=self.eps)
         self.scene_idx = torch.ones([x.shape[0], self.scene], device=x.device) / self.scene
@@ -464,9 +463,13 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        y_ = F.interpolate(self.deconv(self.attn(self.conv(F.interpolate(y, (512, 512))))), (y.shape[-2], y.shape[-1]))
-        y = torch.tanh(y + y_)
-        return y.repeat(1, 3, 1, 1)
+        # y_ = F.interpolate(self.deconv(self.attn(self.conv(F.interpolate(y, (512, 512))))), (y.shape[-2], y.shape[-1]))
+        # y = torch.tanh(y + y_)
+        if HS is not None:
+            y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
+        else:
+            y = y.repeat(1, 3, 1, 1)
+        return y
 
     def naive_scene_selection(self, x):
         x_mean_t = x[:, :, ::2].mean(dim=[1, 2, 3])

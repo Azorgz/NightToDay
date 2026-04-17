@@ -6,6 +6,14 @@
   <component name="ChangeListManager">
     <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Normalization of the output of the decoder">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/modules.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/modules.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/segmentors.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/segmentors.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/utilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/utilities.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

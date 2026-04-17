@@ -243,8 +243,6 @@ class ResnetBlock(nn.Module):
         ]
         self.conv_block = nn.Sequential(*conv_block)
 
-
-
     def forward(self, x):
         out = x + self.conv_block(x)
         return out

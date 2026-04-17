@@ -133,32 +133,39 @@ class G_Plexer(Plexer):
     def __init__(self, names, opt: GenConfig, training_cfg: TrainConfig, device: torch.device):
         super(G_Plexer, self).__init__(names, device, training_cfg.split_optimizers)
         self.input_size = opt.input_size
-        self.fusion_first = opt.fusion_first
         self.opt = opt
         fus = opt.fus
         self.enc_type = fus.type if fus.type in ['IAware', 'UResNet'] else 'UResNet'
         encoders = [IlluminationAwareFusion if fus.type == 'IAware' else ResnetGenEncoder] * 2
-        decoders = [ResnetGenDecoder] * 2  # for _ in range(len(self.names_domains))]
-        # enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
+        decoders = [ResnetGenDecoder] * 2
         enc_args = [(fus.preprocess_thermal if fus.type == 'IAware' else 3,
                      opt.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
                      fus.n_enc_layers if fus.type == 'IAware' else opt.n_enc_layers,
                      fus.dropout if fus.type == 'IAware' else opt.dropout,
                      opt.downscaling if fus.type == 'IAware' else opt.downscaling)] * 2
         dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
-                    (3 if opt.fusion_first else 6, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
+                    (3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
+        fus = opt.fus
+        if not hasattr(fus, 'type'):
+            fus.type = 'IAware'
+        if fus.type == 'UResNet':
+            fusion_module = U_ResNetFusion
+        elif fus.type == 'IAware':
+            fusion_module = IlluminationAwareFusion
+        else:
+            fusion_module = None
+        if fusion_module is not None:
+            self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
+                                     n_downscaling=fus.n_downscaling, thermal_preprocessCfg=fus.preprocess_thermal)
+        else:
+            self.fusion = nn.Identity()
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
-        self.networks: list = self.encoders + self.decoders
+        self.networks: list = self.encoders + self.decoders + [self.fusion]
         self.names = ([f'GenEnc_{dom}' for dom, i in zip(self.names_domains, range(2))] +
-                      [f'GenDec_{dom}' for dom, i in zip(self.names_domains, range(2))])
-        if fus.type == 'UResNet':
-            self.fusion = U_ResNetFusion(fus.preprocess_thermal, 6,
-                                         fus.hidden_dim, fus.n_enc_layers, fus.dropout, fus.n_downscaling)
-            self.networks += [self.fusion]
-            self.names += ['Fusion']
+                      [f'GenDec_{dom}' for dom, i in zip(self.names_domains, range(2))] + ['Fusion'])
 
         if opt.n_shared_layers > 0:
             self.shared_encoder = Sequential(*[block_shared(*shenc_args[1:])] * shenc_args[0])
@@ -170,7 +177,6 @@ class G_Plexer(Plexer):
         self.ori_shape = None
         self.train()
         self.init_optimizers(lr=training_cfg.lr_G, betas=training_cfg.betas_G)
-        # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_G, betas=training_cfg.betas_G)
 
     def encode(self, x, *args, from_: str = None, **kwargs):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"

@@ -9,7 +9,7 @@ model:
 
   seg:
     num_classes: 19
-    type: 'LETNet'#  'LETNet'  # 'Segmentor'
+    type: 'Segmentor'#  'LETNet'  # 'Segmentor'
     base_dim: 64
     n_layers: 4
     training_schedule:
@@ -20,7 +20,7 @@ model:
 
   gen:
     downscaling: 2
-    input_size: 512
+    input_size: 256
     hidden_dim: 384
     n_enc_layers: 4
     n_shared_layers: 2
@@ -31,7 +31,7 @@ model:
         bins: 2048
         scene: 1
       hidden_dim: 256
-      n_enc_layers: [1, 1, 4]
+      n_enc_layers: [1, 2, 4]
       dropout: 0.25
       n_downscaling: 2
       type: UResNet  # 'IAware' # 'UResNet'
@@ -50,7 +50,7 @@ training:
   visualize_freq: 25  # steps
   visualize_dir: '/training_visuals'
   test_freq: 0  # epochs
-  start_epoch: 75
+  start_epoch: 5
   total_epochs: 100
   resume: True
   resume_epoch: latest
@@ -71,8 +71,8 @@ training:
     D: [0.5, 0.999]
     S: [0.5, 0.999]
   loss_scheduler:  # [switch, switch, switch, ...], value
-    lambda_color: [[ 20,  ], 5.1]
-    lambda_color_day: [[ 20,  ], 3.]
+    lambda_color: [[ 10,  ], 5.1]
+    lambda_color_day: [[ 10,  ], 3.]
     lambda_id: [[ 0, 2 ], 0.1]
     lambda_cycle:  [[ 0,  ], 5.0]
     lambda_ssim:  [[ 0,  ], 2.5]
@@ -85,7 +85,7 @@ training:
     lambda_att: [[ 40, ], 0.] # 1.0
     lambda_fus: [[ 0,  2], 5.0]
     lambda_mean: [[ 0, ], 2.0]
-    lambda_scale_robustness: [[ 75,  ], 2.0] # 1.0
+    lambda_scale_robustness: [[ 40,  ], 2.0] # 1.0
     lambda_trafficlight: [[ 20,  ], 0.1] # 0.2
     lambda_illumination_aware: [[ 0,  ], 0.0]
     lambda_thermal: [[ 1,  ], 2.2]
@@ -108,10 +108,10 @@ data:
       sampling: 1
       augmentations:
         hflip: True
-    - name: 'LYNRED'
-      sampling: 1
-      augmentations:
-        hflip: True
+#    - name: 'LYNRED'
+#      sampling: 1
+#      augmentations:
+#        hflip: True
 #  test_datasets:
 #      - name: 'LYNRED_DAY_SAMPLES'
 #        sampling: 1
