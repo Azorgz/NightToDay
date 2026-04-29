@@ -4,16 +4,12 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Normalization of the output of the decoder">
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="day loss updated">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/modules.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/modules.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/segmentors.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/segmentors.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/utilities.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/utilities.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/synchro_folder.sh" beforeDir="false" afterPath="$PROJECT_DIR$/synchro_folder.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -62,7 +58,7 @@
     &quot;Python.encoders.executor&quot;: &quot;Debug&quot;,
     &quot;Python.manual_labeling_flir_night.executor&quot;: &quot;Run&quot;,
     &quot;Python.test.executor&quot;: &quot;Run&quot;,
-    &quot;Python.train.executor&quot;: &quot;Run&quot;,
+    &quot;Python.train.executor&quot;: &quot;Debug&quot;,
     &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
     &quot;SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
@@ -216,46 +212,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00345" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1772632836246</created>
-      <option name="number" value="00345" />
-      <option name="presentableId" value="LOCAL-00345" />
-      <option name="project" value="LOCAL" />
-      <updated>1772632836246</updated>
-    </task>
-    <task id="LOCAL-00346" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1772632893595</created>
-      <option name="number" value="00346" />
-      <option name="presentableId" value="LOCAL-00346" />
-      <option name="project" value="LOCAL" />
-      <updated>1772632893595</updated>
-    </task>
-    <task id="LOCAL-00347" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1772632972118</created>
-      <option name="number" value="00347" />
-      <option name="presentableId" value="LOCAL-00347" />
-      <option name="project" value="LOCAL" />
-      <updated>1772632972118</updated>
-    </task>
-    <task id="LOCAL-00348" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1772634565429</created>
-      <option name="number" value="00348" />
-      <option name="presentableId" value="LOCAL-00348" />
-      <option name="project" value="LOCAL" />
-      <updated>1772634565429</updated>
-    </task>
-    <task id="LOCAL-00349" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1772811863274</created>
-      <option name="number" value="00349" />
-      <option name="presentableId" value="LOCAL-00349" />
-      <option name="project" value="LOCAL" />
-      <updated>1772811863274</updated>
     </task>
     <task id="LOCAL-00350" summary="Update of TL sample merging">
       <option name="closed" value="true" />
@@ -609,7 +565,47 @@
       <option name="project" value="LOCAL" />
       <updated>1775572164128</updated>
     </task>
-    <option name="localTasksCounter" value="394" />
+    <task id="LOCAL-00394" summary="Update global post update dataset">
+      <option name="closed" value="true" />
+      <created>1776429992331</created>
+      <option name="number" value="00394" />
+      <option name="presentableId" value="LOCAL-00394" />
+      <option name="project" value="LOCAL" />
+      <updated>1776429992331</updated>
+    </task>
+    <task id="LOCAL-00395" summary="Update global post update dataset">
+      <option name="closed" value="true" />
+      <created>1776430898149</created>
+      <option name="number" value="00395" />
+      <option name="presentableId" value="LOCAL-00395" />
+      <option name="project" value="LOCAL" />
+      <updated>1776430898149</updated>
+    </task>
+    <task id="LOCAL-00396" summary="Update global post update dataset">
+      <option name="closed" value="true" />
+      <created>1776432470381</created>
+      <option name="number" value="00396" />
+      <option name="presentableId" value="LOCAL-00396" />
+      <option name="project" value="LOCAL" />
+      <updated>1776432470381</updated>
+    </task>
+    <task id="LOCAL-00397" summary="day loss updated">
+      <option name="closed" value="true" />
+      <created>1776435631723</created>
+      <option name="number" value="00397" />
+      <option name="presentableId" value="LOCAL-00397" />
+      <option name="project" value="LOCAL" />
+      <updated>1776435631723</updated>
+    </task>
+    <task id="LOCAL-00398" summary="day loss updated">
+      <option name="closed" value="true" />
+      <created>1776437380518</created>
+      <option name="number" value="00398" />
+      <option name="presentableId" value="LOCAL-00398" />
+      <option name="project" value="LOCAL" />
+      <updated>1776437380518</updated>
+    </task>
+    <option name="localTasksCounter" value="399" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -636,7 +632,9 @@
     <MESSAGE value="Update of the FLIR dataset loading" />
     <MESSAGE value="Update of TL sample merging" />
     <MESSAGE value="Normalization of the output of the decoder" />
-    <option name="LAST_COMMIT_MESSAGE" value="Normalization of the output of the decoder" />
+    <MESSAGE value="Update global post update dataset" />
+    <MESSAGE value="day loss updated" />
+    <option name="LAST_COMMIT_MESSAGE" value="day loss updated" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

@@ -24,7 +24,7 @@ import matplotlib.colors as mcolors
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
-from ImagesCameras.Metrics.Metrics import VGG, QYang, Qabf, StructuralCorrelationDifference
+from ImagesCameras.Metrics.Metrics import VGG, Qabf, StructuralCorrelationDifference
 from kornia.augmentation import RandomCrop
 from kornia.color import rgb_to_lab
 from kornia.contrib import connected_components
@@ -176,7 +176,8 @@ class NightToDay(nn.Module):
             else:
                 checkpoint = torch.load(opt, weights_only=False, map_location='cpu')
                 self.opt = get_config()
-                self.opt.model = checkpoint['config'].model
+                opt_saved = get_config(file=checkpoint['config'])
+                self.opt.model = opt_saved.model
         else:
             checkpoint = opt
             self.opt = get_config()
@@ -187,7 +188,7 @@ class NightToDay(nn.Module):
                 self.mode = 'train'
                 if self.opt.model.build_from_checkpoint and self.opt.training.resume:
                     checkpoint = self.load(self.opt.training.resume_epoch, return_checkpoint=True)
-                    self.opt.model = checkpoint['config'].model
+                    self.opt.model = get_config(file=checkpoint['config']).model
                 else:
                     checkpoint = None
         self.device = self.opt.device
@@ -195,7 +196,7 @@ class NightToDay(nn.Module):
 
     def save(self, epoch):
         checkpoint = {'epoch': epoch,
-                      'config': self.opt}
+                      'config': self.opt.to_dict()}
         for net_label in ['G', 'D', 'S']:
             net = getattr(self, f'net{net_label}')
             checkpoint[net_label] = self.get_weights(net)
@@ -446,16 +447,16 @@ class NightToDay(nn.Module):
         self.rec_T = self.rec_TN
         self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.fake_TN if self.epoch >= 2 else self.remapped_T,
                                                      loss_name='cycle', criterion_lambda='thermal')
-        # endregion
-
-        # region Segmentation Distillation Knowledge
-        rand_size, seg_IR = self.backward_S()
-        # endregion
 
         # region Cycle loss on Latent Space
         if self.lambda_latent > 0:
             self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
             self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_TN)
+        # endregion
+        # endregion
+
+        # region Segmentation Distillation Knowledge
+        rand_size, seg_IR = self.backward_S()
         # endregion
 
         # region Fusion Loss
@@ -467,6 +468,12 @@ class NightToDay(nn.Module):
                                                    loss_name='fus', criterion_lambda='fus')
         self.loss_fus[self.T] += self.compute_loss('mean', self.real_T, self.fake_TN, loss_name='fus',
                                                    criterion_lambda='mean')
+        # endregion
+
+        # region VGG loss, MI loss and QYang Loss
+        self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) +
+                                  self.compute_loss('structuralCorrelationDifference', self.remapped_T, self.real_TN) -
+                                  self.compute_loss('qabf', self.remapped_T, -self.real_N, self.real_TN))
         # endregion
 
         # region Total Variation loss
@@ -496,7 +503,7 @@ class NightToDay(nn.Module):
                                                                 criterion_lambda='trafficlight')
         # endregion
 
-        # region Structure-Gradient Alignment loss
+        # region Structure-Gradient Alignment loss & IR Bias correction Loss
         self.loss_sga[self.D] += self.compute_loss('sga', self.edges_D, self.get_gradmag(self.fake_T))
         self.loss_sga[self.D] += self.compute_loss('IRClsDis', self.segMask_D,
                                                    self.fake_T.mean(dim=1, keepdim=True),
@@ -574,11 +581,6 @@ class NightToDay(nn.Module):
                                                              criterion_lambda='color_day')
         # endregion
 
-        # region VGG loss, MI loss and QYang Loss
-        self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) +
-                                  self.compute_loss('structuralCorrelationDifference', self.remapped_T, self.real_TN) -
-                                  self.compute_loss('qabf', self.remapped_T, -self.real_N, self.real_TN))
-        # endregion
         # combined loss
         self.sum_losses().backward()
 

@@ -31,9 +31,8 @@ model:
         bins: 2048
         scene: 1
       hidden_dim: 256
-      n_enc_layers: [1, 2, 4]
+      n_res_blocks: [1, 2, 4]  # number of ResBlocks in each fusion block
       dropout: 0.25
-      n_downscaling: 2
       type: UResNet  # 'IAware' # 'UResNet'
 
   discr:

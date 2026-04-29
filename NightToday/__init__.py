@@ -1,3 +1,4 @@
+import copy
 import json
 import os
 from dataclasses import dataclass
@@ -41,9 +42,8 @@ class FusConfig:
     preprocess_thermal: ThermalPreprocessConfig
     hidden_dim: 256
     dropout: 0.25
-    n_downscaling: 2
     type: Literal['IAware', 'UResNet']
-    n_enc_layers: list[int]
+    n_res_blocks: list[int]
 
 
 @dataclass
@@ -148,6 +148,11 @@ class OptImage2ImageGATConfig:
     model: ModelConfig
     training: TrainConfig
     data: DataConfig
+    options: dict = None
+
+    def to_dict(self):
+        return self.options
+
 
 
 @dataclass
@@ -170,15 +175,19 @@ class SemClassMapping:
     VEHICLES = [CAR, TRUCK, BUS, TRAIN, MOTORCYCLE, BICYCLE]
 
 
-def get_config(path=None) -> OptImage2ImageGATConfig:
+def get_config(path: str = None, file: dict = None) -> OptImage2ImageGATConfig:
+    assert path is None or file is None, "Only one of path or file should be provided."
     if path is not None and isfile(path):
         with open(path, 'r') as f:
             conf = yaml.safe_load(f)
+    elif file is not None:
+        conf = copy.deepcopy(file)
     else:
         BASE_DIR = Path(__file__).resolve().parent
         path = BASE_DIR / 'configs' / 'conf.yaml'
         with open(path, 'r') as f:
             conf = yaml.safe_load(f)
+    options = copy.deepcopy(conf)
 
     # Model Config
     input_size = tuple([conf['model']['gen']['input_size'], conf['model']['gen']['input_size']]) if not isinstance(
@@ -263,7 +272,8 @@ def get_config(path=None) -> OptImage2ImageGATConfig:
     return OptImage2ImageGATConfig(device=devices,
                                    model=modelConfig,
                                    training=trainConfig,
-                                   data=data)
+                                   data=data,
+                                   options=options)
 
 
 def validate_epoch_load(epoch_load: Union[str, dict, int], n_domains: int, split: bool) -> dict | str | int:

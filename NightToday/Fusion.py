@@ -315,12 +315,12 @@ class U_ResNetFusion(nn.Module):
     """
 
     def __init__(self, thermal_preprocessCfg: ThermalPreprocessConfig, input_channel=6, hidden_dim=256,
-                 n_enc_layers: list = 4, dropout=0.25, n_downscaling=2, norm_layer='instance', use_bias=True):
+                 n_enc_layers: list = None, dropout=0.25, norm_layer='instance', use_bias=True):
         super(U_ResNetFusion, self).__init__()
         self.input_channel = input_channel
         norm_layer = get_norm_layer(norm_layer)
+        n_downscaling = len(n_enc_layers) - 1
         base_dim = hidden_dim // (2 ** n_downscaling)
-        assert len(n_enc_layers) == n_downscaling + 1, "n_enc_layers should have the same length as n_downscaling"
         self.hook = []
         model = [nn.ReflectionPad2d(3),
                  nn.Conv2d(input_channel, base_dim, kernel_size=7, padding=0, bias=use_bias),
@@ -330,13 +330,13 @@ class U_ResNetFusion(nn.Module):
         self.count_skip = 0
         for i in range(n_downscaling):
             mult = 2 ** i
-            self.hook.append(len(model) - 1)  # store index of norm for skip connection
             model += [
                 nn.Conv2d(base_dim * mult, base_dim * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
                 norm_layer(base_dim * mult * 2),
                 nn.ReLU()]
-            self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult, norm_layer=norm_layer,
+            self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
                                                            dropout=dropout, use_bias=use_bias)]*n_enc_layers[i]))
+            self.hook.append(len(model) - 2)  # store index of norm for skip connection
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
         for _ in range(n_enc_layers[-1]):
@@ -392,11 +392,10 @@ class U_ResNetFusion(nn.Module):
         for layer in self.encoder:
             x_feat = layer(x_feat)
         for i, layer in enumerate(self.layers):
-            x_feat = layer(x_feat)
             if i < len(self.layers) - 1:
                 hook_output = getattr(self, f'encoder_hook_{self.hook[-(i + 1)]}')
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
-
+            x_feat = layer(x_feat)
         out = self.final_conv(x_feat)
         # return out, ir, vis_night  # match input channels
         return out.repeat(1, 3, 1, 1), ir, vis_night

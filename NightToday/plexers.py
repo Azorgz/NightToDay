@@ -140,7 +140,7 @@ class G_Plexer(Plexer):
         decoders = [ResnetGenDecoder] * 2
         enc_args = [(fus.preprocess_thermal if fus.type == 'IAware' else 3,
                      opt.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
-                     fus.n_enc_layers if fus.type == 'IAware' else opt.n_enc_layers,
+                     fus.n_res_blocks if fus.type == 'IAware' else opt.n_enc_layers,
                      fus.dropout if fus.type == 'IAware' else opt.dropout,
                      opt.downscaling if fus.type == 'IAware' else opt.downscaling)] * 2
         dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
@@ -157,8 +157,8 @@ class G_Plexer(Plexer):
         else:
             fusion_module = None
         if fusion_module is not None:
-            self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_enc_layers, dropout=fus.dropout,
-                                     n_downscaling=fus.n_downscaling, thermal_preprocessCfg=fus.preprocess_thermal)
+            self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_res_blocks,
+                                        dropout=fus.dropout, thermal_preprocessCfg=fus.preprocess_thermal)
         else:
             self.fusion = nn.Identity()
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
