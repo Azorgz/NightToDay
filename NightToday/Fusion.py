@@ -359,7 +359,7 @@ class U_ResNetFusion(nn.Module):
         self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
-        self.vis_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins, 1)
+        # self.vis_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins, 1)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -385,7 +385,7 @@ class U_ResNetFusion(nn.Module):
 
     def forward(self, ir, vis_night, align_first=False, **kwargs):
         ir = self.thermal_preprocess(ir, **kwargs)
-        vis_night = self.vis_preprocess(vis_night, **kwargs)
+        # vis_night = self.vis_preprocess(vis_night, **kwargs)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
