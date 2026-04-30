@@ -158,7 +158,7 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        y = torch.tanh(self.denoiser_module(y))
+        y = self.denoiser_module(y)
         if HS is not None:
             y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
         else:
@@ -686,15 +686,24 @@ class NAFBlock(nn.Module):
 class FastIRDenoiser(nn.Module):
     """ Shallow wide network for fast IR denoising. """
 
-    def __init__(self, in_c=1, base_c=32, num_blocks=2):
+    def __init__(self, in_c=1, base_c=32, num_blocks=3):
         super().__init__()
         self.intro = nn.Conv2d(in_c, base_c, 3, 1, 1)
         self.blocks = nn.Sequential(*[NAFBlock(base_c) for _ in range(num_blocks)])
         self.outro = nn.Conv2d(base_c, in_c, 3, 1, 1)
+        self.load()
 
     def forward(self, x):
         shortcut = x
         x = self.intro(x)
         x = self.blocks(x)
         x = self.outro(x)
-        return x + shortcut  # Residual learning: network only predicts the noise
+        return torch.tanh(x + shortcut)  # Residual learning: network only predicts the noise
+
+    def load(self):
+        # Load pretrained weights if available
+        try:
+            state_dict = torch.load('checkpoints/fast_ir_denoiser_epoch_50.pth', map_location='cpu')
+            self.load_state_dict(state_dict)
+        except FileNotFoundError:
+            print("Pretrained weights for FastIRDenoiser not found. Using random initialization.")
