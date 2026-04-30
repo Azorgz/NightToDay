@@ -473,8 +473,9 @@ class NightToDay(nn.Module):
 
         # region VGG loss, MI loss and QYang Loss
         self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) +
-                                  self.compute_loss('structuralCorrelationDifference', self.remapped_T, self.fake_TN) -
-                                  self.compute_loss('qabf', self.remapped_T, -self.real_N, self.fake_TN))
+                                  self.compute_loss('structuralCorrelationDifference', self.real_T, self.fake_TN) -
+                                  self.compute_loss('qabf', self.real_T, -self.real_N, self.fake_TN) +
+                                  self.compute_loss('StructuralCorrelationDifference', self.real_T, self.remmaped_T))
         # endregion
 
         # region Total Variation loss
