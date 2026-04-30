@@ -129,6 +129,7 @@ class MonotonicThermalLUT(nn.Module):
         init_delta = torch.ones(scene, bins) * 1.0
         self.delta = nn.Parameter(init_delta)
         self.scene_idx = None
+        self.denoiser_module = FastIRDenoiser(in_c=1, base_c=32, num_blocks=3)
 
     def forward(self, x, *args, p_low=0.5, p_high=100):
         """
@@ -157,8 +158,7 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        # y_ = F.interpolate(self.deconv(self.attn(self.conv(F.interpolate(y, (512, 512))))), (y.shape[-2], y.shape[-1]))
-        # y = torch.tanh(y + y_)
+        y = self.denoiser_module(y)
         if HS is not None:
             y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
         else:
@@ -604,3 +604,97 @@ class DropInSwinBlock(nn.Module):
         # Permute back to [B, C, H, W] for CNNs
         x = x.view(B, H, W, C).permute(0, 3, 1, 2).contiguous()
         return x
+
+
+class SimpleGate(nn.Module):
+    """
+    Replaces standard activations like ReLU/GELU.
+    Splits channels in half and multiplies them. Extremely fast.
+    """
+
+    def forward(self, x):
+        x1, x2 = x.chunk(2, dim=1)
+        return x1 * x2
+
+
+class SimplifiedChannelAttention(nn.Module):
+    """ A lightweight channel attention mechanism. """
+
+    def __init__(self, c):
+        super().__init__()
+        self.squeeze = nn.AdaptiveAvgPool2d(1)
+        self.excite = nn.Sequential(
+            nn.Conv2d(c, c // 2, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(c // 2, c, 1, bias=False),
+            nn.Sigmoid()
+        )
+
+    def forward(self, x):
+        return x * self.excite(self.squeeze(x))
+
+
+class NAFBlock(nn.Module):
+    """
+    Nonlinear Activation Free Block.
+    Uses Depthwise Convolutions and SimpleGates for minimum latency.
+    """
+
+    def __init__(self, c, DW_Expand=2, FFN_Expand=2):
+        super().__init__()
+        dw_channel = c * DW_Expand
+
+        # Spatial feature extraction (Depthwise)
+        self.conv1 = nn.Conv2d(c, dw_channel, 1)
+        self.conv2 = nn.Conv2d(dw_channel, dw_channel, 3, 1, 1, groups=dw_channel)
+        self.sg1 = SimpleGate()
+        self.sca = SimplifiedChannelAttention(dw_channel // 2)
+        self.conv3 = nn.Conv2d(dw_channel // 2, c, 1)
+
+        # Channel feature mixing (Pointwise)
+        ffn_channel = c * FFN_Expand
+        self.conv4 = nn.Conv2d(c, ffn_channel, 1)
+        self.sg2 = SimpleGate()
+        self.conv5 = nn.Conv2d(ffn_channel // 2, c, 1)
+
+        self.norm1 = nn.InstanceNorm2d(c)
+        self.norm2 = nn.InstanceNorm2d(c)
+
+    def forward(self, x):
+        shortcut = x
+
+        # Spatial processing
+        x = self.norm1(x)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.sg1(x)
+        x = self.sca(x)
+        x = self.conv3(x)
+        x = x + shortcut
+
+        # Channel processing
+        shortcut = x
+        x = self.norm2(x)
+        x = self.conv4(x)
+        x = self.sg2(x)
+        x = self.conv5(x)
+        x = x + shortcut
+
+        return x
+
+
+class FastIRDenoiser(nn.Module):
+    """ Shallow wide network for fast IR denoising. """
+
+    def __init__(self, in_c=1, base_c=32, num_blocks=2):
+        super().__init__()
+        self.intro = nn.Conv2d(in_c, base_c, 3, 1, 1)
+        self.blocks = nn.Sequential(*[NAFBlock(base_c) for _ in range(num_blocks)])
+        self.outro = nn.Conv2d(base_c, in_c, 3, 1, 1)
+
+    def forward(self, x):
+        shortcut = x
+        x = self.intro(x)
+        x = self.blocks(x)
+        x = self.outro(x)
+        return x + shortcut  # Residual learning: network only predicts the noise
