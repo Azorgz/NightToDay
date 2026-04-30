@@ -564,6 +564,7 @@ class NightToDay(nn.Module):
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_TN, self.segMask_TN_update)
+        self.loss_contour[self.T] += self.compute_loss('contour', self.rec_TN, self.segMask_TN_update)
         self.loss_contour[self.D] += self.compute_loss('contour', self.fake_T, self.segMask_D_update)
         self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update)
 
