@@ -1181,10 +1181,11 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                                   HL_region[b:b + 1].sum() + 1e-6))
 
             # losses rec D consistency
-            rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b + 1], T[b:b + 1],
-                                                        total_[b:b + 1] * sky_mask[b:b + 1]) + \
-                                   PixelConsistencyLoss(rec_T[b:b + 1], TN[b:b + 1], mask_[b:b + 1]) + \
-                                   Intensity_corr_loss(fake_D[b:b + 1], -TN[b:b + 1], mask_[b:b + 1])
+            # rec_consistency_loss = PixelConsistencyLoss(rec_T[b:b + 1], T[b:b + 1],
+            #                                             total_[b:b + 1] * sky_mask[b:b + 1]) + \
+            #                        PixelConsistencyLoss(rec_T[b:b + 1], TN[b:b + 1], mask_[b:b + 1]) + \
+            #                        Intensity_corr_loss(fake_D[b:b + 1], -TN[b:b + 1], mask_[b:b + 1])
+            rec_consistency_loss = 0
 
 
             HL_fake_T = (fake_T < fake_T[b:b + 1, :, y0_mask:y1_mask, x0_mask:x1_mask].mean()) * mask_

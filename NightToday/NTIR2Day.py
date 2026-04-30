@@ -327,10 +327,10 @@ class NightToDay(nn.Module):
         self.real_D = self.real_D * (
                     1 - vegetation_mask - sky_mask) + greener_veg * vegetation_mask + bluer_sky * sky_mask
         # Cloud labeling
-        std = real_D.std(dim=1, keepdim=True)
-        cloud_mask = (sky_mask * (std < 0.06) *
-                      (std < (std*sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 1.25).float())
-        self.segMask_D[cloud_mask > 0] = 3
+        # std = real_D.std(dim=1, keepdim=True)
+        # cloud_mask = (sky_mask * (std < 0.06) *
+        #               (std < (std*sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 1.25).float())
+        # self.segMask_D[cloud_mask > 0] = 3
 
     # endregion
 
@@ -456,7 +456,7 @@ class NightToDay(nn.Module):
         # endregion
 
         # region Segmentation Distillation Knowledge
-        rand_size, seg_IR = self.backward_S()
+        rand_size, seg_IR = self.backward_S(self.lambda_seg if self.lambda_seg != 0 else None)
         # endregion
 
         # region Fusion Loss
@@ -495,7 +495,7 @@ class NightToDay(nn.Module):
             self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
             self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
             self.loss_trafficlight[self.N] += self.compute_loss('tll', self.N_com, self.remapped_T_com, self.TN_com,
-                                                                self.rec_TN_com, self.D_com, self.fake_D_com,
+                                                                None, self.D_com, self.fake_D_com,
                                                                 self.fake_T_com,
                                                                 segMask_com, contourMask, weights,
                                                                 self.segMask_TN_update,
@@ -598,9 +598,9 @@ class NightToDay(nn.Module):
         # combined loss
         self.sum_losses().backward()
 
-    def backward_S(self) -> tuple[int, Tensor]:
+    def backward_S(self, stage=None) -> tuple[int, Tensor]:
         """Random size for segmentation network training. Then, retain original image size."""
-        stage = self.netS.stage
+        stage = stage or self.netS.stage
         if stage == 'freeze_all':
             rand_size = self.input_size[0]
             self.segMask_D_update = self.segMask_D
