@@ -724,7 +724,7 @@ class FastIRDenoiser(nn.Module):
     def load(self):
         # Load pretrained weights if available
         try:
-            state_dict = torch.load('checkpoints/fast_ir_denoiser_epoch_50.pth', map_location='cpu')
+            state_dict = torch.load('checkpoints/fast_ir_denoiser_epoch_10.pth', map_location='cpu')
             self.load_state_dict(state_dict, strict=False)
         except FileNotFoundError:
             print("Pretrained weights for FastIRDenoiser not found. Using random initialization.")

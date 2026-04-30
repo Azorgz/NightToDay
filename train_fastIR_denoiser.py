@@ -41,7 +41,7 @@ class SyntheticNoiseDataset(Dataset):
         clean_img = self.transform(Image.open(img_path))
 
         # Inject Gaussian Noise
-        clean_img = clean_img * (0.8 + torch.rand(1) * 0.2)  # Randomly scale down to simulate varying conditions
+        clean_img = clean_img * (0.5 + torch.rand(1) * 0.5)  # Randomly scale down to simulate varying conditions
         if torch.rand(1) < 0.5:
             noise_scale = 100.0
             # 1. Multiply by scale to get the Poisson rate (lambda)
