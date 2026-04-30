@@ -475,7 +475,7 @@ class NightToDay(nn.Module):
         self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) +
                                   self.compute_loss('structuralCorrelationDifference', self.real_T, self.fake_TN) -
                                   self.compute_loss('qabf', self.real_T, -self.real_N, self.fake_TN) +
-                                  self.compute_loss('StructuralCorrelationDifference', self.real_T, self.remmaped_T))
+                                  self.compute_loss('StructuralCorrelationDifference', self.real_T, self.remapped_T))
         # endregion
 
         # region Total Variation loss
