@@ -158,7 +158,7 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        y = self.denoiser_module(y)
+        y = torch.tanh(self.denoiser_module(y))
         if HS is not None:
             y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
         else:

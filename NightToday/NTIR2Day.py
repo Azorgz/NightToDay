@@ -559,7 +559,7 @@ class NightToDay(nn.Module):
                                                      weights=self.class_weight)
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.real_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
                                                        self.segMask_TN_update, weights=self.class_weight)
