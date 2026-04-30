@@ -694,11 +694,12 @@ class FastIRDenoiser(nn.Module):
         self.load()
 
     def forward(self, x):
+        x = x * 0.5 + 0.5
         shortcut = x
-        x = self.intro(x)
-        x = self.blocks(x)
-        x = self.outro(x)
-        x = torch.tanh(x + shortcut)
+        noise = self.intro(x)
+        noise = self.blocks(noise)
+        noise = self.outro(noise)
+        x = (noise + shortcut**2)
         return (x - x.min())/(x.max() - x.min() + 1e-8) * 2 - 1  # Residual learning: network only predicts the noise
 
     def load(self):
