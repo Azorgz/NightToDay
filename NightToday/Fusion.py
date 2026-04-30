@@ -698,7 +698,8 @@ class FastIRDenoiser(nn.Module):
         x = self.intro(x)
         x = self.blocks(x)
         x = self.outro(x)
-        return torch.tanh(x + shortcut)  # Residual learning: network only predicts the noise
+        x = torch.tanh(x + shortcut)
+        return (x - x.min())/(x.max() - x.min() + 1e-8) * 2 - 1  # Residual learning: network only predicts the noise
 
     def load(self):
         # Load pretrained weights if available
