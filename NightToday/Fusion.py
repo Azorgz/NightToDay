@@ -683,6 +683,24 @@ class NAFBlock(nn.Module):
         return x
 
 
+class detailBlock(nn.Module):
+    """ A simple block to extract fine details from the IR image. """
+
+    def __init__(self, c=32):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, c, 3, 1, 1)
+        self.conv2 = nn.Conv2d(c, c, 3, 1, 1)
+        self.conv3 = nn.Conv2d(c, 1, 3, 1, 1)
+        self.norm = nn.InstanceNorm2d(c)
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x = self.relu(self.norm(self.conv1(x)))
+        x = self.relu(self.norm(self.conv2(x)))
+        x = self.conv3(x)
+        return x
+
+
 class FastIRDenoiser(nn.Module):
     """ Shallow wide network for fast IR denoising. """
 
@@ -691,21 +709,22 @@ class FastIRDenoiser(nn.Module):
         self.intro = nn.Conv2d(in_c, base_c, 3, 1, 1)
         self.blocks = nn.Sequential(*[NAFBlock(base_c) for _ in range(num_blocks)])
         self.outro = nn.Conv2d(base_c, in_c, 3, 1, 1)
+        self.detail_extractor = detailBlock(c=base_c)
         self.load()
 
     def forward(self, x):
-        x = x * 0.5 + 0.5
         shortcut = x
         noise = self.intro(x)
         noise = self.blocks(noise)
         noise = self.outro(noise)
-        x = (noise + shortcut**2)
-        return (x - x.min())/(x.max() - x.min() + 1e-8) * 2 - 1  # Residual learning: network only predicts the noise
+        detail = self.detail_extractor(shortcut)
+        x = torch.tanh(noise + shortcut + detail)  # Residual learning + detail enhancement
+        return x  # Residual learning: network only predicts the noise
 
     def load(self):
         # Load pretrained weights if available
         try:
             state_dict = torch.load('checkpoints/fast_ir_denoiser_epoch_50.pth', map_location='cpu')
-            self.load_state_dict(state_dict)
+            self.load_state_dict(state_dict, strict=False)
         except FileNotFoundError:
             print("Pretrained weights for FastIRDenoiser not found. Using random initialization.")

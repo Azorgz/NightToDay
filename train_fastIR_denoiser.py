@@ -22,7 +22,7 @@ class SyntheticNoiseDataset(Dataset):
     This creates perfect paired data for training the denoiser.
     """
 
-    def __init__(self, image_dir, image_size=256, noise_level=0.1):
+    def __init__(self, image_dir, image_size=256, noise_level=0.01):
         self.image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if
                             f.endswith(('.png', '.jpg', '.jpeg'))]
         self.noise_level = noise_level
@@ -43,15 +43,16 @@ class SyntheticNoiseDataset(Dataset):
         # Inject Gaussian Noise
         clean_img = clean_img * (0.8 + torch.rand(1) * 0.2)  # Randomly scale down to simulate varying conditions
         if torch.rand(1) < 0.5:
-            noise_scale = 30.0
+            noise_scale = 100.0
             # 1. Multiply by scale to get the Poisson rate (lambda)
             rate = clean_img * noise_scale
             # 2. Sample from the Poisson distribution
             noisy_img = torch.poisson(rate)
             # 3. Divide by the scale to bring it back to the [0, 1] range
             noisy_img = noisy_img / noise_scale
+            noisy_img = noisy_img * self.noise_level + clean_img * (1 - self.noise_level)
         else:
-            noise = torch.randn_like(clean_img) * self.noise_level
+            noise = torch.randn_like(clean_img) * self.noise_level * torch.rand(1)  # Random noise level for each image
             noisy_img = clean_img + noise
         clean_img = (clean_img - clean_img.min()) / (clean_img.max() - clean_img.min())  # Normalize to [0, 1]
 
@@ -81,7 +82,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
     model = FastIRDenoiser().to(device)
 
     # resume from checkpoint if exists
-    epoch = 0
+    epoch = 10
     checkpoint_path = f"checkpoints/fast_ir_denoiser_epoch_{epoch}.pth"
     if os.path.exists(checkpoint_path):
         model.load_state_dict(torch.load(checkpoint_path))
