@@ -460,7 +460,8 @@ class NightToDay(nn.Module):
         # endregion
 
         # region Fusion Loss
-        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
+        self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
+        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_TN, self.real_T, self.real_T)
         gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
         self.loss_fus[self.N] += self.compute_loss('cycle', self.fake_TN, -gray_N.repeat(1, 3, 1, 1),
                                                    loss_name='fus', criterion_lambda='fus')
@@ -472,8 +473,8 @@ class NightToDay(nn.Module):
 
         # region VGG loss, MI loss and QYang Loss
         self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) +
-                                  self.compute_loss('structuralCorrelationDifference', self.remapped_T, self.real_TN) -
-                                  self.compute_loss('qabf', self.remapped_T, -self.real_N, self.real_TN))
+                                  self.compute_loss('structuralCorrelationDifference', self.remapped_T, self.fake_TN) -
+                                  self.compute_loss('qabf', self.remapped_T, -self.real_N, self.fake_TN))
         # endregion
 
         # region Total Variation loss
@@ -559,12 +560,12 @@ class NightToDay(nn.Module):
                                                      weights=self.class_weight)
         self.loss_color[self.D] += self.compute_loss('color', self.rec_D, self.real_D, self.segMask_D,
                                                      weights=self.class_weight)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.real_T, self.real_N,
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
                                                        self.segMask_TN_update, weights=self.class_weight)
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_TN, self.segMask_TN_update)
-        self.loss_contour[self.T] += self.compute_loss('contour', self.rec_TN, self.segMask_TN_update)
+        self.loss_contour[self.T] += self.compute_loss('contour', self.rec_T, self.segMask_TN_update)
         self.loss_contour[self.D] += self.compute_loss('contour', self.fake_T, self.segMask_D_update)
         self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update)
 
