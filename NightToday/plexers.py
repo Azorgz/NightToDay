@@ -11,7 +11,7 @@ from torch.nn.functional import interpolate
 from ultralytics.optim import MuSGD
 
 from . import GenConfig, TrainConfig, SegConfig, DiscrConfig
-from .Fusion import U_ResNetFusion, IlluminationAwareFusion
+from .Fusion import U_ResNetFusion
 from .LETNet import LETNet
 from .discriminators import NLayerDiscriminatorSN
 from .generators import ResnetGenEncoder, ResnetGenDecoder, ResnetBlock
@@ -136,7 +136,7 @@ class G_Plexer(Plexer):
         self.opt = opt
         fus = opt.fus
         self.enc_type = fus.type if fus.type in ['IAware', 'UResNet'] else 'UResNet'
-        encoders = [IlluminationAwareFusion if fus.type == 'IAware' else ResnetGenEncoder] * 2
+        encoders = [ResnetGenEncoder] * 2
         decoders = [ResnetGenDecoder] * 2
         enc_args = [(fus.preprocess_thermal if fus.type == 'IAware' else 3,
                      opt.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
@@ -148,12 +148,8 @@ class G_Plexer(Plexer):
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
         fus = opt.fus
-        if not hasattr(fus, 'type'):
-            fus.type = 'IAware'
         if fus.type == 'UResNet':
             fusion_module = U_ResNetFusion
-        elif fus.type == 'IAware':
-            fusion_module = IlluminationAwareFusion
         else:
             fusion_module = None
         if fusion_module is not None:

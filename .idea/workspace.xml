@@ -4,12 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="day loss updated">
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Saving pattern update">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/synchro_folder.sh" beforeDir="false" afterPath="$PROJECT_DIR$/synchro_folder.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -212,22 +210,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00350" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1773050825815</created>
-      <option name="number" value="00350" />
-      <option name="presentableId" value="LOCAL-00350" />
-      <option name="project" value="LOCAL" />
-      <updated>1773050825816</updated>
-    </task>
-    <task id="LOCAL-00351" summary="Update of TL sample merging">
-      <option name="closed" value="true" />
-      <created>1773050926299</created>
-      <option name="number" value="00351" />
-      <option name="presentableId" value="LOCAL-00351" />
-      <option name="project" value="LOCAL" />
-      <updated>1773050926299</updated>
     </task>
     <task id="LOCAL-00352" summary="Update of TL sample merging">
       <option name="closed" value="true" />
@@ -605,7 +587,23 @@
       <option name="project" value="LOCAL" />
       <updated>1776437380518</updated>
     </task>
-    <option name="localTasksCounter" value="399" />
+    <task id="LOCAL-00399" summary="Saving pattern update">
+      <option name="closed" value="true" />
+      <created>1777444309473</created>
+      <option name="number" value="00399" />
+      <option name="presentableId" value="LOCAL-00399" />
+      <option name="project" value="LOCAL" />
+      <updated>1777444309474</updated>
+    </task>
+    <task id="LOCAL-00400" summary="Saving pattern update">
+      <option name="closed" value="true" />
+      <created>1777447395337</created>
+      <option name="number" value="00400" />
+      <option name="presentableId" value="LOCAL-00400" />
+      <option name="project" value="LOCAL" />
+      <updated>1777447395338</updated>
+    </task>
+    <option name="localTasksCounter" value="401" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -634,7 +632,8 @@
     <MESSAGE value="Normalization of the output of the decoder" />
     <MESSAGE value="Update global post update dataset" />
     <MESSAGE value="day loss updated" />
-    <option name="LAST_COMMIT_MESSAGE" value="day loss updated" />
+    <MESSAGE value="Saving pattern update" />
+    <option name="LAST_COMMIT_MESSAGE" value="Saving pattern update" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>
@@ -643,6 +642,16 @@
           <url>file://$PROJECT_DIR$/Datasets/manual_labeling_flir_night.py</url>
           <line>102</line>
           <option name="timeStamp" value="220" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/NightToday/NTIR2Day.py</url>
+          <line>101</line>
+          <option name="timeStamp" value="222" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/NightToday/NTIR2Day.py</url>
+          <line>190</line>
+          <option name="timeStamp" value="223" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

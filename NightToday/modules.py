@@ -543,37 +543,6 @@ class CatersianGrid(nn.Module):
 
         return grid.to(x)
 
-# -------------------- Segmentation Networks --------------------
-
-class SmallUNet(nn.Module):
-    """Lightweight U-Net for segmentation used during training only.
-    Produces segmentation logits. You can replace or extend this with any segmentation architecture.
-    """
-
-    def __init__(self, in_ch=3, out_ch=19, base=32):
-        super().__init__()
-        self.enc1 = nn.Sequential(nn.Conv2d(in_ch, base, 3, padding=1), nn.ReLU(), nn.Conv2d(base, base, 3, padding=1),
-                                  nn.ReLU())
-        self.pool = nn.MaxPool2d(2)
-        self.enc2 = nn.Sequential(nn.Conv2d(base, base * 2, 3, padding=1), nn.ReLU(),
-                                  nn.Conv2d(base * 2, base * 2, 3, padding=1), nn.ReLU())
-        self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
-        self.dec1 = nn.Sequential(nn.Conv2d(base * 2, base, 3, padding=1), nn.ReLU(),
-                                  nn.Conv2d(base, base, 3, padding=1), nn.ReLU())
-        self.out = nn.Conv2d(base, out_ch, 1)
-
-    def forward(self, x, return_encoder=False):
-        e1 = self.enc1(x)
-        p = self.pool(e1)
-        e2 = self.enc2(p)
-        u = self.up(e2)
-        d = self.dec1(u + e1)
-        logits = self.out(d)
-        if return_encoder:
-            # return a compact feature map for transfer losses (use e2)
-            return logits, e2
-        return logits
-
 # -------------------- Loss Scheduler (controls loss weights over epochs) --------------------
 
 

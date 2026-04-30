@@ -328,7 +328,7 @@ class NightToDay(nn.Module):
                     1 - vegetation_mask - sky_mask) + greener_veg * vegetation_mask + bluer_sky * sky_mask
         # Cloud labeling
         std = real_D.std(dim=1, keepdim=True)
-        cloud_mask = (sky_mask * (std < 0.1) *
+        cloud_mask = (sky_mask * (std < 0.06) *
                       (std < (std*sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 1.25).float())
         self.segMask_D[cloud_mask > 0] = 3
 
@@ -641,6 +641,7 @@ class NightToDay(nn.Module):
                                                          self.segMask_D_update.squeeze(1), loss_name='S')
                 self.loss_S[self.D] += self.compute_loss('semEdge', real_D_pred_seg,
                                                          self.segMask_D_update, loss_name='S')
+                # train seg IR network with fake IR
                 self.loss_seg[self.D] += self.compute_loss('seg', fake_T_pred_seg_d,
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255

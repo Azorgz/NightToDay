@@ -3,11 +3,7 @@ from typing import Optional, Tuple
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from kornia.color import rgb_to_lab, lab_to_rgb, rgb_to_hsv, hsv_to_rgb
-from kornia.filters import median_blur, bilateral_blur
-from torch import conv2d
-from torch.nn import ModuleList
-from torchvision.transforms.functional import gaussian_blur
+from kornia.color import rgb_to_hsv, hsv_to_rgb
 
 from . import ThermalPreprocessConfig
 from .CrossRAFT import get_wrapper
@@ -339,8 +335,8 @@ class U_ResNetFusion(nn.Module):
             self.hook.append(len(model) - 2)  # store index of norm for skip connection
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
-        for _ in range(n_enc_layers[-1]):
-            model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+        # model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)] * n_enc_layers[-1]
+        model += [DropInSwinBlock(base_dim * mult)] * n_enc_layers[-1]
         self.encoder = nn.ModuleList(model)
         for i, idx in enumerate(self.hook):
             self.encoder[idx].register_forward_hook(lambda model, input, output: self._register_hook(output))
@@ -425,14 +421,6 @@ class MonotonicThermalLUT(nn.Module):
         # softplus(delta) ≈ constant → cumsum ≈ linear ramp
         init_delta = torch.ones(scene, bins) * 1.0
         self.delta = nn.Parameter(init_delta)
-        self.scene_selection = SceneSelector()
-        # self.attn = nn.Sequential(*[SelfAttention(256)] * 4)
-        # self.conv = nn.Sequential(nn.Conv2d(1, 256, kernel_size=16, stride=16),
-        #                           nn.ReLU())
-        # self.deconv = nn.Sequential(nn.ConvTranspose2d(256, 1, kernel_size=16, stride=16),
-        #                             nn.ReLU(),
-        #                             nn.Conv2d(1, 1, 3, padding=1),
-        #                             nn.Tanh())
         self.scene_idx = None
 
     def forward(self, x, *args, p_low=0.5, p_high=100):
@@ -498,275 +486,414 @@ class MonotonicThermalLUT(nn.Module):
         return ((x - lo) / (hi - lo + eps)).clamp(0, 1)
 
 
-class SceneSelector(nn.Module):
-    def __init__(self,
-                 scene: int = 8,
-                 embed_dim: int = 64):
-        super().__init__()
-        self.scene = scene
-        self.first_conv = nn.Sequential(nn.Conv2d(3, 3, 5, padding=2),
-                                        nn.ReLU(),
-                                        nn.Conv2d(3, 3, 5, padding=2),
-                                        nn.ReLU(),
-                                        nn.Conv2d(3, 1, 5, padding=2),
-                                        nn.ReLU(),
-                                        )
-        self.classifier = nn.Sequential(
-            nn.AdaptiveAvgPool2d(1),
-            nn.Flatten(1),
-            nn.Linear(256, embed_dim),
-            nn.Linear(embed_dim, scene))
-
-    def forward(self, x, *args):
-        """
-        x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
-           assumed normalized to [0,1]
-        args: complementary modality for scene selection
-        """
-        if x.shape[1] == 1:
-            x_ = x.repeat(1, 3, 1, 1)
-        elif x.shape[1] == 3:
-            x_ = x
-        else:
-            raise NotImplementedError
-        x_rs = F.interpolate(x_, (256, 256))
-        x_conv = self.first_conv(x_rs)
-        x_patches = self.split(x_conv)
-        scene_logits = self.classifier(x_patches)
-        if args is not None:
-            for arg in args:
-                if arg.shape[1] == 1:
-                    y = arg.repeat(1, 3, 1, 1)
-                elif arg.shape[1] == 3:
-                    y = arg
-                else:
-                    raise NotImplementedError
-                y_rs = F.interpolate(y, (256, 256))
-                y_conv = self.first_conv(y_rs)
-                y_patches = self.split(y_conv)
-                y_digit = self.classifier(y_patches)
-                scene_logits = scene_logits + y_digit
-
-        scene_idx = torch.softmax(scene_logits, dim=-1)  # (B, scene)
-        return scene_idx
-
-    def split(self, x: torch.Tensor) -> torch.Tensor:
-        """Split the input into small patches with sliding window."""
-        x_patch_list = []
-        for j in range(16):
-            j0 = j * 16
-            j1 = j0 + 16
-
-            for i in range(16):
-                i0 = i * 16
-                i1 = i0 + 16
-                x_patch_list.append(x[..., j0:j1, i0:i1])
-
-        return torch.cat(x_patch_list, dim=1)
-
-
-# -----------------------------------------------------------
-# Utilities
-# -----------------------------------------------------------
-
-def gradient(x):
-    dx = x[:, :, :, 1:] - x[:, :, :, :-1]
-    dy = x[:, :, 1:, :] - x[:, :, :-1, :]
-    return dx, dy
-
-
-def highlight_mask(vis, threshold=0.95, softness=25.0):
-    # vis in [-1,1] → convert to [0,1]
-    vis = (vis + 1) * 0.5
-    lum = 0.299 * vis[:, 0:1] + \
-          0.587 * vis[:, 1:2] + \
-          0.114 * vis[:, 2:3]
-    col = torch.max(vis, dim=1, keepdim=True)[0] - torch.min(vis, dim=1, keepdim=True)[0]
-    lum = lum * (1 - col)  # boost saturated highlights
-    return torch.sigmoid((lum - threshold) * softness)
-
-
-# -----------------------------------------------------------
-# Attention Blocks
-# -----------------------------------------------------------
-
-class CrossModalAttention(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.query = nn.Conv2d(dim, dim, 1)
-        self.key   = nn.Conv2d(dim, dim, 1)
-        self.value = nn.Conv2d(dim, dim, 1)
-        self.gamma = nn.Parameter(torch.zeros(1))
-
-    def forward(self, ir_feat, vis_feat):
-        Q = self.query(ir_feat)
-        K = self.key(vis_feat)
-        V = self.value(vis_feat)
-
-        attn = torch.softmax(
-            torch.sum(Q * K, dim=1, keepdim=True), dim=-1
-        )
-        out = ir_feat + self.gamma * attn * V
-        return out
-
-
-class SelfAttention(nn.Module):
-    def __init__(self, dim):
-        super().__init__()
-        self.query = nn.Conv2d(dim, dim, 1)
-        self.key   = nn.Conv2d(dim, dim, 1)
-        self.value = nn.Conv2d(dim, dim, 1)
-        self.gamma = nn.Parameter(torch.zeros(1))
-
-    def forward(self, feat):
-        Q = self.query(feat)
-        K = self.key(feat)
-        V = self.value(feat)
-
-        attn = torch.softmax(
-            torch.sum(Q * K, dim=1, keepdim=True), dim=-1
-        )
-        out = feat + self.gamma * attn * V
-        return out
-
-
-# -----------------------------------------------------------
-# Illumination Aware Fusion Network
-# -----------------------------------------------------------
-
-class IlluminationAwareFusion(nn.Module):
+#
+# class SceneSelector(nn.Module):
+#     def __init__(self,
+#                  scene: int = 8,
+#                  embed_dim: int = 64):
+#         super().__init__()
+#         self.scene = scene
+#         self.first_conv = nn.Sequential(nn.Conv2d(3, 3, 5, padding=2),
+#                                         nn.ReLU(),
+#                                         nn.Conv2d(3, 3, 5, padding=2),
+#                                         nn.ReLU(),
+#                                         nn.Conv2d(3, 1, 5, padding=2),
+#                                         nn.ReLU(),
+#                                         )
+#         self.classifier = nn.Sequential(
+#             nn.AdaptiveAvgPool2d(1),
+#             nn.Flatten(1),
+#             nn.Linear(256, embed_dim),
+#             nn.Linear(embed_dim, scene))
+#
+#     def forward(self, x, *args):
+#         """
+#         x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
+#            assumed normalized to [0,1]
+#         args: complementary modality for scene selection
+#         """
+#         if x.shape[1] == 1:
+#             x_ = x.repeat(1, 3, 1, 1)
+#         elif x.shape[1] == 3:
+#             x_ = x
+#         else:
+#             raise NotImplementedError
+#         x_rs = F.interpolate(x_, (256, 256))
+#         x_conv = self.first_conv(x_rs)
+#         x_patches = self.split(x_conv)
+#         scene_logits = self.classifier(x_patches)
+#         if args is not None:
+#             for arg in args:
+#                 if arg.shape[1] == 1:
+#                     y = arg.repeat(1, 3, 1, 1)
+#                 elif arg.shape[1] == 3:
+#                     y = arg
+#                 else:
+#                     raise NotImplementedError
+#                 y_rs = F.interpolate(y, (256, 256))
+#                 y_conv = self.first_conv(y_rs)
+#                 y_patches = self.split(y_conv)
+#                 y_digit = self.classifier(y_patches)
+#                 scene_logits = scene_logits + y_digit
+#
+#         scene_idx = torch.softmax(scene_logits, dim=-1)  # (B, scene)
+#         return scene_idx
+#
+#     def split(self, x: torch.Tensor) -> torch.Tensor:
+#         """Split the input into small patches with sliding window."""
+#         x_patch_list = []
+#         for j in range(16):
+#             j0 = j * 16
+#             j1 = j0 + 16
+#
+#             for i in range(16):
+#                 i0 = i * 16
+#                 i1 = i0 + 16
+#                 x_patch_list.append(x[..., j0:j1, i0:i1])
+#
+#         return torch.cat(x_patch_list, dim=1)
+#
+#
+# # -----------------------------------------------------------
+# # Utilities
+# # -----------------------------------------------------------
+#
+# def gradient(x):
+#     dx = x[:, :, :, 1:] - x[:, :, :, :-1]
+#     dy = x[:, :, 1:, :] - x[:, :, :-1, :]
+#     return dx, dy
+#
+#
+# def highlight_mask(vis, threshold=0.95, softness=25.0):
+#     # vis in [-1,1] → convert to [0,1]
+#     vis = (vis + 1) * 0.5
+#     lum = 0.299 * vis[:, 0:1] + \
+#           0.587 * vis[:, 1:2] + \
+#           0.114 * vis[:, 2:3]
+#     col = torch.max(vis, dim=1, keepdim=True)[0] - torch.min(vis, dim=1, keepdim=True)[0]
+#     lum = lum * (1 - col)  # boost saturated highlights
+#     return torch.sigmoid((lum - threshold) * softness)
+#
+#
+# # -----------------------------------------------------------
+# # Attention Blocks
+# # -----------------------------------------------------------
+#
+# class CrossModalAttention(nn.Module):
+#     def __init__(self, dim):
+#         super().__init__()
+#         self.query = nn.Conv2d(dim, dim, 1)
+#         self.key   = nn.Conv2d(dim, dim, 1)
+#         self.value = nn.Conv2d(dim, dim, 1)
+#         self.gamma = nn.Parameter(torch.zeros(1))
+#
+#     def forward(self, ir_feat, vis_feat):
+#         Q = self.query(ir_feat)
+#         K = self.key(vis_feat)
+#         V = self.value(vis_feat)
+#
+#         attn = torch.softmax(
+#             torch.sum(Q * K, dim=1, keepdim=True), dim=-1
+#         )
+#         out = ir_feat + self.gamma * attn * V
+#         return out
+#
+#
+# class SelfAttention(nn.Module):
+#     def __init__(self, dim):
+#         super().__init__()
+#         self.query = nn.Conv2d(dim, dim, 1)
+#         self.key   = nn.Conv2d(dim, dim, 1)
+#         self.value = nn.Conv2d(dim, dim, 1)
+#         self.gamma = nn.Parameter(torch.zeros(1))
+#
+#     def forward(self, feat):
+#         Q = self.query(feat)
+#         K = self.key(feat)
+#         V = self.value(feat)
+#
+#         attn = torch.softmax(
+#             torch.sum(Q * K, dim=1, keepdim=True), dim=-1
+#         )
+#         out = feat + self.gamma * attn * V
+#         return out
+def window_partition(x, window_size):
     """
-    Unpaired illumination-aware fusion module.
-    Produces:
-        fake_ir, reflectance, illumination
+    Splits the feature map into non-overlapping windows.
+    Args:
+        x: (B, H, W, C)
+        window_size (int): window size
+    Returns:
+        windows: (num_windows*B, window_size, window_size, C)
+    """
+    B, H, W, C = x.shape
+    x = x.view(B, H // window_size, window_size, W // window_size, window_size, C)
+    windows = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(-1, window_size, window_size, C)
+    return windows
+
+
+def window_reverse(windows, window_size, H, W):
+    """
+    Reconstructs the feature map from windows.
+    Args:
+        windows: (num_windows*B, window_size, window_size, C)
+        window_size (int): Window size
+        H (int): Height of image
+        W (int): Width of image
+    Returns:
+        x: (B, H, W, C)
+    """
+    B = int(windows.shape[0] / (H * W / window_size / window_size))
+    x = windows.view(B, H // window_size, W // window_size, window_size, window_size, -1)
+    x = x.permute(0, 1, 3, 2, 4, 5).contiguous().view(B, H, W, -1)
+    return x
+
+
+class WindowAttention(nn.Module):
+    """ Standard Multi-Head Self-Attention applied inside a local window. """
+
+    def __init__(self, dim, window_size, num_heads, qkv_bias=True):
+        super().__init__()
+        self.dim = dim
+        self.window_size = window_size  # (Wh, Ww)
+        self.num_heads = num_heads
+        head_dim = dim // num_heads
+        self.scale = head_dim ** -0.5
+
+        # Define a parameter table of relative position bias
+        self.relative_position_bias_table = nn.Parameter(
+            torch.zeros((2 * window_size[0] - 1) * (2 * window_size[1] - 1), num_heads))
+
+        # Get pair-wise relative position index for each token inside the window
+        coords_h = torch.arange(self.window_size[0])
+        coords_w = torch.arange(self.window_size[1])
+        coords = torch.stack(torch.meshgrid([coords_h, coords_w], indexing='ij'))
+        coords_flatten = torch.flatten(coords, 1)
+        relative_coords = coords_flatten[:, :, None] - coords_flatten[:, None, :]
+        relative_coords = relative_coords.permute(1, 2, 0).contiguous()
+        relative_coords[:, :, 0] += self.window_size[0] - 1
+        relative_coords[:, :, 1] += self.window_size[1] - 1
+        relative_coords[:, :, 0] *= 2 * self.window_size[1] - 1
+        relative_position_index = relative_coords.sum(-1)
+        self.register_buffer("relative_position_index", relative_position_index)
+
+        self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
+        self.proj = nn.Linear(dim, dim)
+        self.softmax = nn.Softmax(dim=-1)
+
+        nn.init.trunc_normal_(self.relative_position_bias_table, std=.02)
+
+    def forward(self, x, mask=None):
+        B_, N, C = x.shape
+        qkv = self.qkv(x).reshape(B_, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]
+
+        q = q * self.scale
+        attn = (q @ k.transpose(-2, -1))
+
+        relative_position_bias = self.relative_position_bias_table[self.relative_position_index.view(-1)].view(
+            self.window_size[0] * self.window_size[1], self.window_size[0] * self.window_size[1], -1)
+        relative_position_bias = relative_position_bias.permute(2, 0, 1).contiguous()
+        attn = attn + relative_position_bias.unsqueeze(0)
+
+        if mask is not None:
+            nW = mask.shape[0]
+            attn = attn.view(B_ // nW, nW, self.num_heads, N, N) + mask.unsqueeze(1).unsqueeze(0)
+            attn = attn.view(-1, self.num_heads, N, N)
+
+        attn = self.softmax(attn)
+        x = (attn @ v).transpose(1, 2).reshape(B_, N, C)
+        x = self.proj(x)
+        return x
+
+
+class SwinBlock(nn.Module):
+    """ The Core Swin Transformer Block. """
+
+    def __init__(self, dim, input_resolution, num_heads, window_size=8, shift_size=0):
+        super().__init__()
+        self.dim = dim
+        self.input_resolution = input_resolution
+        self.num_heads = num_heads
+        self.window_size = window_size
+        self.shift_size = shift_size
+
+        self.norm1 = nn.LayerNorm(dim)
+        self.attn = WindowAttention(
+            dim, window_size=(self.window_size, self.window_size), num_heads=num_heads)
+
+        self.norm2 = nn.LayerNorm(dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, dim * 4),
+            nn.GELU(),
+            nn.Linear(dim * 4, dim)
+        )
+
+        # Build attention mask for SW-MSA (Shifted Window)
+        if self.shift_size > 0:
+            H, W = self.input_resolution
+            img_mask = torch.zeros((1, H, W, 1))
+            h_slices = (slice(0, -self.window_size),
+                        slice(-self.window_size, -self.shift_size),
+                        slice(-self.shift_size, None))
+            w_slices = (slice(0, -self.window_size),
+                        slice(-self.window_size, -self.shift_size),
+                        slice(-self.shift_size, None))
+            cnt = 0
+            for h in h_slices:
+                for w in w_slices:
+                    img_mask[:, h, w, :] = cnt
+                    cnt += 1
+
+            mask_windows = window_partition(img_mask, self.window_size)
+            mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
+            attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
+            attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
+        else:
+            attn_mask = None
+
+        self.register_buffer("attn_mask", attn_mask)
+
+    def forward(self, x):
+        H, W = self.input_resolution
+        B, L, C = x.shape
+        shortcut = x
+        x = self.norm1(x)
+        x = x.view(B, H, W, C)
+
+        # Cyclic shift
+        if self.shift_size > 0:
+            shifted_x = torch.roll(x, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+        else:
+            shifted_x = x
+
+        # Partition windows
+        x_windows = window_partition(shifted_x, self.window_size)
+        x_windows = x_windows.view(-1, self.window_size * self.window_size, C)
+
+        # W-MSA/SW-MSA
+        attn_windows = self.attn(x_windows, mask=self.attn_mask)
+
+        # Merge windows
+        attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
+        shifted_x = window_reverse(attn_windows, self.window_size, H, W)
+
+        # Reverse cyclic shift
+        if self.shift_size > 0:
+            x = torch.roll(shifted_x, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
+        else:
+            x = shifted_x
+
+        x = x.view(B, H * W, C)
+
+        # FFN
+        x = shortcut + x
+        x = x + self.mlp(self.norm2(x))
+        return x
+
+
+class DynamicSwinBlock(SwinBlock):  # Inheriting from the previous SwinBlock
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, input_resolution=(64, 64), **kwargs)
+        # Remove the static mask from __init__
+        self.attn_mask = None
+        self.mask_resolution = None  # To track cached mask size
+
+    def build_attention_mask(self, H, W, device):
+        """ Dynamically builds the shifted window mask based on current H, W """
+        img_mask = torch.zeros((1, H, W, 1), device=device)
+        h_slices = (slice(0, -self.window_size),
+                    slice(-self.window_size, -self.shift_size),
+                    slice(-self.shift_size, None))
+        w_slices = (slice(0, -self.window_size),
+                    slice(-self.window_size, -self.shift_size),
+                    slice(-self.shift_size, None))
+        cnt = 0
+        for h in h_slices:
+            for w in w_slices:
+                img_mask[:, h, w, :] = cnt
+                cnt += 1
+
+        mask_windows = window_partition(img_mask, self.window_size)
+        mask_windows = mask_windows.view(-1, self.window_size * self.window_size)
+        attn_mask = mask_windows.unsqueeze(1) - mask_windows.unsqueeze(2)
+        attn_mask = attn_mask.masked_fill(attn_mask != 0, float(-100.0)).masked_fill(attn_mask == 0, float(0.0))
+        return attn_mask
+
+    def forward(self, x):
+        # 1. Dynamically extract H and W
+        B, C, H, W = x.shape  # Assuming the wrapper passes [B, C, H, W]
+
+        # 2. Reshape for transformer [B, H*W, C]
+        x_flat = x.permute(0, 2, 3, 1).contiguous().view(B, H * W, C)
+
+        shortcut = x_flat
+        x_flat = self.norm1(x_flat)
+        x_flat = x_flat.view(B, H, W, C)
+
+        # 3. Handle dynamic mask for shifted windows
+        if self.shift_size > 0:
+            # Check if resolution changed; if so, rebuild mask
+            if self.mask_resolution != (H, W) or self.attn_mask is None:
+                self.attn_mask = self.build_attention_mask(H, W, x.device)
+                self.mask_resolution = (H, W)
+
+            shifted_x = torch.roll(x_flat, shifts=(-self.shift_size, -self.shift_size), dims=(1, 2))
+            current_mask = self.attn_mask
+        else:
+            shifted_x = x_flat
+            current_mask = None
+
+        # Partition windows
+        x_windows = window_partition(shifted_x, self.window_size)
+        x_windows = x_windows.view(-1, self.window_size * self.window_size, C)
+
+        # W-MSA/SW-MSA with dynamic mask
+        attn_windows = self.attn(x_windows, mask=current_mask)
+
+        # Merge windows
+        attn_windows = attn_windows.view(-1, self.window_size, self.window_size, C)
+        shifted_x = window_reverse(attn_windows, self.window_size, H, W)
+
+        # Reverse cyclic shift
+        if self.shift_size > 0:
+            x_flat = torch.roll(shifted_x, shifts=(self.shift_size, self.shift_size), dims=(1, 2))
+        else:
+            x_flat = shifted_x
+
+        x_flat = x_flat.view(B, H * W, C)
+
+        # FFN
+        x_flat = shortcut + x_flat
+        x_flat = x_flat + self.mlp(self.norm2(x_flat))
+
+        # Return to [B, C, H, W]
+        return x_flat.view(B, H, W, C).permute(0, 3, 1, 2).contiguous()
+
+
+class DropInSwinBlock(nn.Module):
+    """
+    Wrapper to easily drop Swin into CNNs.
+    Handles the [B, C, H, W] <---> [B, H, W, C] permutations automatically.
+    A standard Swin layer requires two blocks: one standard, one shifted.
     """
 
-    def __init__(self, thermal_preprocessCfg: ThermalPreprocessConfig, hidden_dim=256,
-                 n_enc_layers=4, dropout=0.25, n_downscaling=2):
+    def __init__(self, dim=384, num_heads=8, window_size=8):
         super().__init__()
-        norm_layer = get_norm_layer('instance')
-        base_dim = hidden_dim // (2 ** n_downscaling)
-        # Encoder
-        enc_th = nn.Sequential(
-            nn.Conv2d(1, base_dim, 7, padding=3, padding_mode='reflect'),
-            nn.InstanceNorm2d(base_dim),
-            nn.ReLU(inplace=True)
-        )
-        enc_vis = nn.Sequential(
-            nn.Conv2d(4, base_dim, 7, padding=3, padding_mode='reflect'),
-            nn.InstanceNorm2d(base_dim),
-            nn.ReLU(inplace=True)
-        )
-        self.enc_th = nn.ModuleList([enc_th])
-        self.enc_vis = nn.ModuleList([enc_vis])
-        self.attn_th, self.attn_vis = nn.ModuleList([SelfAttention(base_dim)]), nn.ModuleList([SelfAttention(base_dim)])
-        mult = 1
-        for i in range(n_downscaling):
-            mult = 2 ** (i + 1)
-            self.enc_th.append(nn.Sequential(
-                nn.Conv2d(base_dim * mult // 2, base_dim * mult, kernel_size=3, stride=2, padding=1),
-                nn.InstanceNorm2d(base_dim * mult),
-                nn.ReLU(inplace=True)
-            ))
-            self.enc_vis.append(nn.Sequential(
-                nn.Conv2d(base_dim * mult // 2, base_dim * mult, kernel_size=3, stride=2, padding=1),
-                nn.InstanceNorm2d(base_dim * mult),
-                nn.ReLU(inplace=True)
-            ))
-            self.attn_th.append(CrossModalAttention(base_dim * mult))
-            self.attn_vis.append(CrossModalAttention(base_dim * mult))
-        # self.enc = nn.Sequential(*self.enc)
+        # Standard Window Attention
+        self.block1 = DynamicSwinBlock(dim=dim, num_heads=num_heads, window_size=window_size, shift_size=0)
 
-        # Cross modal attention at bottleneck
-        # self.cross_attn = CrossModalAttention(base_dim * mult)
-        # self.self_attn_th = SelfAttention(base_dim * mult)
-        # self.self_attn_vis = SelfAttention(base_dim * mult)
-        #
-        # # Decoder
-        # self.dec = []
-        # for i in range(n_downscaling):
-        #     mult = 2 ** (n_downscaling - i)
-        #     self.dec.append(nn.Sequential(
-        #         nn.ConvTranspose2d(base_dim * mult, base_dim * mult // 2, 4, stride=2, padding=1),
-        #         nn.InstanceNorm2d(base_dim * mult // 2),
-        #         nn.ReLU(inplace=True)
-        #     ))
-        # self.dec = nn.Sequential(*self.dec)
+        # Shifted Window Attention
+        self.block2 = DynamicSwinBlock(dim=dim, num_heads=num_heads, window_size=window_size, shift_size=window_size // 2)
 
-        # Dual heads
-        hidden_dim = base_dim * mult
-        self.reflectance_head = nn.Sequential(
-            nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1, padding_mode='reflect'),
-            nn.InstanceNorm2d(hidden_dim),
-            nn.ReLU(inplace=True)
-        )
+    def forward(self, x):
+        """ Expects input of shape [B, C, H, W] """
+        B, C, H, W = x.shape
 
-        self.illumination_head = nn.Sequential(
-            nn.Conv2d(2 * hidden_dim, hidden_dim, 3, padding=1, padding_mode='reflect'),
-            nn.InstanceNorm2d(hidden_dim),
-            nn.ReLU(inplace=True)
-        )
-        self.intern_illum_head = nn.Sequential(
-            nn.Conv2d(hidden_dim, hidden_dim, 3, padding=1, padding_mode='reflect'),
-            nn.InstanceNorm2d(hidden_dim),
-            nn.ReLU(inplace=True)
-        )
-        self.resnet = nn.Sequential(*([ResnetBlock(hidden_dim, norm_layer=norm_layer, dropout=dropout)]*n_enc_layers))
-        self.spatial_aligner = get_wrapper('vis2ir')
-        self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
-                                                      thermal_preprocessCfg.scene)
+        # Pass through Swin Blocks
+        x = self.block1(x)
+        x = self.block2(x)
 
-    # -------------------------------------------------------
-
-    def forward(self, ir, vis=None, align_first=True, **kwargs):
-        """
-        ir, vis_night ∈ [-1,1]
-        """
-        # Highlight awareness
-        ir = self.thermal_preprocess(ir, **kwargs)
-        if align_first and vis is not None:
-            vis = self.spatial_aligner(vis, ir).detach()
-        mask = highlight_mask(vis) if vis is not None else None
-
-        # First convs
-        ir_feats = self.attn_th[0](self.enc_th[0](ir.mean(dim=1, keepdim=True)))  # convert to grayscale
-        vis_feats = self.attn_vis[0](self.enc_vis[0](torch.cat([vis, mask], dim=1))) if vis is not None else None
-
-        # layers
-        for i in range(1, len(self.enc_th)):
-            ir_feats = self.enc_th[i](ir_feats)
-            if vis is not None:
-                vis_feats = self.enc_vis[i](vis_feats)
-                # cross attention
-                ir_feats = self.attn_th[i](ir_feats, vis_feats)
-                vis_feats = self.attn_vis[i](vis_feats, ir_feats)
-            else:
-                ir_feats = self.attn_th[i](ir_feats, 1 - ir_feats)
-
-        # Head work
-        R = self.reflectance_head(ir_feats)  # [-1, 1]
-        if vis is not None:
-            I = self.illumination_head(torch.cat([ir_feats, vis_feats], dim=1))
-            I_d = self.intern_illum_head((ir_feats + vis_feats)/2)
-        else:
-            I = self.illumination_head(torch.cat([ir_feats, 1 - ir_feats], dim=1))
-            I_d = self.intern_illum_head(ir_feats)
-        # x = torch.cat([ir, vis_night, mask], dim=1)
-        #
-        # feat = self.enc(x)
-        # # Split IR and VIS features for attention
-        # ir_feat = feat
-        # vis_feat = feat.detach()  # prevent visible highlight domination
-        #
-        # bottleneck = self.attn(ir_feat, vis_feat)
-        #
-        # decoded_feat = self.dec(bottleneck)
-        #
-        # R = self.reflectance_head(decoded_feat) * 0.5 + 1.5  # [1, 2]
-        # I = self.illumination_head(decoded_feat)  # [0, 1]
-
-        feats = self.resnet(R * I + I_d)  # combine reflectance and illumination, scale to [-1,1]
-        if vis is not None:
-            return feats, ir, vis
-        else:
-            return feats
+        # Permute back to [B, C, H, W] for CNNs
+        x = x.view(B, H, W, C).permute(0, 3, 1, 2).contiguous()
+        return x
