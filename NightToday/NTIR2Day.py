@@ -488,14 +488,14 @@ class NightToDay(nn.Module):
                 encoded_TN, self.TN_com, self.remapped_T_com, *_ = self.netG.encode(self.T_com, self.N_com,
                                                                                from_=self.T, align_first=False)
                 self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
-                self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
+                # self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
             else:
                 self.TN_com, self.remapped_T_com = self.fake_TN.clone(), self.remapped_T.clone()
                 self.fake_D_com, self.rec_TN_com = self.fake_D.clone(), self.rec_TN.clone()
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
             self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.loss_trafficlight[self.N] += self.compute_loss('tll', self.N_com, self.remapped_T_com, self.TN_com,
-                                                                None, self.D_com, self.fake_D_com,
+                                                                self.rec_TN_com , self.D_com, self.fake_D_com,
                                                                 self.fake_T_com,
                                                                 segMask_com, contourMask, weights,
                                                                 self.segMask_TN_update,
