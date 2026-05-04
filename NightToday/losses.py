@@ -675,13 +675,12 @@ class SharpFusionLoss(torch.nn.Module):
     def forward(self, I_f, I_vi, I_ir):
         size = I_f.shape[-1] // 256 * 2 + 1
         # Convert to grayscale if needed
-        I_f = (0.299 * I_f[:, 0:1] + 0.587 * I_f[:, 1:2] + 0.114 * I_f[:, 2:3]) * 0.5 + 0.5 if I_f.shape[
-                                                                                                   1] == 3 else I_f * 0.5 + 0.5
-        I_vi = (0.299 * I_vi[:, 0:1] + 0.587 * I_vi[:, 1:2] + 0.114 * I_vi[:, 2:3]) * 0.5 + 0.5 if I_vi.shape[
-                                                                                                       1] == 3 else I_vi * 0.5 + 0.5
-        I_ir = (0.299 * I_ir[:, 0:1] + 0.587 * I_ir[:, 1:2] + 0.114 * I_ir[:, 2:3]) * 0.5 + 0.5 if I_ir.shape[
-                                                                                                       1] == 3 else I_ir * 0.5 + 0.5
-        weigths = 1.5 - I_vi
+        I_f = (0.299 * I_f[:, 0:1] + 0.587 * I_f[:, 1:2] + 0.114 * I_f[:, 2:3]) * 0.5 + 0.5 \
+            if I_f.shape[1] == 3 else I_f * 0.5 + 0.5
+        I_vi = (0.299 * I_vi[:, 0:1] + 0.587 * I_vi[:, 1:2] + 0.114 * I_vi[:, 2:3]) * 0.5 + 0.5 \
+            if I_vi.shape[1] == 3 else I_vi * 0.5 + 0.5
+        I_ir = (0.299 * I_ir[:, 0:1] + 0.587 * I_ir[:, 1:2] + 0.114 * I_ir[:, 2:3]) * 0.5 + 0.5 \
+            if I_ir.shape[1] == 3 else I_ir * 0.5 + 0.5
         # -------- Gradient Loss --------
         G_f = sobel(I_f).abs()
         G_vi = sobel(I_vi).abs()
@@ -715,7 +714,7 @@ class SharpFusionLoss(torch.nn.Module):
              self.lam_contrast * L_contrast +
              self.lam_freq * L_freq)
 
-        return L.mean() * 20
+        return L.mean()
 
 
 class ThermalNoiseLoss(nn.Module):

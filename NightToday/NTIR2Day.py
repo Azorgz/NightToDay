@@ -324,10 +324,10 @@ class NightToDay(nn.Module):
         self.real_D = self.real_D * (
                     1 - vegetation_mask - sky_mask) + greener_veg * vegetation_mask + bluer_sky * sky_mask
         # Cloud labeling
-        # std = real_D.std(dim=1, keepdim=True)
-        # cloud_mask = (sky_mask * (std < 0.06) *
-        #               (std < (std*sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 1.25).float())
-        # self.segMask_D[cloud_mask > 0] = 3
+        std = real_D.std(dim=1, keepdim=True)
+        cloud_mask = (sky_mask * (std < 0.06) *
+                      (std < (std*sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) * 1.25).float())
+        self.segMask_D[cloud_mask > 0] = 3
 
     # endregion
 
