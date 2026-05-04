@@ -827,12 +827,11 @@ class TVLoss(nn.Module):
         grad_x, grad_y = image_gradients(x)
         h_tv = (grad_x**2).sum()
         w_tv = (grad_y**2).sum()
-        # l_h_tv = ((grad_x[:, :, 1:, :] - grad_x[:, :, :h_x - 1, :])**2).sum()
-        # l_w_tv = ((grad_y[:, :, :, 1:] - grad_y[:, :, :, :w_x - 1])**2).sum()
+        l_h_tv = ((grad_x[:, :, 1:, :] - grad_x[:, :, :h_x - 1, :])**2).sum()
+        l_w_tv = ((grad_y[:, :, :, 1:] - grad_y[:, :, :, :w_x - 1])**2).sum()
         # h_tv = torch.pow((x[:, :, 1:, :] - x[:, :, :h_x - 1, :]), 2).sum()
         # w_tv = torch.pow((x[:, :, :, 1:] - x[:, :, :, :w_x - 1]), 2).sum()
-        return self.TVLoss_weight * (h_tv / count_h + w_tv / count_w) / batch_size
-        # - l_h_tv/(count_h - 1) - l_w_tv / (count_w + 1)) / batch_size
+        return self.TVLoss_weight * (h_tv / count_h + w_tv / count_w - l_h_tv/(count_h - 1) - l_w_tv / (count_w + 1)) / batch_size
 
     def _tensor_size(self, t):
         return t.shape[1] * t.shape[2] * t.shape[3]

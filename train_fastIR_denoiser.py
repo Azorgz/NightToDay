@@ -11,6 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from NightToday.Fusion import FastIRDenoiser
+from NightToday.losses import TVLoss
 
 
 # Assuming you saved the previous code in a file named `models.py`
@@ -93,6 +94,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
     criterion = nn.L1Loss()
     mse_criterion = nn.MSELoss()  # Used strictly for calculating PSNR
     ssim_criterion = SSIM(device)  # SSIM expects input in range [-1, 1]
+    TV_criterion = TVLoss()
 
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
@@ -105,6 +107,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
         epoch_loss = 0.0
         epoch_psnr = 0.0
         epoch_ssim = 0.0
+        epoch_tv = 0.0
 
         for batch_idx, (noisy_imgs, clean_imgs) in enumerate(dataloader):
             noisy_imgs, clean_imgs = noisy_imgs.to(device), clean_imgs.to(device)
@@ -116,6 +119,8 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
             # Loss calculation
             loss = criterion(restored_imgs, clean_imgs)
             ssim = ssim_criterion(restored_imgs.mean(1, keepdim=True), clean_imgs.mean(1, keepdim=True)).mean()
+            tv = TV_criterion(restored_imgs)
+            loss += tv * 0.1  # TV loss helps to reduce noise
             loss -= ssim * 0.05
 
             # Backward pass
@@ -129,8 +134,12 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
                 mse = mse_criterion(restored_imgs, clean_imgs).item()
                 epoch_psnr += calculate_psnr(mse)
                 epoch_ssim += ssim.item()
+                epoch_tv += tv.item()
             bar.update(1)
-            bar.set_postfix({"Epoch": epoch + 1, "Batch Loss": loss.item(), "PSNR": epoch_psnr / (batch_idx + 1), "SSIM": epoch_ssim / (batch_idx + 1)})
+            bar.set_postfix({"Epoch": epoch + 1, "Batch Loss": loss.item(),
+                             "PSNR": epoch_psnr / (batch_idx + 1),
+                             "SSIM": epoch_ssim / (batch_idx + 1),
+                             "TV": epoch_tv / (batch_idx + 1)})
             if batch_idx % 10 == 0:
                 compose = ImageTensor(clean_imgs[0]).hstack(ImageTensor(noisy_imgs[0])).hstack(ImageTensor(restored_imgs[0]))
                 if screen is None:
