@@ -63,9 +63,6 @@ class NightToDay(nn.Module):
         checkpoint = self.initialization(opt, *args, **kwargs)
         self.names_domains = self.opt.model.names_domains
         self.mode = self.opt.model.mode if trainable else 'test'
-        self.opt.model.gen.fusion_first = self.opt.model.fusion_first
-        self.opt.model.discr.fusion_first = self.opt.model.fusion_first
-        self.opt.model.seg.fusion_first = self.opt.model.fusion_first
         self.model_name += f"_{self.opt.model.gen.fus.type}"
 
         if self.mode == 'test':
@@ -486,15 +483,17 @@ class NightToDay(nn.Module):
         # region ACL
         # First step : Learning to translate Day color traffic lights to Thermal traffic lights
         if self.lambda_trafficlight > 0.0:
-            self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights = self.merge_TL()
-            total_mask = segMask_com | contourMask
-            encoded_TN, self.TN_com, self.remapped_T_com, *_ = self.netG.encode(self.T_com, self.N_com,
+            self.D_com, self.T_com, self.N_com, segMask_com, contourMask, weights, nb = self.merge_TL()
+            if nb > 0:
+                encoded_TN, self.TN_com, self.remapped_T_com, *_ = self.netG.encode(self.T_com, self.N_com,
                                                                                from_=self.T, align_first=False)
-            # self.fake_T_com = self.fake_T * (~total_mask) + self.TN_com * total_mask
+                self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
+                self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
+            else:
+                self.TN_com, self.remapped_T_com = self.fake_TN.clone(), self.remapped_T.clone()
+                self.fake_D_com, self.rec_TN_com = self.fake_D.clone(), self.rec_TN.clone()
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
-            # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
-            self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
-            self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
+            self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.loss_trafficlight[self.N] += self.compute_loss('tll', self.N_com, self.remapped_T_com, self.TN_com,
                                                                 None, self.D_com, self.fake_D_com,
                                                                 self.fake_T_com,
@@ -880,22 +879,6 @@ class NightToDay(nn.Module):
                 N[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_N_
                 D[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = TL_D_
                 segMask_TN[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 6
-
-                # y1_N = y + TL_N_.shape[-2] // 2
-                # x1_N = x + TL_N_.shape[-1] // 2
-                # x0_N = x1_N - TL_N_.shape[-1]
-                # y0_N = y1_N - TL_N_.shape[-2]
-                # real = N[:, :, y0_N:y1_N, x0_N:x1_N]
-                # if TL_T.shape[-1] != TL_N_.shape[-1]:
-                #     mask_ori = torch.zeros_like(TL_N_[:, :1])
-                #     mask_ori[:, :, TL_N_.shape[-2] // 2 - TL_T_.shape[-2] // 2:TL_N_.shape[-2] // 2 + TL_T_.shape[-2] // 2,
-                #     TL_N_.shape[-1] // 2 - TL_T_.shape[-1] // 2:TL_N_.shape[-1] // 2 + TL_T_.shape[-1] // 2] = 1.0
-                # else:
-                #     mask_ori = torch.ones_like(TL_N_[:, :1])
-                # TL_N_mean = (TL_N_.mean(1, keepdim=True) * mask_ori).sum(dim=[1, 2, 3]) / mask_ori.sum()
-                # C_intensity = TL_N_.max(1, keepdim=True)[0] - TL_N_.min(1, keepdim=True)[0]
-                # mask = (TL_N_.mean(1, keepdim=True) + mask_ori + C_intensity).max(1, keepdim=True)[0].clamp(0, 1)
-                # N[:, :, y0_N:y1_N, x0_N:x1_N] = TL_N_ * mask + real * (1 - mask)
                 contour_mask[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 1
                 weights[:, :, y0_TD:y1_TD, x0_TD:x1_TD] = 0.5
 
@@ -903,7 +886,7 @@ class NightToDay(nn.Module):
                                  get_disk_kernel(3, contour_mask.device)) - (segMask_TN == 6).float()).bool()
 
         return ((D * 2 - 1).detach(), (T * 2 - 1).detach(), (N * 2 - 1).detach(), (segMask_TN == 6).detach(),
-                contour_mask.detach(), weights.detach())
+                contour_mask.detach(), weights.detach(), nb)
 
     def create_TN(self):
         L = self.real_T.mean(1, keepdim=True)

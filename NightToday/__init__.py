@@ -28,7 +28,6 @@ class SegConfig:
     base_dim: int
     n_layers: int
     training_schedule: SegScheduleConfig
-    fusion_first: bool = False
 
 
 @dataclass
@@ -56,14 +55,12 @@ class GenConfig:
     n_shared_layers: int = 2
     n_dec_layers: int = 4
     dropout: float = 0.1
-    fusion_first: bool = True
 
 
 @dataclass
 class DiscrConfig:
     base_dim: int = 64
     n_layers: int = 4
-    fusion_first: bool = False
 
 
 @dataclass
@@ -72,7 +69,6 @@ class ModelConfig:
     names_domains: list[str]
     mode: Literal['train', 'test']
     build_from_checkpoint: bool
-    fusion_first: bool
     gen: GenConfig
     discr: DiscrConfig
     seg: SegConfig
@@ -212,7 +208,6 @@ def get_config(path: str = None, file: dict = None) -> OptImage2ImageGATConfig:
                               names_domains=conf['model']['names_domains'],
                               mode=conf['model']['mode'],
                               build_from_checkpoint=conf['model']['build_from_checkpoint'],
-                              fusion_first=conf['model']['fusion_first'],
                               gen=GenConfig(**conf['model']['gen']),
                               discr=DiscrConfig(**conf['model']['discr']),
                               seg=SegConfig(**conf['model']['seg']))

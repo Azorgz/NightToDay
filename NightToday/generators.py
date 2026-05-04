@@ -10,7 +10,7 @@ import torch
 from torch import nn
 
 from .modules import LABToRGB_dEmbed, TransformerDecoderBlock, CrossAttentionFusion, TransformerEncoderBlock, \
-    RGBToLAB_Embed, PatchEmbed, ResnetBlock
+    RGBToLAB_Embed, PatchEmbed, ResnetBlock, DropInSwinBlock
 from .utilities import get_norm_layer
 
 

@@ -15,7 +15,7 @@ from .Fusion import U_ResNetFusion
 from .LETNet import LETNet
 from .discriminators import NLayerDiscriminatorSN
 from .generators import ResnetGenEncoder, ResnetGenDecoder, ResnetBlock
-from .modules import Sequential
+from .modules import Sequential, SwinBlock, DropInSwinBlock
 from .segmentors import SegmentorHeadv2
 from .utilities import weights_init
 
@@ -41,14 +41,7 @@ class Plexer(nn.Module):
     def train(self, *args, mode: bool = True):
         super().train(mode=mode)
         for net in self.networks:
-            # if isinstance(net, SimpleCondViT) or isinstance(net, U_ResNetFusion):
-            #     net.train(mode=mode)
-            #     for p in net.parameters():
-            #         p.requires_grad = True
-            # else:
             net.train(mode=False)
-            # for p in net.parameters():
-            #     p.requires_grad = False
         for arg in args if args else range(len(self.networks)):
             if arg < len(self.networks):
                 self.networks[arg].train(mode=mode)
@@ -67,12 +60,12 @@ class Plexer(nn.Module):
             net.apply(func)
 
     def init_optimizers(self, lr, betas):
-        # opt = MuSGD
-        # optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-        #                   lr=lr)]
-        opt = torch.optim.Adam
+        opt = MuSGD
         optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-                              lr=lr, betas=betas)]
+                          lr=lr)]
+        # opt = torch.optim.Adam
+        # optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
+        #                       lr=lr, betas=betas)]
         setattr(self, 'optimizers', optimizers)
 
     def zero_grads(self, *args):
@@ -122,7 +115,11 @@ class Plexer(nn.Module):
         for i, net in enumerate(self.networks):
             if i < len(self.names):
                 if self.names[i] in weights:
-                    net.load_state_dict(weights[self.names[i]], strict=False)
+                    try:
+                        net.load_state_dict(weights[self.names[i]], strict=True)
+                    except RuntimeError as e:
+                        print(f"Error loading weights for {self.names[i]}: {e}, loading with strict=False.")
+                        net.load_state_dict(weights[self.names[i]], strict=False)
         self.to(device=self.device)
 
 
@@ -145,8 +142,10 @@ class G_Plexer(Plexer):
                      opt.downscaling if fus.type == 'IAware' else opt.downscaling)] * 2
         dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
                     (3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
+        # block_shared = DropInSwinBlock
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
+        # shenc_args = (opt.hidden_dim, )
         fus = opt.fus
         if fus.type == 'UResNet':
             fusion_module = U_ResNetFusion
@@ -227,11 +226,8 @@ class D_Plexer(Plexer):
     def __init__(self, names, opt: DiscrConfig, training_cfg: TrainConfig, device: torch.device):
         super(D_Plexer, self).__init__(names, device, training_cfg.split_optimizers)
         discriminators = NLayerDiscriminatorSN
-        if opt.fusion_first:
-            discr_args = [{'input_nc': 3, 'base_dim': opt.base_dim, 'n_layers': opt.n_layers},
-                          {'input_nc': 3, 'base_dim': opt.base_dim, 'n_layers': opt.n_layers}]
-        else:
-            discr_args = [{'input_nc': 3, 'base_dim': opt.base_dim, 'n_layers': opt.n_layers}] * 3
+        discr_args = [{'input_nc': 3, 'base_dim': opt.base_dim, 'n_layers': opt.n_layers},
+                      {'input_nc': 3, 'base_dim': opt.base_dim, 'n_layers': opt.n_layers}]
         self.networks = [discriminators(**model_arg) for model_arg in discr_args]
         self.names = [f'D_{dom}' for dom in self.names_domains]
         self.apply(weights_init)
@@ -262,10 +258,10 @@ class S_Plexer(Plexer):
         if not opt.type == 'LETNet':
             model = SegmentorHeadv2
             model_args = [(3, opt.n_layers, opt.base_dim, opt.num_classes, 'instance'),
-                          (3 if opt.fusion_first else 6, opt.n_layers, opt.base_dim, opt.num_classes, 'instance')]
+                          (3, opt.n_layers, opt.base_dim, opt.num_classes, 'instance')]
         else:
             model = LETNet
-            model_args = [(opt.num_classes, 3), (opt.num_classes, 3 if opt.fusion_first else 6)]
+            model_args = [(opt.num_classes, 3)] * 2
 
         self.networks = [model(*model_arg) for model_arg in model_args]
         self.names = [f'S_{dom}' for dom in self.names_domains]
@@ -278,7 +274,6 @@ class S_Plexer(Plexer):
             net.load_state_dict(torch.load(path), strict=False)
         self.to(self.device)
         self.init_optimizers(lr=training_cfg.lr_G, betas=training_cfg.betas_G)
-        # self.init_optimizers(torch.optim.Adam, lr=training_cfg.lr_S, betas=training_cfg.betas_D)
         self.freeze = True
 
     def forward(self, x, *args, from_: str = None):
