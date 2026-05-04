@@ -24,7 +24,7 @@ import matplotlib.colors as mcolors
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
-from ImagesCameras.Metrics.Metrics import VGG, Qabf, StructuralCorrelationDifference
+from ImagesCameras.Metrics.Metrics import VGG, Qabf, StructuralCorrelationDifference, GradientCorrelation
 from kornia.augmentation import RandomCrop
 from kornia.color import rgb_to_lab
 from kornia.contrib import connected_components
@@ -443,7 +443,7 @@ class NightToDay(nn.Module):
         self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
         self.rec_T = self.rec_TN
         self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.fake_TN if self.epoch >= 2 else self.remapped_T,
-                                                     loss_name='cycle', criterion_lambda='thermal')
+                                                     loss_name='cycle', criterion_lambda='thermal') - GradientCorrelation('cuda')(self.rec_T, self.fake_T)
 
         # region Cycle loss on Latent Space
         if self.lambda_latent > 0:
