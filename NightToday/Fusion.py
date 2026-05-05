@@ -44,8 +44,9 @@ class U_ResNetFusion(nn.Module):
             self.hook.append(len(model) - 2)  # store index of norm for skip connection
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
-        # model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)] * n_enc_layers[-1]
-        model += [DropInSwinBlock(base_dim * mult)] * n_enc_layers[-1]
+        for _ in range(n_enc_layers[-1]):
+            model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            # model += [DropInSwinBlock(base_dim * mult)] * n_enc_layers[-1]
         self.encoder = nn.ModuleList(model)
         for i, idx in enumerate(self.hook):
             self.encoder[idx].register_forward_hook(lambda model, input, output: self._register_hook(output))
@@ -61,7 +62,7 @@ class U_ResNetFusion(nn.Module):
                                      kernel_size=7, padding=3, padding_mode='reflect'))
         self.final_conv = nn.Sequential(nn.Conv2d(1, 1,
                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
-        self.spatial_aligner = get_wrapper('vis2ir')
+        # self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
 
@@ -100,13 +101,13 @@ class U_ResNetFusion(nn.Module):
                 hook_output = getattr(self, f'encoder_hook_{self.hook[-(i + 1)]}')
                 x_feat = x_feat + self.res_skip[-(i + 1)](hook_output)
             x_feat = layer(x_feat)
-        out = self.final_conv(x_feat)
+        out = self.tanh_n(1)(self.final_conv(x_feat))
         # return out, ir, vis_night  # match input channels
         return out.repeat(1, 3, 1, 1), ir, vis_night
 
     def train(self, mode: bool = True) -> None:
         super().train(mode)
-        self.spatial_aligner.train(False)
+        # self.spatial_aligner.train(False)
 
     @property
     def scene_idx(self):

@@ -656,7 +656,7 @@ class SharpFusionLoss(torch.nn.Module):
     def to(self, device):
         self.gauss = self.gauss.to(device)
 
-    def fft_high(self, x, cutoff=0.25):
+    def fft_high(self, x, cutoff=0.15):
         # x: Bx1xHxW
         B, _, H, W = x.shape
         X = torch.fft.fftshift(torch.fft.fft2(x, norm='ortho'))
@@ -692,7 +692,7 @@ class SharpFusionLoss(torch.nn.Module):
         L_f = laplacian(I_f, size).abs()
         L_vi = laplacian(I_vi, size).abs()
         L_ir = laplacian(I_ir, size).abs()
-        L_ref = torch.max(L_vi, L_ir)
+        L_ref = torch.max(L_vi, L_ir) * 1.05  # allow some enhancement in laplacian
         L_lap = F.l1_loss(L_f, L_ref)
 
         # -------- Frequency Loss --------
@@ -706,7 +706,7 @@ class SharpFusionLoss(torch.nn.Module):
         C_f = self.local_std(I_f)
         C_vi = self.local_std(I_vi)
         C_ir = self.local_std(I_ir)
-        C_ref = torch.max(C_vi, C_ir)
+        C_ref = torch.max(C_vi, C_ir) * 1.05  # allow some enhancement in local contrast
         L_contrast = F.l1_loss(C_f, C_ref)
         # ---- Total ----
         L = (self.lam_grad * L_grad +
@@ -724,9 +724,9 @@ class ThermalNoiseLoss(nn.Module):
         self.scales = (2, 4)
         self.alpha = 1.8
         self.eps = 1e-3
-        self.w_ms = 1.0
+        self.w_ms = 0.1
         self.w_tensor = 0.7
-        self.w_tv = 0.4
+        self.w_tv = 0.1
         self.w_freq = 0.6
         self.w_edges = 0.2
 
@@ -775,12 +775,7 @@ class ThermalNoiseLoss(nn.Module):
         B, C, H, W = x.shape
         X = torch.fft.fftshift(torch.fft.fft2(x, norm='ortho'))
         mag = torch.abs(X)
-
         R = torch.sqrt(create_meshgrid(H, W, device=x.device).pow(2).sum(dim=-1))
-        # u = torch.linspace(-1, 1, H, device=x.device)
-        # v = torch.linspace(-1, 1, W, device=x.device)
-        # U, V = torch.meshgrid(u, v, indexing='ij')
-        # R = torch.sqrt(U * U + V * V)
 
         return (mag * (R ** self.alpha)).mean()
 
@@ -923,7 +918,7 @@ def FakeIRPersonLoss(Seg_mask: torch.Tensor, fake_IR: torch.Tensor) -> torch.Ten
     B, C, H, W = fake_IR.shape
     GT_mask_resize = F.interpolate(Seg_mask.float(), size=[H, W], mode='nearest').long()
     # person mask (B,1,H,W)
-    person_mask = erosion((GT_mask_resize == 11).float(), torch.ones(3, 3, device=GT_mask_resize.device))
+    person_mask = erosion((GT_mask_resize == PERSON).float(), torch.ones(3, 3, device=GT_mask_resize.device))
 
     fake_img_norm = (fake_IR + 1.0) * 0.5
     fake_mean_fea, fake_cls_tensor, _ = ClsMeanPixelValue(fake_img_norm, Seg_mask.detach(), 19)
@@ -1021,7 +1016,7 @@ def BiasCorrLoss(Seg_D, Seg_TN, fake_IR, real_vis, rec_vis, real_edges, fake_gra
             SLight_loss[SLight_valid] += F.relu(0.7 - fake_region_high.flatten(1).min(1).values)
     # endregion
 
-    # region Cloud Artifact Correction, force the temperature of the sky to be consistent with the input infrared image at the same height
+    # region Cloud Artifact Correction
     valid_veg = veg_mask.sum(dim=[1, 2, 3]) > 0
     valid_cloud = cloud_mask.sum(dim=[1, 2, 3]) > 0
     valid = valid_veg * valid_cloud

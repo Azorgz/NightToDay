@@ -271,7 +271,10 @@ class S_Plexer(Plexer):
                 path = BASE_DIR / 'checkpoints' / f'{name}.pth'
             else:
                 path = f'/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/{name}.pth'
-            net.load_state_dict(torch.load(path), strict=False)
+            try:
+                net.load_state_dict(torch.load(path), strict=False)
+            except FileNotFoundError as e:
+                print(f"Checkpoint for {name} not found at {path}. Starting with random weights.")
         self.to(self.device)
         self.init_optimizers(lr=training_cfg.lr_G, betas=training_cfg.betas_G)
         self.freeze = True
