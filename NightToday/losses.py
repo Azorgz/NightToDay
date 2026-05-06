@@ -292,14 +292,16 @@ def cycle_loss(real, fake):
     return loss
 
 
-def sky_loss(fake, GT_seg_fake, T, TN):
+def sky_loss(fake, GT_seg_fake, T, TN, fake_T, GT_seg):
     """
     Sky loss that focuses on sky regions in the image.
     """
     sky_mask = F.interpolate((GT_seg_fake == SKY).float(), size=fake.shape[-2:], mode='nearest')
     cloud_mask = F.interpolate((GT_seg_fake == CLOUD).float(), size=fake.shape[-2:], mode='nearest')
-    mask = (T < (T[:, :, ::2].mean() - T[:, :, ::2].std()))
-    loss_sky = (TN * mask)[:, :, ::2].mean()
+
+    sky_mask_D = F.interpolate((GT_seg == SKY).float(), size=fake.shape[-2:], mode='nearest')
+    cloud_mask_D = F.interpolate((GT_seg == CLOUD).float(), size=fake.shape[-2:], mode='nearest')
+
     dx, dy = image_gradients(fake)
     valid_sky = sky_mask.sum(dim=[1, 2, 3]) > 100
     valid_cloud = cloud_mask.sum(dim=[1, 2, 3]) > 100
@@ -307,6 +309,8 @@ def sky_loss(fake, GT_seg_fake, T, TN):
         return torch.tensor(0., device=fake.device)
     loss_grad = torch.sqrt(dx[valid_sky] ** 2 + dy[valid_sky] ** 2 + 1e-6) * sky_mask[valid_sky]
     loss_cloud = torch.relu(0.95 - fake[valid_cloud]) * cloud_mask[valid_cloud]
+    loss_sky = torch.relu((TN * sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) -
+        (fake_T * sky_mask_D).sum(dim=[1, 2, 3]) / (sky_mask_D.sum(dim=[1, 2, 3]) + 1e-6))
     loss_color = (((torch.relu(fake[valid_sky][:, 1:2] - fake[valid_sky][:, 2:3]) +
                    torch.relu(fake[valid_sky][:, 0:1] - fake[valid_sky][:, 2:3])) * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) /
                   (sky_mask[valid_sky].sum(dim=[1, 2, 3]) + 1e-6))
@@ -690,15 +694,15 @@ class SharpFusionLoss(torch.nn.Module):
         # -------- Gradient Loss --------
         G_f = sobel(I_f).abs()
         G_vi = sobel(I_vi).abs()
-        G_ir = sobel(I_ir).abs() * 1.05  # allow some enhancement in gradient
+        G_ir = sobel(I_ir).abs() * 1.1  # allow some enhancement in gradient
         G_ref = torch.max(G_vi, G_ir)
         L_grad = torch.relu(G_ref - G_f).mean()
 
         # -------- Laplacian Loss --------
         L_f = laplacian(I_f, size).abs()
         L_vi = laplacian(I_vi, size).abs()
-        L_ir = laplacian(I_ir, size).abs()
-        L_ref = torch.max(L_vi, L_ir) * 1.05  # allow some enhancement in laplacian
+        L_ir = laplacian(I_ir, size).abs() * 1.1  # allow some enhancement in laplacian
+        L_ref = torch.max(L_vi, L_ir)
         L_lap = torch.relu(L_ref - L_f)
 
         # -------- Frequency Loss --------
