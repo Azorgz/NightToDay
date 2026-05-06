@@ -539,7 +539,7 @@ class NightToDay(nn.Module):
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_TN, self.segMask_TN_update)
         self.loss_contour[self.T] += self.compute_loss('contour', self.rec_T, self.segMask_TN_update)
         self.loss_contour[self.D] += self.compute_loss('contour', self.fake_T, self.segMask_D_update)
-        self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update, self.real_T, self.fake_TN, fake_T)
+        self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update, self.real_T, self.fake_TN, self.fake_T)
         # endregion
 
         # endregion
