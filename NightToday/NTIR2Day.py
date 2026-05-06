@@ -433,7 +433,7 @@ class NightToDay(nn.Module):
         # Backward
         rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
         self.rec_T = self.netG.decode(rec_encoded_TN, self.T)
-        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.T
+        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T
                                                      if self.lambda_fus > 0 else self.fake_TN,
                                                      loss_name='cycle', criterion_lambda='thermal')
 
