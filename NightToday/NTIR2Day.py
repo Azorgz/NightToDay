@@ -441,7 +441,6 @@ class NightToDay(nn.Module):
         if self.lambda_latent > 0:
             self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
             self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_TN)
-            self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_D)
         # endregion
 
         # region Identity "auto-encode" loss
@@ -540,7 +539,7 @@ class NightToDay(nn.Module):
         self.loss_contour[self.T] += self.compute_loss('contour', self.fake_TN, self.segMask_TN_update)
         self.loss_contour[self.T] += self.compute_loss('contour', self.rec_T, self.segMask_TN_update)
         self.loss_contour[self.D] += self.compute_loss('contour', self.fake_T, self.segMask_D_update)
-        self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update)
+        self.loss_sky[self.D] += self.compute_loss('sky', self.fake_D, self.segMask_TN_update, self.T, self.fake_TN)
         # endregion
 
         # endregion
