@@ -297,15 +297,18 @@ def sky_loss(fake, GT_seg_fake):
     Sky loss that focuses on sky regions in the image.
     """
     sky_mask = F.interpolate((GT_seg_fake == SKY).float(), size=fake.shape[-2:], mode='nearest')
+    cloud_mask = F.interpolate((GT_seg_fake == CLOUD).float(), size=fake.shape[-2:], mode='nearest')
     dx, dy = image_gradients(fake)
-    valid = sky_mask.sum(dim=[1, 2, 3]) > 100
-    if not valid.any():
+    valid_sky = sky_mask.sum(dim=[1, 2, 3]) > 100
+    valid_cloud = cloud_mask.sum(dim=[1, 2, 3]) > 100
+    if not valid_cloud.any() or not valid_sky.any():
         return torch.tensor(0., device=fake.device)
-    loss_grad = torch.sqrt(dx[valid] ** 2 + dy[valid] ** 2 + 1e-6) * sky_mask[valid]
-    loss_color = (((torch.relu(fake[valid][:, 1:2] - fake[valid][:, 2:3]) +
-                   torch.relu(fake[valid][:, 0:1] - fake[valid][:, 2:3])) * sky_mask[valid]).sum(dim=[1, 2, 3]) /
-                  (sky_mask[valid].sum(dim=[1, 2, 3]) + 1e-6))
-    return loss_grad.mean() * 0.5 + loss_color * 0.5
+    loss_grad = torch.sqrt(dx[valid_sky] ** 2 + dy[valid_sky] ** 2 + 1e-6) * sky_mask[valid_sky]
+    loss_cloud = torch.relu(0.95 - fake[valid_cloud]) * cloud_mask[valid_cloud]
+    loss_color = (((torch.relu(fake[valid_sky][:, 1:2] - fake[valid_sky][:, 2:3]) +
+                   torch.relu(fake[valid_sky][:, 0:1] - fake[valid_sky][:, 2:3])) * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) /
+                  (sky_mask[valid_sky].sum(dim=[1, 2, 3]) + 1e-6))
+    return loss_grad.mean() * 0.5 + loss_color.mean() * 0.5 + loss_cloud.mean() * 0.5
 
 
 def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, weights=None):
