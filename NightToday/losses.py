@@ -694,14 +694,14 @@ class SharpFusionLoss(torch.nn.Module):
         # -------- Gradient Loss --------
         G_f = sobel(I_f).abs()
         G_vi = sobel(I_vi).abs() * mask_hl  # focus on dark areas where thermal has more details
-        G_ir = sobel(I_ir).abs() * 1.1  # allow some enhancement in gradient
+        G_ir = sobel(I_ir).abs()
         G_ref = torch.max(G_vi, G_ir)
         L_grad = torch.relu(G_ref - G_f).mean()
 
         # -------- Laplacian Loss --------
         L_f = laplacian(I_f, size).abs()
         L_vi = laplacian(I_vi, size).abs() * mask_hl
-        L_ir = laplacian(I_ir, size).abs() * 1.1  # allow some enhancement in laplacian
+        L_ir = laplacian(I_ir, size).abs()
         L_ref = torch.max(L_vi, L_ir)
         L_lap = torch.relu(L_ref - L_f)
 

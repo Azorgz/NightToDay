@@ -472,13 +472,10 @@ class NightToDay(nn.Module):
 
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.remapped_T)
-        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.real_N, self.real_T)
+        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.fake_D, self.remapped_T)
 
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
                                                        seg_IR, weights=self.class_weight)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
-                                                       seg_IR, weights=self.class_weight)
-
         # endregion
 
         # region class-wise loss
