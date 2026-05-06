@@ -441,6 +441,7 @@ class NightToDay(nn.Module):
         if self.lambda_latent > 0:
             self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
             self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_TN)
+            self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_D)
         # endregion
 
         # region Identity "auto-encode" loss
