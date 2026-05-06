@@ -165,7 +165,7 @@ class MonotonicThermalLUT(nn.Module):
             y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
         else:
             y = y.repeat(1, 3, 1, 1)
-        y = self.robust_norm(y, p_low=0, p_high=100, eps=self.eps)
+        y = self.robust_norm(y, p_low=0.1, p_high=100, eps=self.eps) * 2 - 1  # re-normalize to [-1,1]
         return y
 
     def naive_scene_selection(self, x):
