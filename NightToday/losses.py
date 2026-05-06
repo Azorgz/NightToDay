@@ -690,17 +690,17 @@ class SharpFusionLoss(torch.nn.Module):
             if I_vi.shape[1] == 3 else I_vi * 0.5 + 0.5
         I_ir = (0.299 * I_ir[:, 0:1] + 0.587 * I_ir[:, 1:2] + 0.114 * I_ir[:, 2:3]) * 0.5 + 0.5 \
             if I_ir.shape[1] == 3 else I_ir * 0.5 + 0.5
-        I_vi = I_vi.clamp(0, 0.9)
+        mask_hl = erosion(I_vi < 0.9, kernel=torch.ones(5, 5, device=I_vi.device))
         # -------- Gradient Loss --------
         G_f = sobel(I_f).abs()
-        G_vi = sobel(I_vi).abs()
+        G_vi = sobel(I_vi).abs() * mask_hl  # focus on dark areas where thermal has more details
         G_ir = sobel(I_ir).abs() * 1.1  # allow some enhancement in gradient
         G_ref = torch.max(G_vi, G_ir)
         L_grad = torch.relu(G_ref - G_f).mean()
 
         # -------- Laplacian Loss --------
         L_f = laplacian(I_f, size).abs()
-        L_vi = laplacian(I_vi, size).abs()
+        L_vi = laplacian(I_vi, size).abs() * mask_hl
         L_ir = laplacian(I_ir, size).abs() * 1.1  # allow some enhancement in laplacian
         L_ref = torch.max(L_vi, L_ir)
         L_lap = torch.relu(L_ref - L_f)
@@ -709,12 +709,12 @@ class SharpFusionLoss(torch.nn.Module):
         F_f = self.fft_high(I_f)
         F_vi = self.fft_high(I_vi)
         F_ir = self.fft_high(I_ir)
-        F_ref = torch.max(torch.abs(F_vi), torch.abs(F_ir))
+        F_ref = torch.max(torch.abs(F_vi) * mask_hl, torch.abs(F_ir))
         L_freq = torch.relu(F_ref - torch.abs(F_f))
 
         # -------- Local Contrast Loss --------
         C_f = self.local_std(I_f)
-        C_vi = self.local_std(I_vi)
+        C_vi = self.local_std(I_vi) * mask_hl
         C_ir = self.local_std(I_ir)
         C_ref = torch.max(C_vi, C_ir)
         L_contrast = torch.relu(C_ref - C_f)
