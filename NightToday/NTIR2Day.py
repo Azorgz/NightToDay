@@ -271,7 +271,7 @@ class NightToDay(nn.Module):
         setattr(self, 'fake_T_com', None)
         setattr(self, 'fake_D_com', None)
         setattr(self, 'fake_TN_com', None)
-        setattr(self, 'rec_TN_com', None)
+        setattr(self, 'rec_T_com', None)
         setattr(self, 'fake_D_day', None)
         setattr(self, 'att_rec_D', None)
 
@@ -394,7 +394,7 @@ class NightToDay(nn.Module):
 
         # G_A and G_B
         self.netG.zero_grads(), self.netS.zero_grads()
-        self.backward_G()
+        self.backward_G() if self.lambda_fus == 0 else self.backward_G_warmup()
         self.netG.step_grads(*self.partial_train_net['G'])
         if self.lambda_seg > 0.0:
             self.netS.step_grads(*self.partial_train_net['S'])
@@ -407,7 +407,8 @@ class NightToDay(nn.Module):
         self.pred_real_T = self.netD(self.real_T, from_=self.T)
 
         encoded_D = self.netG.encode(self.real_D, from_=self.D)
-        encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T, self.real_N,
+        encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T,
+                                                                                  self.real_N,
                                                                                   from_=self.T)
 
         # region GAN adv loss
@@ -431,9 +432,8 @@ class NightToDay(nn.Module):
         self.loss_cycle[self.D] += self.compute_loss('cycle', self.rec_D, self.real_D)
         # Backward
         rec_encoded_TN = self.netG.encode(self.fake_D, from_=self.D)
-        self.rec_TN = self.netG.decode(rec_encoded_TN, self.T)
-        self.rec_T = self.rec_TN
-        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.remapped_T
+        self.rec_T = self.netG.decode(rec_encoded_TN, self.T)
+        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.T
                                                      if self.lambda_fus > 0 else self.fake_TN,
                                                      loss_name='cycle', criterion_lambda='thermal')
 
@@ -454,11 +454,11 @@ class NightToDay(nn.Module):
 
         # endregion
 
-        # region Segmentation Distillation Knowledge
+        # region Segmentation Distillation Knowledge (Losses Seg and Sem)
         seg_IR = self.backward_S(self.lambda_seg if self.lambda_seg != 0 else None)
-        # endregion
+        # endregion losses
 
-        # region Fusion Loss
+        # region Fusion
 
         # region initial Fusion Losses (epoch 0-2 warmup)
         if self.lambda_fus > 0.0:
@@ -488,15 +488,14 @@ class NightToDay(nn.Module):
                 encoded_TN, self.TN_com, self.remapped_T_com, *_ = self.netG.encode(self.T_com, self.N_com,
                                                                                from_=self.T, align_first=False)
                 self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
-                # self.rec_TN_com = self.netG.decode(self.netG.encode(self.fake_D_com, from_=self.D), to_=self.T)
-                self.rec_TN_com = None  # to save memory, we can skip this reconstruction
+                self.rec_T_com = None  # to save memory, we can skip this reconstruction
             else:
                 self.TN_com, self.remapped_T_com = self.fake_TN.clone(), self.remapped_T.clone()
-                self.fake_D_com, self.rec_TN_com = self.fake_D.clone(), self.rec_TN.clone()
+                self.fake_D_com, self.rec_T_com = self.fake_D.clone(), self.rec_T.clone()
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
             self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
             self.loss_trafficlight[self.N] += self.compute_loss('tll', self.N_com, self.remapped_T_com, self.TN_com,
-                                                                self.rec_TN_com, self.D_com, self.fake_D_com,
+                                                                self.rec_T_com, self.D_com, self.fake_D_com,
                                                                 self.fake_T_com,
                                                                 segMask_com, contourMask, weights,
                                                                 self.segMask_TN_update,
@@ -586,7 +585,6 @@ class NightToDay(nn.Module):
                                                        criterion_lambda='att')
         # endregion
 
-
         if self.real_D_T is not None and self.lambda_color_day > 0.0:
             real_D_noised = Perturb_Lightness()(self.real_D)
             encoded_TD, fake_T_day, _, real_D = self.netG.encode(self.real_D_T, real_D_noised, from_=self.T)
@@ -604,11 +602,85 @@ class NightToDay(nn.Module):
         # combined loss
         self.sum_losses().backward()
 
+    def backward_G_warmup(self):
+        self.pred_real_D = self.netD(self.real_D, from_=self.D)
+        self.pred_real_T = self.netD(self.real_T, from_=self.T)
+
+        encoded_D = self.netG.encode(self.real_D, from_=self.D)
+        _, self.fake_TN, self.remapped_T, _ = self.netG.encode(self.real_T, self.real_N,
+                                                                                  from_=self.T)
+        encoded_T = self.netG.encode(self.real_T, from_=self.T)
+
+        # region GAN adv loss
+        """D_T(G_T(D))"""
+        self.fake_T = self.netG.decode(encoded_D, to_=self.T)
+        self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T),
+                                                 self.real_T, self.pred_real_T, self.fake_T, False, loss_name='G')
+        """D_N(G_N(T))"""
+        self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T),
+                                                 self.real_T, self.pred_real_T, self.fake_TN, False, loss_name='G')
+        """D_D(G_D(T))"""
+        self.fake_D = self.netG.decode(encoded_T, to_=self.D)
+        self.loss_G[self.D] += self.compute_loss('gan', partial(self.netD, from_=self.D), self.real_D,
+                                                 self.pred_real_D, self.fake_D, False, loss_name='G')
+        # endregion
+
+        # region Cycle loss
+        #  Forward
+        rec_encoded_D = self.netG.encode(self.fake_T, from_=self.T)
+        self.rec_D = self.netG.decode(rec_encoded_D, self.D)
+        self.loss_cycle[self.D] += self.compute_loss('cycle', self.rec_D, self.real_D)
+        # Backward
+        rec_encoded_T = self.netG.encode(self.fake_D, from_=self.D)
+        self.rec_T = self.netG.decode(rec_encoded_T, self.T)
+        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.T
+                                                     if self.lambda_fus > 0 else self.fake_TN,
+                                                     loss_name='cycle', criterion_lambda='thermal')
+
+        # region Cycle loss on Latent Space
+        if self.lambda_latent > 0:
+            self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
+            self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_T, encoded_T)
+        # endregion
+
+        # region Identity "auto-encode" loss
+        if self.lambda_id > 0:
+            # Same encoder and decoder should recreate image
+            id_D = self.netG.decode(encoded_D, to_=self.D)
+            self.loss_id[self.D] += self.compute_loss('id', id_D, self.real_D)
+            id_TN = self.netG.decode(encoded_T, to_=self.T)
+            self.loss_id[self.T] += self.compute_loss('id', id_TN, self.fake_TN)
+        # endregion
+
+        # endregion
+
+        # region Fusion Loss
+
+        # region initial Fusion Losses (epoch 0-2 warmup)
+        if self.lambda_fus > 0.0:
+            gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
+            self.loss_fus[self.N] += self.compute_loss('cycle', self.fake_TN, -gray_N.repeat(1, 3, 1, 1),
+                                                       loss_name='fus', criterion_lambda='fus')
+            self.loss_fus[self.T] += self.compute_loss('cycle', self.fake_TN, self.remapped_T,
+                                                       loss_name='fus', criterion_lambda='fus')
+        # endregion
+
+        self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
+        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.real_N, self.real_T)
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
+                                                       None, weights=self.class_weight)
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
+                                                       None, weights=self.class_weight)
+        # endregion
+
+        # combined loss
+        self.sum_losses().backward()
+
     def backward_D(self):
         #  D_Thermal
         D = partial(self.netD, from_=self.T)
-        self.loss_D[self.T] += self.compute_loss('gan', D, self.fake_TN if self.lambda_fus > 0 else self.T, self.pred_real_T,
-                                                 self.fake_T, True, loss_name='D')
+        self.loss_D[self.T] += self.compute_loss('gan', D, self.fake_TN if self.lambda_fus == 0 else
+                                                 self.T, self.pred_real_T, self.fake_T, True, loss_name='D')
         #  D_Day
         D = partial(self.netD, from_=self.D)
         self.loss_D[self.D] += self.compute_loss('gan', D, self.real_D, self.pred_real_D,
@@ -920,7 +992,7 @@ class NightToDay(nn.Module):
                        self.remapped_T_com * 0.5 + 0.5 if self.remapped_T_com is not None else self.remapped_T * 0.5 + 0.5),
                    'fake_TN': (self.TN_com * 0.5 + 0.5 if self.TN_com is not None else self.fake_TN * 0.5 + 0.5),
                    'rec_D': (self.fake_D_day * 0.5 + 0.5 if self.fake_D_day is not None else self.rec_D * 0.5 + 0.5),
-                   'rec_T': (self.rec_TN_com * 0.5 + 0.5 if self.rec_TN_com is not None else self.rec_TN * 0.5 + 0.5),
+                   'rec_T': (self.rec_T_com * 0.5 + 0.5 if self.rec_T_com is not None else self.rec_T * 0.5 + 0.5),
                    'fake_D': (self.fake_D_com * 0.5 + 0.5 if self.fake_D_com is not None else self.fake_D * 0.5 + 0.5)}
         out = {lab: ImageTensor(im[0]) for lab, im in visuals.items() if im is not None}
         # out = {lab: ImageTensor(im[0], colorspace='LAB' if ('fake_T' in lab or 'rec_T' in lab) else 'RGB') for lab, im in visuals.items() if im is not None}

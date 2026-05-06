@@ -60,12 +60,14 @@ class Plexer(nn.Module):
             net.apply(func)
 
     def init_optimizers(self, lr, betas):
-        opt = MuSGD
+        # opt = MuSGD
+        # param_groups = [{'params': (p for net in self.networks for p in net.parameters() if p.requires_grad and p.ndim > 1)
+        #                 , 'use_muon': True}, {'params': (p for net in self.networks for p in net.parameters() if p.requires_grad and p.ndim <= 1)
+        #                 , 'use_muon': False}]
+        # optimizers = [opt(param_groups, lr=0.001, momentum=0.98, weight_decay=0.005)]
+        opt = torch.optim.Adam
         optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-                          lr=lr)]
-        # opt = torch.optim.Adam
-        # optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-        #                       lr=lr, betas=betas)]
+                              lr=lr, betas=betas)]
         setattr(self, 'optimizers', optimizers)
 
     def zero_grads(self, *args):
@@ -119,7 +121,8 @@ class Plexer(nn.Module):
                         net.load_state_dict(weights[self.names[i]], strict=True)
                     except RuntimeError as e:
                         print(f"Error loading weights for {self.names[i]}: {e}, loading with strict=False.")
-                        net.load_state_dict(weights[self.names[i]], strict=False)
+                        pass
+                        # net.load_state_dict(weights[self.names[i]], strict=False)
         self.to(device=self.device)
 
 
