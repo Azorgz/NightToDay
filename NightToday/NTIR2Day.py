@@ -458,6 +458,7 @@ class NightToDay(nn.Module):
         seg_IR = self.backward_S(self.lambda_seg if self.lambda_seg != 0 else None)
         # endregion losses
 
+
         # region Fusion
 
         # region initial Fusion Losses (epoch 0-2 warmup)
@@ -470,7 +471,7 @@ class NightToDay(nn.Module):
         # endregion
 
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
-        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.real_T)
+        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.remapped_T)
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.real_N, self.real_T)
 
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
@@ -691,7 +692,7 @@ class NightToDay(nn.Module):
 
     def backward_S(self, stage=None) -> Tensor | Any:
         """Random size for segmentation network training. Then, retain original image size."""
-        stage = stage or self.netS.stage
+        stage = self.netS.stage if stage is not None else 'freeze_all'
         if stage == 'freeze_all':
             self.segMask_D_update = self.segMask_D
             self.segMask_TN_update = self.segMask_TN
