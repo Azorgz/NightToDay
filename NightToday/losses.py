@@ -686,33 +686,34 @@ class SharpFusionLoss(torch.nn.Module):
             if I_vi.shape[1] == 3 else I_vi * 0.5 + 0.5
         I_ir = (0.299 * I_ir[:, 0:1] + 0.587 * I_ir[:, 1:2] + 0.114 * I_ir[:, 2:3]) * 0.5 + 0.5 \
             if I_ir.shape[1] == 3 else I_ir * 0.5 + 0.5
+        I_vi
         # -------- Gradient Loss --------
         G_f = sobel(I_f).abs()
         G_vi = sobel(I_vi).abs()
-        G_ir = sobel(I_ir).abs()
+        G_ir = sobel(I_ir).abs() * 1.05  # allow some enhancement in gradient
         G_ref = torch.max(G_vi, G_ir)
-        L_grad = F.l1_loss(G_f, G_ref)
+        L_grad = torch.relu(G_ref - G_f).mean()
 
         # -------- Laplacian Loss --------
         L_f = laplacian(I_f, size).abs()
         L_vi = laplacian(I_vi, size).abs()
         L_ir = laplacian(I_ir, size).abs()
         L_ref = torch.max(L_vi, L_ir) * 1.05  # allow some enhancement in laplacian
-        L_lap = F.l1_loss(L_f, L_ref)
+        L_lap = torch.relu(L_ref - L_f)
 
         # -------- Frequency Loss --------
         F_f = self.fft_high(I_f)
         F_vi = self.fft_high(I_vi)
         F_ir = self.fft_high(I_ir)
         F_ref = torch.max(torch.abs(F_vi), torch.abs(F_ir))
-        L_freq = F.l1_loss(torch.abs(F_f), F_ref)
+        L_freq = torch.relu(F_ref - torch.abs(F_f))
 
         # -------- Local Contrast Loss --------
         C_f = self.local_std(I_f)
         C_vi = self.local_std(I_vi)
         C_ir = self.local_std(I_ir)
-        C_ref = torch.max(C_vi, C_ir) * 1.05  # allow some enhancement in local contrast
-        L_contrast = F.l1_loss(C_f, C_ref)
+        C_ref = torch.max(C_vi, C_ir)
+        L_contrast = torch.relu(C_ref - C_f)
         # ---- Total ----
         L = (self.lam_grad * L_grad +
              self.lam_lap * L_lap +
