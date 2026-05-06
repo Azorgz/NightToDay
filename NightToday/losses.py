@@ -310,7 +310,7 @@ def sky_loss(fake, GT_seg_fake, T, TN, fake_T, GT_seg):
     loss_grad = torch.sqrt(dx[valid_sky] ** 2 + dy[valid_sky] ** 2 + 1e-6) * sky_mask[valid_sky]
     loss_cloud = torch.relu(0.95 - fake[valid_cloud]) * cloud_mask[valid_cloud]
     loss_sky = torch.relu((TN * sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6) -
-        (fake_T * sky_mask_D).sum(dim=[1, 2, 3]) / (sky_mask_D.sum(dim=[1, 2, 3]) + 1e-6))
+        (fake_T.detach() * sky_mask_D).sum(dim=[1, 2, 3]) / (sky_mask_D.sum(dim=[1, 2, 3]) + 1e-6))
     loss_color = (((torch.relu(fake[valid_sky][:, 1:2] - fake[valid_sky][:, 2:3]) +
                    torch.relu(fake[valid_sky][:, 0:1] - fake[valid_sky][:, 2:3])) * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) /
                   (sky_mask[valid_sky].sum(dim=[1, 2, 3]) + 1e-6))
