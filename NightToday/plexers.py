@@ -104,15 +104,6 @@ class Plexer(nn.Module):
             weights[self.names[i]] = net.state_dict()
         return weights
 
-    def load_split_weights(self, save_path: str | list):
-        if not isinstance(save_path, list):
-            save_path = [save_path] * len(self.networks)
-        for i, (net, path) in enumerate(zip(self.networks, save_path)):
-            filename = path + '.pth'
-            if isfile(filename):
-                net.load_state_dict(torch.load(filename))
-        self.to(device=self.device)
-
     def load_weights(self, weights: dict):
         for i, net in enumerate(self.networks):
             if i < len(self.names):

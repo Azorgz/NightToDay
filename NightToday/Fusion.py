@@ -62,7 +62,7 @@ class U_ResNetFusion(nn.Module):
                                      kernel_size=7, padding=3, padding_mode='reflect'))
         self.final_conv = nn.Sequential(nn.Conv2d(1, 1,
                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
-        # self.spatial_aligner = get_wrapper('vis2ir')
+        self.spatial_aligner = get_wrapper('vis2ir')
         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
                                                       thermal_preprocessCfg.scene)
 
@@ -131,7 +131,7 @@ class MonotonicThermalLUT(nn.Module):
         init_delta = torch.ones(scene, bins) * 1.0
         self.delta = nn.Parameter(init_delta)
         self.scene_idx = None
-        # self.denoiser_module = FastIRDenoiser(in_c=1, base_c=32, num_blocks=3)
+        self.denoiser_module = FastIRDenoiser(in_c=1, base_c=32, num_blocks=3)
 
     def forward(self, x, *args, p_low=0.5, p_high=100):
         """
@@ -160,7 +160,7 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        # y = self.denoiser_module(y)
+        y = self.denoiser_module(y)
         if HS is not None:
             y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
         else:
