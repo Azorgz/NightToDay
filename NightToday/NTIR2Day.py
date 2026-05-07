@@ -736,7 +736,7 @@ class NightToDay(nn.Module):
                 self.segMask_TN_update = (UpdateIRGTv1(fake_TN_pred_seg.detach(), fake_D_pred_seg_d,
                                                        255 * torch.ones_like(segMask_D_s), fake_TN_s) *
                                           mask_uncertain + ~mask_uncertain * segMask_TN_s)
-                IR_pred_seg = fake_D_pred_seg_d
+                IR_pred_seg = self.segMask_TN_update
 
             elif stage == 'update_TN':
                 real_D_s = interpolate(self.real_D, size=rand_size, mode='bilinear', align_corners=False)
@@ -763,7 +763,7 @@ class NightToDay(nn.Module):
                 self.criterion_seg = self.update_class_criterion(self.segMask_TN_update)
                 self.loss_seg[self.T] += self.compute_loss('seg', fake_TN_pred_seg_d.squeeze(1),
                                                            self.segMask_TN_update.squeeze(1))
-                IR_pred_seg = fake_D_pred_seg_d
+                IR_pred_seg = self.segMask_TN_update
 
             else:
                 fake_TN_s = interpolate(self.fake_TN, size=rand_size, mode='bilinear', align_corners=False)
@@ -785,7 +785,7 @@ class NightToDay(nn.Module):
                 self.criterion_seg = self.update_class_criterion(segMask_TN_update_s)
                 self.loss_seg[self.T] = self.compute_loss('seg', fake_D_pred_seg,
                                                           segMask_TN_update_s.squeeze(1))
-                IR_pred_seg = fake_D_pred_seg_d
+                IR_pred_seg = self.segMask_TN_update
             return interpolate(IR_pred_seg.argmax(1)[:, None].float(), size=self.input_size, mode='nearest').long()
 
     def update_class_criterion(self, labels):
