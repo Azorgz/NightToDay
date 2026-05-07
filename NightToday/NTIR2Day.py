@@ -302,7 +302,7 @@ class NightToDay(nn.Module):
         setattr(self, 'loss_contour', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_vgg', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_sky', {k: 0. for k in self.names_domains})
-        setattr(self, 'loss_contrast_ir', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_contrastive', {k: 0. for k in self.names_domains})
 
     def set_pedestrians_color(self):
         if self.pedestrian_color[0] is None:
