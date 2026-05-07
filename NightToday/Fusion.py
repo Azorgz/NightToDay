@@ -161,11 +161,11 @@ class MonotonicThermalLUT(nn.Module):
 
         y = torch.cat(y, 0)
         y = self.denoiser_module(y)
+        y = self.robust_norm(y, p_low=0.0, p_high=100, eps=self.eps) * 2 - 1  # re-normalize to [-1,1]
         if HS is not None:
             y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
         else:
             y = y.repeat(1, 3, 1, 1)
-        y = self.robust_norm(y, p_low=0.1, p_high=100, eps=self.eps) * 2 - 1  # re-normalize to [-1,1]
         return y
 
     def naive_scene_selection(self, x):
@@ -334,7 +334,6 @@ class SimpleGate(nn.Module):
     Replaces standard activations like ReLU/GELU.
     Splits channels in half and multiplies them. Extremely fast.
     """
-
     def forward(self, x):
         x1, x2 = x.chunk(2, dim=1)
         return x1 * x2
@@ -441,8 +440,8 @@ class FastIRDenoiser(nn.Module):
         noise = self.blocks(noise)
         noise = self.outro(noise)
         detail = self.detail_extractor(shortcut)
-        x = torch.tanh(noise + shortcut + detail)  # Residual learning + detail enhancement
-        return x  # Residual learning: network only predicts the noise
+        x = torch.tanh(shortcut + detail - noise)  # Residual learning + detail enhancement
+        return x
 
     def load(self):
         # Load pretrained weights if available
