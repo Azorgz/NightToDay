@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from kornia.color import rgb_to_hsv, hsv_to_rgb
+from kornia.enhance import image_histogram2d, equalize
 
 from . import ThermalPreprocessConfig
 from .CrossRAFT import get_wrapper
@@ -428,15 +429,18 @@ class FastIRDenoiser(nn.Module):
 
     def __init__(self, in_c=1, base_c=32, num_blocks=3):
         super().__init__()
-        self.intro = nn.Conv2d(in_c, base_c, 3, 1, 1)
+        self.intro = nn.Conv2d(in_c*3, base_c, 3, 1, 1)
         self.blocks = nn.Sequential(*[NAFBlock(base_c) for _ in range(num_blocks)])
         self.outro = nn.Conv2d(base_c, in_c, 3, 1, 1)
         self.detail_extractor = detailBlock(c=base_c)
         self.load()
 
     def forward(self, x):
-        shortcut = x
-        noise = self.intro(x)
+        shortcut = x.clone()
+        x = (x - x.min()) / (x.max() - x.min() + EPS)  # Normalize to [0,1] for better LUT performance
+        low_contrast = x ** 4
+        high_contrast = x.clamp(EPS, 1) ** 0.25
+        noise = self.intro(torch.cat([x, low_contrast, high_contrast], dim=1))
         noise = self.blocks(noise)
         noise = self.outro(noise)
         detail = self.detail_extractor(shortcut)
@@ -446,7 +450,7 @@ class FastIRDenoiser(nn.Module):
     def load(self):
         # Load pretrained weights if available
         try:
-            state_dict = torch.load('checkpoints/fast_ir_denoiser_epoch.pth', map_location='cpu')
+            state_dict = torch.load('checkpoints/fast_ir_denoiser.pth', map_location='cpu')
             self.load_state_dict(state_dict, strict=False)
         except FileNotFoundError:
             print("Pretrained weights for FastIRDenoiser not found. Using random initialization.")

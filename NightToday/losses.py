@@ -758,7 +758,8 @@ class ContrastiveLoss(nn.Module):
         local_mean = split_images.view(B, C, N, -1).mean(dim=-1)
         local_tv = split_gradients.view(B, C, N, -1).mean(dim=-1) * 0.2
         loss = local_tv / (local_std + 1e-6) * (local_mean * (1 - local_mean) + 1e-6) * 0.1
-        return loss.mean() + torch.abs(image - gt).mean() * 0.1 - dy.abs().mean() * 0.1
+
+        return loss.mean() - (dy.abs().mean() + gradient.mean() * 0.2) * 0.1 - (image * gt)[:, :, ::2].mean() * 0.1
 
 
 class ThermalNoiseLoss(nn.Module):

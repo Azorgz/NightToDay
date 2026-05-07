@@ -42,7 +42,7 @@ class SyntheticNoiseDataset(Dataset):
         clean_img = self.transform(Image.open(img_path))
 
         # Inject Gaussian Noise
-        clean_img = clean_img * (0.5 + torch.rand(1) * 0.5)  # Randomly scale down to simulate varying conditions
+        clean_img = clean_img ** (0.2 + torch.rand(1)*0.8) * ( 1 - torch.rand(1)*0.7)  # Randomly scale down to simulate varying conditions
         if torch.rand(1) < 0.5:
             noise_scale = 100.0
             # 1. Multiply by scale to get the Poisson rate (lambda)
@@ -73,7 +73,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
     print("Initializing standalone denoiser training...")
 
     # 1. Setup Data
-    dataset = SyntheticNoiseDataset(image_dir=data_dir, noise_level=0.05)
+    dataset = SyntheticNoiseDataset(image_dir=data_dir, noise_level=0.02)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     # 2. Initialize Model (Imported from your modules)
@@ -84,7 +84,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
 
     # resume from checkpoint if exists
     epoch = 10
-    checkpoint_path = f"checkpoints/fast_ir_denoiser_epoch.pth"
+    checkpoint_path = f"checkpoints/fast_ir_denoiser_epoch_.pth"
     if os.path.exists(checkpoint_path):
         model.load_state_dict(torch.load(checkpoint_path))
         print(f"--> Resumed from checkpoint: {checkpoint_path}")
@@ -123,7 +123,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
             ssim = ssim_criterion(restored_imgs.mean(1, keepdim=True), clean_imgs.mean(1, keepdim=True)).mean()
             tv = TV_criterion(restored_imgs)
             contrast = contrast_criterion(restored_imgs, clean_imgs)
-            loss += tv * 0.1 + contrast * 0.5 # TV loss helps to reduce noise
+            loss += tv * 0.1 + contrast * 5 # TV loss helps to reduce noise
             loss -= ssim * 0.05
 
             # Backward pass
