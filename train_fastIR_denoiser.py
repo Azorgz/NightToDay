@@ -11,7 +11,7 @@ from PIL import Image
 from tqdm import tqdm
 
 from NightToday.Fusion import FastIRDenoiser
-from NightToday.losses import TVLoss
+from NightToday.losses import TVLoss, ContrastiveLoss
 
 
 # Assuming you saved the previous code in a file named `models.py`
@@ -23,7 +23,7 @@ class SyntheticNoiseDataset(Dataset):
     This creates perfect paired data for training the denoiser.
     """
 
-    def __init__(self, image_dir, image_size=256, noise_level=0.01):
+    def __init__(self, image_dir, image_size=256, noise_level=0.002):
         self.image_paths = [os.path.join(image_dir, f) for f in os.listdir(image_dir) if
                             f.endswith(('.png', '.jpg', '.jpeg'))]
         self.noise_level = noise_level
@@ -73,7 +73,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
     print("Initializing standalone denoiser training...")
 
     # 1. Setup Data
-    dataset = SyntheticNoiseDataset(image_dir=data_dir, noise_level=0.1)
+    dataset = SyntheticNoiseDataset(image_dir=data_dir, noise_level=0.05)
     dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     # 2. Initialize Model (Imported from your modules)
@@ -84,7 +84,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
 
     # resume from checkpoint if exists
     epoch = 10
-    checkpoint_path = f"checkpoints/fast_ir_denoiser_epoch_{epoch}.pth"
+    checkpoint_path = f"checkpoints/fast_ir_denoiser_epoch.pth"
     if os.path.exists(checkpoint_path):
         model.load_state_dict(torch.load(checkpoint_path))
         print(f"--> Resumed from checkpoint: {checkpoint_path}")
@@ -95,6 +95,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
     mse_criterion = nn.MSELoss()  # Used strictly for calculating PSNR
     ssim_criterion = SSIM(device)  # SSIM expects input in range [-1, 1]
     TV_criterion = TVLoss()
+    contrast_criterion = ContrastiveLoss()
 
     optimizer = optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=epochs)
@@ -108,6 +109,7 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
         epoch_psnr = 0.0
         epoch_ssim = 0.0
         epoch_tv = 0.0
+        epoch_contrast = 0.0
 
         for batch_idx, (noisy_imgs, clean_imgs) in enumerate(dataloader):
             noisy_imgs, clean_imgs = noisy_imgs.to(device), clean_imgs.to(device)
@@ -120,7 +122,8 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
             loss = criterion(restored_imgs, clean_imgs)
             ssim = ssim_criterion(restored_imgs.mean(1, keepdim=True), clean_imgs.mean(1, keepdim=True)).mean()
             tv = TV_criterion(restored_imgs)
-            loss += tv * 0.1  # TV loss helps to reduce noise
+            contrast = contrast_criterion(restored_imgs)
+            loss += tv * 0.1 + contrast * 0.5 # TV loss helps to reduce noise
             loss -= ssim * 0.05
 
             # Backward pass
@@ -135,11 +138,13 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
                 epoch_psnr += calculate_psnr(mse)
                 epoch_ssim += ssim.item()
                 epoch_tv += tv.item()
+                epoch_contrast += contrast.item()
             bar.update(1)
             bar.set_postfix({"Epoch": epoch + 1, "Batch Loss": loss.item(),
                              "PSNR": epoch_psnr / (batch_idx + 1),
                              "SSIM": epoch_ssim / (batch_idx + 1),
-                             "TV": epoch_tv / (batch_idx + 1)})
+                             "TV": epoch_tv / (batch_idx + 1),
+                             "Contrast": epoch_contrast / (batch_idx + 1)})
             if batch_idx % 10 == 0:
                 compose = ImageTensor(clean_imgs[0]).hstack(ImageTensor(noisy_imgs[0])).hstack(ImageTensor(restored_imgs[0]))
                 if screen is None:

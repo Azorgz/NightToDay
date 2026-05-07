@@ -38,7 +38,7 @@ from . import get_config
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
     ThermalLoss, SharpFusionLoss, IlluminationAwareFusionLoss, PixelConsistencyLoss, \
-    TrafLighLumiLoss_TN, ForegroundContourLoss, sky_loss
+    TrafLighLumiLoss_TN, ForegroundContourLoss, sky_loss, ContrastiveLoss
 from .modules import LossScheduler, Get_gradmag_gray
 from .plexers import G_Plexer, D_Plexer, S_Plexer
 from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_disk_kernel, \
@@ -145,6 +145,7 @@ class NightToDay(nn.Module):
             self.criterion_qabf = Qabf(device=self.device)
             self.criterion_sky = sky_loss
             self.criterion_mean = lambda x, y: torch.relu(torch.abs(x.mean(dim=[1, 2, 3]) - y.mean(dim=[1, 2, 3])) - 1e-2).mean()
+            self.criterion_contrastive = ContrastiveLoss()
 
             # Losses storage
             self.initialize_losses()
@@ -301,6 +302,7 @@ class NightToDay(nn.Module):
         setattr(self, 'loss_contour', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_vgg', {k: 0. for k in self.names_domains})
         setattr(self, 'loss_sky', {k: 0. for k in self.names_domains})
+        setattr(self, 'loss_contrast_ir', {k: 0. for k in self.names_domains})
 
     def set_pedestrians_color(self):
         if self.pedestrian_color[0] is None:
@@ -473,6 +475,7 @@ class NightToDay(nn.Module):
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.remapped_T)
         # self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.fake_D, self.remapped_T)
+        self.loss_contrast_ir[self.D] += self.compute_loss('contrastive', self.remapped_T, self.real_T)
 
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
                                                        seg_IR, weights=self.class_weight)

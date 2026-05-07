@@ -726,6 +726,40 @@ class SharpFusionLoss(torch.nn.Module):
 
         return L.mean()
 
+class ContrastiveLoss(nn.Module):
+    """
+    Compute a loss based on a sliding window contrastive approach. The loss encourage sharp edges but penalize
+    unsolicited gradients.
+    """
+    def __init__(self, window_size=16):
+        super(ContrastiveLoss, self).__init__()
+        self.window_size = window_size
+
+    def split_into_windows(self, image):
+        B, C, H, W = image.shape
+        ws = self.window_size
+        image = image.unfold(2, ws, ws).unfold(3, ws, ws)
+        return image.contiguous().view(B, C, -1, ws, ws)
+
+    def normalize(self, image):
+        mean = image.mean(dim=[2, 3], keepdim=True)
+        std = image.std(dim=[2, 3], keepdim=True) + 1e-6
+        image = (image - mean) / std
+        return (image - image.min()) / (image.max() - image.min() + 1e-6)
+
+    def forward(self, image):
+        image = self.normalize(image)
+        dx, dy = image_gradients(image)
+        gradient = torch.sqrt(dx ** 2 + dy ** 2 + 1e-6)
+        split_images = self.split_into_windows(image)
+        split_gradients = self.split_into_windows(gradient)
+        B, C, N, ws, _ = split_images.shape
+        local_std = split_images.view(B, C, N, -1).std(dim=-1)
+        local_mean = split_images.view(B, C, N, -1).mean(dim=-1)
+        local_tv = split_gradients.view(B, C, N, -1).mean(dim=-1) * 0.2
+        loss = local_tv / (local_std + 1e-6) * (local_mean * (1 - local_mean) + 1e-6) - dy.abs().mean(dim=[2, 3]) * 0.1
+        return loss.mean()
+
 
 class ThermalNoiseLoss(nn.Module):
 
