@@ -550,6 +550,10 @@ class LETNet(nn.Module):
 
     def forward(self, input):
 
+        h, w = input.shape[-2:]
+        if h % 32 != 0 or w % 32 != 0:
+            input = F.interpolate(input, (h - h % 32, w - w % 32), mode='bilinear', align_corners=False)
+
         output0 = self.init_conv(input)
         output0 = self.bn_prelu_1(output0)
 
@@ -594,6 +598,7 @@ class LETNet(nn.Module):
 
         out = F.interpolate(output6, input.size()[2:], mode='bilinear', align_corners=False)
         out = self.classifier(out)
+        out = F.interpolate(out, (h, w), mode='bilinear', align_corners=False)
         return out
 
 

@@ -74,7 +74,7 @@ class TrainDataset(Dataset):
 
     def __init__(self, opt):
         self.num_classes = opt.num_classes
-        random_size = int((opt.load_size[0] * (torch.rand(1).item() * 0.6 + 0.4)) // 32 * 32)
+        random_size = int((opt.load_size[0] * (torch.rand(1).item() * 0.6 + 0.4)) // 8 * 8)
         self.augmentations = Augmentations([hflip if opt.augmentations['hflip'] else None,
                                             RandomCrop((random_size, random_size)) if opt.augmentations['crop'] else None])
         self.load_size = opt.load_size
