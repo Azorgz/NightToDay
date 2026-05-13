@@ -123,8 +123,8 @@ class NightToDay(nn.Module):
             self.criterion_att = lambda rec, fake: (self.criterion_cycle(rec, self.real_TN) +
                                                     self.criterion_cycle(fake, self.fake_D.detach()))
             self.criterion_semEdge = partial(SemEdgeLoss, num_classes=self.netS.num_classes)
-            # self.criterion_sharpness = RobustFusionDenoiseLoss().to(self.device)
-            self.criterion_sharpness = SharpFusionLoss()
+            self.criterion_sharpness = RobustFusionDenoiseLoss().to(self.device)
+            # self.criterion_sharpness = SharpFusionLoss()
             self.criterion_scene_id = nn.CrossEntropyLoss()
             self.criterion_cgr = lambda f_d, seg_t, r_t: CondGradRepaLoss(f_d,
                                                                           seg_t.detach() if seg_t is not None else seg_t,
@@ -465,8 +465,8 @@ class NightToDay(nn.Module):
 
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         # self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.remapped_T.detach())
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T,
-                                                       self.real_N, seg_IR)
+        # self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T,
+        #                                                self.real_N, seg_IR)
         # endregion
 
         # region class-wise loss
