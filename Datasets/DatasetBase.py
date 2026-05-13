@@ -43,8 +43,8 @@ class TestDataset(Dataset):
 
 
 class Augmentations(list):
-    def __init__(self, *args):
-        super().__init__(*args)
+    def __init__(self, augmentations: list):
+        super().__init__(*augmentations)
 
     def __call__(self, x):
         for aug in self:
