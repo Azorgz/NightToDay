@@ -25,7 +25,7 @@ import matplotlib.colors as mcolors
 import torch
 import torch.nn as nn
 from ImagesCameras import ImageTensor
-from ImagesCameras.Metrics.Metrics import VGG, Qabf, StructuralCorrelationDifference, GradientCorrelation
+from ImagesCameras.Metrics.Metrics import VGG, Qabf, StructuralCorrelationDifference, GradientCorrelation, NEC
 from kornia.augmentation import RandomCrop
 from kornia.color import rgb_to_lab
 from kornia.contrib import connected_components
@@ -112,7 +112,7 @@ class NightToDay(nn.Module):
             self.downsample = torch.nn.AvgPool2d(3, stride=2)
 
             self.criterion_gan = lambda d, r, p_r, f, v: self.GANLoss(d, r, p_r, f, v)
-            self.criterion_id = lambda y, t: self.L1((y - t.mean())/t.std(), (t- t.mean())/t.std())
+            self.criterion_id = lambda y, t: self.L1((y - t.mean())/t.std(), (t - t.mean())/t.std())
             # self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
             self.criterion_cycle = lambda rec, real: (nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec, real)
                                                       / self.lambda_cycle)
@@ -147,6 +147,7 @@ class NightToDay(nn.Module):
             self.criterion_qabf = Qabf(device=self.device)
             self.criterion_sky = sky_loss
             self.criterion_mean = lambda x, y: torch.relu(torch.abs(x.mean(dim=[1, 2, 3]) - y.mean(dim=[1, 2, 3])) - 1e-2).mean()
+            self.criterion_contrastive = NEC(device=self.device)
             self.criterion_contrastive = ContrastiveLoss()
 
             # Losses storage
@@ -500,6 +501,8 @@ class NightToDay(nn.Module):
         self.loss_sga[self.D] += self.compute_loss('bc', self.segMask_D, seg_IR,
                                                    self.fake_T, self.real_D, self.rec_D, self.edges_D,
                                                    self.get_gradmag(self.fake_T), criterion_lambda='bc', loss_name='sga')
+
+        self.loss_contrastive[self.T] += self.compute_loss('contrastive', self.fake_TN, self.fake_D)
 
         self.loss_sga[self.D] += self.compute_loss('IRClsDis', self.segMask_D,
                                                    self.fake_T.mean(dim=1, keepdim=True),
