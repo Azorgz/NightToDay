@@ -116,8 +116,8 @@ class GANLoss(nn.Module):
             gradient_penalty = [None] * len(pred_real)
         res = 0.
         for i in range(3):
-            losses = self.loss(gradient_penalty, pred_real[i], pred_fake[i], for_discriminator)
-            multipliers = list(range(1, len(pred_fake[i]) + 1))
+            losses = self.loss(gradient_penalty, pred_real[i], pred_fake[i], for_discriminator) # return a list of 4 losses, one per scale
+            multipliers = list(range(1, len(losses) + 1))  # The losses are ordered from largest to smallest scale, so we give more weight to smaller scales
             multipliers[-1] += 1
             res += sum([m * l for m, l in zip(multipliers, losses)]) / sum(multipliers)
         return res / 3
@@ -389,7 +389,7 @@ def ColorLoss(fake_color, real_color, GT_seg=None, th_high=0.95, th_low=0.15, we
     return loss.mean()
 
 
-def ThermalLoss(TN, T, N, GT_seg=None, weights=None):
+def ThermalLoss(TN, T, N, GT_seg=None):
     """
     Thermal Loss to enhance the thermal characteristics of the fused image.
     The texture gradient will be maximized in vegetation and vehicles regions
@@ -403,54 +403,24 @@ def ThermalLoss(TN, T, N, GT_seg=None, weights=None):
     B = TN.shape[0]
     device = T.device
     if GT_seg is None:
-        total_classes_loss = torch.zeros([B, ], device=device)
+        person_loss = torch.zeros([B, ], device=device)
     else:
         GT_resized = F.interpolate(GT_seg.float(), size=TN.shape[-2:], mode='nearest').long().detach()
-        weights = weights[[SKY, VEG, PERSON, CAR]] if weights is not None else (
-            torch.tensor([1., 1., 1., 1.], device=TN.device))
-        weights[0] *= 0.2  # sky
-        sky_mask = erosion((GT_resized == SKY).float(), torch.ones(3, 3, device=TN.device))
-        area_sky = sky_mask.sum(dim=[1, 2, 3])
-        valid_sky = area_sky > 200
-        veg_mask = (GT_resized == VEG).float()
-        area_veg = veg_mask.sum(dim=[1, 2, 3])
-        valid_veg = area_veg > 200
         person_mask = erosion((GT_resized == PERSON).float(), torch.ones(5, 5, device=TN.device))
         area_person = person_mask.sum(dim=[1, 2, 3])
         valid_person = area_person > 30
         thermal_diff_high = ReLU()(T - TN)  # only penalize lower values
-        sky_loss = torch.zeros([B, ], device=device)
-        veg_loss = torch.zeros([B, ], device=device)
         person_loss = torch.zeros([B, ], device=device)
-        # blobs_loss = torch.zeros([B, ], device=image_target.device)
-
-        #  Thermal correction losses per classes
-        # mask_up_low = (T[:, :, ::2] < -0.85).float()
-        # sky_loss[valid_sky] += ((thermal_diff_low[:, :, ::2] * mask_up_low).sum(dim=[1, 2, 3])
-        #                         / (mask_up_low.sum(dim=[1, 2, 3]) + 1e-6) * 2)
-        # sky_loss[valid_sky] += (thermal_diff_low[valid_sky] * sky_mask[valid_sky]).sum(dim=[1, 2, 3]) / area_sky[
-        #     valid_sky] * 5
-        # sky_loss[valid_sky] += (thermal_diff_low * sky_mask).sum(dim=[1, 2, 3]) / (sky_mask.sum(dim=[1, 2, 3]) + 1e-6)
-        # veg_loss[valid_veg] += torch.relu((min_values[valid_veg] + 0.1 - TN[valid_veg]) * veg_mask[valid_veg].detach()).sum(
-        #     dim=[1, 2, 3]) / area_veg[valid_veg] * 5
-        # veg_loss[valid_veg] += (thermal_diff_high[valid_veg] * veg_mask[valid_veg]).sum(dim=[1, 2, 3]) / area_veg[valid_veg]
-        # veg_loss[valid_sky*valid_veg] += ReLU()((TN*sky_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_sky[valid_sky*valid_veg] -
-        #                                         (TN*veg_mask)[valid_sky*valid_veg].sum(dim=[1, 2, 3]) / area_veg[valid_sky*valid_veg] * 0.8)
-        # sky_loss[valid_sky] += ReLU()((TN * sky_mask)[valid_sky * valid_veg].sum(dim=[1, 2, 3]) / (area_sky[valid_sky].sum(dim=[1, 2, 3]) + 1e-6))
-
-        person_loss[valid_person] += (thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) / \
-                                     area_person[valid_person]
-        total_classes_loss = ((sky_loss * weights[0] + veg_loss * weights[1] + person_loss * weights[2]) /
-                              (weights[:3] * torch.stack([valid_sky, valid_veg, valid_person], dim=-1).float()).sum(
-                                  1)).mean()
-    grad_TN_y, grad_TN_x = image_gradients(TN)
-    grad_T_y, grad_T_x = image_gradients(T)
-    gradient_loss = (torch.relu(torch.abs(grad_T_x) - torch.abs(grad_TN_x)) +
-                     torch.relu(torch.abs(grad_T_y**2 - grad_TN_y ** 2)))
+        person_loss[valid_person] += ((thermal_diff_high[valid_person] * person_mask[valid_person]).sum(dim=[1, 2, 3]) /
+                                      area_person[valid_person])
+    # grad_TN_y, grad_TN_x = image_gradients(TN)
+    # grad_T_y, grad_T_x = image_gradients(T)
+    # gradient_loss = (torch.relu(torch.abs(grad_T_x) - torch.abs(grad_TN_x)) +
+    #                  torch.relu(torch.abs(grad_T_y) - torch.abs(grad_TN_y)))
 
     thermal_noise_loss = ThermalNoiseLoss()(TN, T, N).mean() * 2
 
-    return total_classes_loss + thermal_noise_loss + gradient_loss.mean() * 0.5
+    return person_loss.mean() + thermal_noise_loss  # + gradient_loss.mean() * 0.5
 
 
 # def TL_fake_loss(D, f_T, GT_mask_D):
@@ -645,6 +615,108 @@ def ForegroundContourLoss(fake, GT_seg):
         return 0.0
 
 
+class ContrastiveLoss(nn.Module):
+    """
+    Compute a loss based on a sliding window contrastive approach. The loss encourage sharp edges but penalize
+    unsolicited gradients.
+    """
+    def __init__(self, window_size=16):
+        super(ContrastiveLoss, self).__init__()
+        self.window_size = window_size
+
+    def split_into_windows(self, image):
+        B, C, H, W = image.shape
+        ws = self.window_size
+        image = image.unfold(2, ws, ws).unfold(3, ws, ws)
+        return image.contiguous().view(B, C, -1, ws, ws)
+
+    def normalize(self, image):
+        mean = image.mean(dim=[2, 3], keepdim=True)
+        std = image.std(dim=[2, 3], keepdim=True) + 1e-6
+        image = (image - mean) / std
+        return (image - image.min()) / (image.max() - image.min() + 1e-6)
+
+    def forward(self, image, gt):
+        image = self.normalize(image)
+        dx, dy = image_gradients(image)
+        gradient = torch.sqrt(dx ** 2 + dy ** 2 + 1e-6)
+        split_images = self.split_into_windows(image)
+        split_gradients = self.split_into_windows(gradient)
+        B, C, N, ws, _ = split_images.shape
+        local_std = split_images.view(B, C, N, -1).std(dim=-1)
+        local_mean = split_images.view(B, C, N, -1).mean(dim=-1)
+        local_tv = split_gradients.view(B, C, N, -1).mean(dim=-1) * 0.2
+        loss = local_tv / (local_std + 1e-6) * (local_mean * (1 - local_mean) + 1e-6) * 0.1
+
+        return loss.mean() - (dy.abs().mean() + gradient.mean() * 0.2) * 0.1 - (image * gt)[:, :, ::2].mean() * 0.1
+
+
+class RobustFusionDenoiseLoss(nn.Module):
+    def __init__(self, w_detail=5.0, w_noise=2.0, w_fft=0.1):
+        super().__init__()
+        self.w_detail = w_detail
+        self.w_noise = w_noise
+        self.w_fft = w_fft
+
+        # Sobel kernels for self-contained fast gradient computation
+        kernel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]])
+        kernel_y = torch.tensor([[-1., -2., -1.], [0., 0., 0.], [1., 2., 1.]])
+        self.register_buffer('sobel_x', kernel_x.view(1, 1, 3, 3))
+        self.register_buffer('sobel_y', kernel_y.view(1, 1, 3, 3))
+
+    def _to_gray(self, x):
+        if x.shape[1] == 3:
+            x = 0.299 * x[:, 0:1] + 0.587 * x[:, 1:2] + 0.114 * x[:, 2:3]
+        return x * 0.5 + 0.5
+
+    def _get_gradients(self, x):
+        # Fast spatial gradients
+        gx = F.conv2d(F.pad(x, (1, 1, 1, 1), mode='reflect'), self.sobel_x)
+        gy = F.conv2d(F.pad(x, (1, 1, 1, 1), mode='reflect'), self.sobel_y)
+        return torch.sqrt(gx ** 2 + gy ** 2 + 1e-6)
+
+    def forward(self, I_fused, I_vi, I_ir):
+        B, _, H, W = I_fused.shape
+        device = I_fused.device
+
+        # 1. Convert to Grayscale
+        I_f, I_v, I_i = map(self._to_gray, [I_fused, I_vi, I_ir])
+
+        # 2. Highlight Masking (Fast Morphological Erosion)
+        dark_mask = (I_v < 0.9).float()
+        mask_hl = -F.max_pool2d(-dark_mask, kernel_size=5, stride=1, padding=2)
+
+        # 3. Compute Gradients
+        G_f = self._get_gradients(I_f)
+        G_v = self._get_gradients(I_v) * mask_hl
+        G_i = self._get_gradients(I_i)
+
+        # ==========================================
+        # 4. Detail Injection (Sharpening)
+        # ==========================================
+        # Force fused image to have AT LEAST the strongest edge from either source.
+        G_ref = torch.max(G_v, G_i)
+        L_detail = F.relu(G_ref - G_f).mean()
+
+        # ==========================================
+        # 5. Guided Noise Penalty (Smart TV)
+        # ==========================================
+        noise_mask = (G_f > G_v) & (G_f > G_i)
+        L_noise = (G_f * noise_mask.float()).mean()
+
+        # ==========================================
+        # 6. High-Frequency Spectral Decay (Global Denoise)
+        # ==========================================
+        FFT_f = torch.fft.fftshift(torch.fft.fft2(I_f, norm='ortho'))
+        u = torch.linspace(-1, 1, H, device=device)
+        v = torch.linspace(-1, 1, W, device=device)
+        U, V = torch.meshgrid(u, v, indexing='ij')
+        R = torch.sqrt(U ** 2 + V ** 2).unsqueeze(0).unsqueeze(0)  # Bx1xHxW
+
+        L_fft = (FFT_f.abs() * R).mean()
+        return self.w_detail * L_detail + self.w_noise * L_noise + self.w_fft * L_fft
+
+
 class SharpFusionLoss(torch.nn.Module):
     def __init__(self, lam_grad=7.0, lam_lap=4.5, lam_contrast=3.5, lam_freq=1.5):
         super().__init__()
@@ -726,41 +798,6 @@ class SharpFusionLoss(torch.nn.Module):
 
         return L.mean()
 
-class ContrastiveLoss(nn.Module):
-    """
-    Compute a loss based on a sliding window contrastive approach. The loss encourage sharp edges but penalize
-    unsolicited gradients.
-    """
-    def __init__(self, window_size=16):
-        super(ContrastiveLoss, self).__init__()
-        self.window_size = window_size
-
-    def split_into_windows(self, image):
-        B, C, H, W = image.shape
-        ws = self.window_size
-        image = image.unfold(2, ws, ws).unfold(3, ws, ws)
-        return image.contiguous().view(B, C, -1, ws, ws)
-
-    def normalize(self, image):
-        mean = image.mean(dim=[2, 3], keepdim=True)
-        std = image.std(dim=[2, 3], keepdim=True) + 1e-6
-        image = (image - mean) / std
-        return (image - image.min()) / (image.max() - image.min() + 1e-6)
-
-    def forward(self, image, gt):
-        image = self.normalize(image)
-        dx, dy = image_gradients(image)
-        gradient = torch.sqrt(dx ** 2 + dy ** 2 + 1e-6)
-        split_images = self.split_into_windows(image)
-        split_gradients = self.split_into_windows(gradient)
-        B, C, N, ws, _ = split_images.shape
-        local_std = split_images.view(B, C, N, -1).std(dim=-1)
-        local_mean = split_images.view(B, C, N, -1).mean(dim=-1)
-        local_tv = split_gradients.view(B, C, N, -1).mean(dim=-1) * 0.2
-        loss = local_tv / (local_std + 1e-6) * (local_mean * (1 - local_mean) + 1e-6) * 0.1
-
-        return loss.mean() - (dy.abs().mean() + gradient.mean() * 0.2) * 0.1 - (image * gt)[:, :, ::2].mean() * 0.1
-
 
 class ThermalNoiseLoss(nn.Module):
 
@@ -772,7 +809,7 @@ class ThermalNoiseLoss(nn.Module):
         self.w_ms = 0.1
         self.w_tensor = 0.7
         self.w_tv = 0.1
-        self.w_freq = 0.6
+        self.w_freq = 0.1
         self.w_edges = 0.2
 
     # -------- Multiscale coherence --------
@@ -790,7 +827,7 @@ class ThermalNoiseLoss(nn.Module):
         edges_ref = sobel(IR).abs()
         edges_ref2 = sobel(N).abs() * dilation((N < 0.9).float(),
                                                kernel=torch.ones(3, 3, device=N.device))  # focus on dark areas
-        return F.relu(edges_x - edges_ref * 0.9) / 2 + F.relu(edges_x - edges_ref2 * 0.9) / 2
+        return F.relu(edges_ref - edges_x * 0.9) / 2 + F.relu(edges_ref2 - edges_x * 0.9) / 2
 
     # -------- Structure tensor loss --------
     def structure_tensor_loss(self, x):
@@ -845,12 +882,6 @@ class SSIM_Loss(SSIM):
             ssim = lambda x, y: super(SSIM_Loss, self).forward(x, y)
         else:
             ssim = lambda x, y: super(SSIM_Loss, self).forward(x, y, return_map=True)
-        if img1.shape[1] == 6:
-            img1_1 = img1[:, :3, :, :]
-            img2_1 = img2[:, :3, :, :]
-            img1_2 = img1[:, 3:, :, :]
-            img2_2 = img2[:, 3:, :, :]
-            return 1 - (ssim(img1_1, img2_1) + ssim(img1_2, img2_2)) * 0.5
         return 1 - ssim(img1, img2)
 
 
@@ -1194,6 +1225,8 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 HL_region = erosion(HL_region, get_disk_kernel(radius_HL // 8, device=mask.device))
             else:
                 HL_region = erosion(HL_region, get_disk_kernel(radius_HL // 3, device=mask.device))
+
+            housing_mask = torch.relu(total_ - dilation(HL_region, get_disk_kernel(3, device=mask.device)))
             # losses fake TN composition
             sky_mask = F.interpolate((seg_mask[b:b + 1] == SKY).float(), size=(h, w), mode='nearest')
             T_adjusted = (T * 0.5 + 0.5) ** (mean_T_light_region / 0.5) * 2 - 1
@@ -1235,13 +1268,27 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
-            std_loss = ((fake_D[b:b + 1] * (mask_ - HL_region)).std(1).mean() +
-                        (fake_D[b:b + 1].mean(1) * (mask_ - HL_region)).std(dim=[1, 2, 3])).sum()
+            # std_loss = ((fake_D[b:b + 1] * (mask_ - HL_region)).std(1).mean() +
+            #             (fake_D[b:b + 1].mean(1) * (mask_ - HL_region)).std(dim=[1, 2, 3])).sum()
+            std_loss = ((fake_D[b:b + 1] * housing_mask).std(1).mean() +
+                        (fake_D[b:b + 1].mean(1) * housing_mask).std(dim=[1, 2, 3])).sum()
             # grad_loss to enhance the gradient of traffic light region
-            grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
-            grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
-            grad_loss = (nn.L1Loss()(grad_fake_D, grad_TN) * total_[b:b + 1]).sum() / (
-                    total_[b:b + 1].sum() + 1e-6) * 2
+            # grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
+            # grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
+            # grad_loss = (nn.L1Loss()(grad_fake_D, grad_TN) * total_[b:b + 1]).sum() / (
+            #         total_[b:b + 1].sum() + 1e-6) * 2
+            grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True)))
+            grad_T = torch.abs(sobel(T[b:b + 1].mean(1, keepdim=True)))
+            housing_grad_loss = (nn.L1Loss()(grad_fake_D * housing_mask,
+                                             grad_T * housing_mask) * housing_mask).sum() / (housing_mask.sum() + 1e-6)
+            # 4. Anti-Bleed Edge Enforcement: Stop the blob from leaking into the background
+            mask_boundary = dilation(mask_, torch.ones((3, 3), device=mask.device)) - mask_
+            bleed_loss = (grad_fake_D * mask_boundary * (1 - total_)).sum() / (mask_boundary.sum() + 1e-6)
+
+            # Combine new shape losses (using higher weights to prioritize fixing the blobs)
+            grad_loss = (housing_grad_loss * 3.0) + (bleed_loss * 2.0)
+
+            # 5. Sky contour loss
             sky_contour = sky_mask * contour[b:b + 1]
             if sky_contour.sum() > 0:
                 sky_mean_fake_D = (sky_mask * fake_D[b:b + 1]).sum() / (3 * sky_mask.sum() + 1e-6)

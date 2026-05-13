@@ -38,7 +38,7 @@ from . import get_config
 from .losses import GANLoss, SSIM_Loss, TVLoss, StructuralGradientLoss, \
     FakeIRPersonLoss, BiasCorrLoss, ColorLoss, CondGradRepaLoss, AdaptativeColAttentionLoss, SemEdgeLoss, \
     ThermalLoss, SharpFusionLoss, IlluminationAwareFusionLoss, PixelConsistencyLoss, \
-    TrafLighLumiLoss_TN, ForegroundContourLoss, sky_loss, ContrastiveLoss
+    TrafLighLumiLoss_TN, ForegroundContourLoss, sky_loss, ContrastiveLoss, RobustFusionDenoiseLoss
 from .modules import LossScheduler, Get_gradmag_gray
 from .plexers import G_Plexer, D_Plexer, S_Plexer
 from .utilities import UpdateVisGT, UpdateIRGTv1, UpdateIRGTv2, AttackImages, get_disk_kernel, \
@@ -113,8 +113,8 @@ class NightToDay(nn.Module):
 
             self.criterion_gan = lambda d, r, p_r, f, v: self.GANLoss(d, r, p_r, f, v)
             self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
-            self.criterion_cycle = lambda rec, real: nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec,
-                                                                                                                real) / self.lambda_cycle
+            self.criterion_cycle = lambda rec, real: (nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec, real)
+                                                      / self.lambda_cycle)
             self.criterion_latent = lambda y, t: self.L1(y, t.detach())
             self.criterion_ssim = lambda x, y: SSIM_Loss()((x + 1) / 2, (y + 1) / 2) * self.lambda_ssim
             self.criterion_tv = TVLoss(TVLoss_weight=1)
@@ -123,7 +123,8 @@ class NightToDay(nn.Module):
             self.criterion_att = lambda rec, fake: (self.criterion_cycle(rec, self.real_TN) +
                                                     self.criterion_cycle(fake, self.fake_D.detach()))
             self.criterion_semEdge = partial(SemEdgeLoss, num_classes=self.netS.num_classes)
-            self.criterion_sharpness = SharpFusionLoss()
+            self.criterion_sharpness = RobustFusionDenoiseLoss().to(self.device)
+            # self.criterion_sharpness = SharpFusionLoss()
             self.criterion_scene_id = nn.CrossEntropyLoss()
             self.criterion_cgr = lambda f_d, seg_t, r_t: CondGradRepaLoss(f_d,
                                                                           seg_t.detach() if seg_t is not None else seg_t,
@@ -460,25 +461,13 @@ class NightToDay(nn.Module):
         seg_IR = self.backward_S(self.lambda_seg if self.lambda_seg != 0 else None)
         # endregion losses
 
-
         # region Fusion
 
-        # region initial Fusion Losses (epoch 0-2 warmup)
-        if self.lambda_fus > 0.0:
-            gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
-            self.loss_fus[self.N] += self.compute_loss('cycle', self.fake_TN, -gray_N.repeat(1, 3, 1, 1),
-                                                       loss_name='fus', criterion_lambda='fus')
-            self.loss_fus[self.T] += self.compute_loss('cycle', self.fake_TN, self.remapped_T,
-                                                       loss_name='fus', criterion_lambda='fus')
-        # endregion
-
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
-        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.remapped_T)
-        # self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.fake_D, self.remapped_T)
-        self.loss_contrastive[self.D] += self.compute_loss('contrastive', self.remapped_T, self.real_T)
-
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
-                                                       seg_IR, weights=self.class_weight)
+        # self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
+        # self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.fake_D, self.real_N, self.remapped_T.detach())
+        # self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T,
+        #                                                self.real_N, seg_IR)
         # endregion
 
         # region class-wise loss
@@ -560,7 +549,28 @@ class NightToDay(nn.Module):
 
         # endregion
 
-        # region Scale Robustness Loss
+        # region Attacks stability loss & Scale Robustness
+        if self.lambda_att > 0.0:
+            att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1) / 20).repeat(1, 3, 1,
+                                                                                                              1)
+            self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
+            self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att',
+                                                       criterion_lambda='att')
+
+        if self.real_D_T is not None and self.lambda_color_day > 0.0:
+            real_D_noised = Perturb_Lightness()(self.real_D)
+            encoded_TD, fake_T_day, _, real_D = self.netG.encode(self.real_D_T, real_D_noised, from_=self.T, align_first=True)
+            self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
+            self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
+                                                             criterion_lambda='color_day')
+            mask_proj = (self.real_D.mean(dim=1, keepdim=True) == 0.5).float() * (self.real_D.std(dim=1, keepdim=True) == 0).float()
+            mask_lum = (self.real_D.mean(dim=1, keepdim=True) < 0.90).float() * (1-mask_proj)
+            self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
+                                                             self.real_D*mask_lum, loss_name='color_day',
+                                                             criterion_lambda='color_day')
+            self.loss_color_day[self.D] += self.compute_loss('sharpness', self.fake_D_day, self.real_D, self.real_D_T,
+                                                             criterion_lambda='color_day')
+
         if self.lambda_scale_robustness > 0.0:
             size = self.input_size
             h_ds, w_ds = size[0] // 2, size[1] // 2
@@ -577,29 +587,6 @@ class NightToDay(nn.Module):
                                                                     loss_name='scale_robustness',
                                                                     criterion_lambda='scale_robustness')
         # endregion
-
-        # region Attacks stability loss
-        if self.lambda_att > 0.0:
-            att_fake_T = self.att_input(self.fake_T.mean(1, keepdim=True), epsilon=torch.rand(1) / 20).repeat(1, 3, 1,
-                                                                                                              1)
-            self.att_rec_D = self.netG.decode(self.netG.encode(att_fake_T, from_=self.T, align_first=False), to_=self.D)
-            self.loss_att[self.T] += self.compute_loss('cycle', self.att_rec_D, self.real_D, loss_name='att',
-                                                       criterion_lambda='att')
-        # endregion
-
-        if self.real_D_T is not None and self.lambda_color_day > 0.0:
-            real_D_noised = Perturb_Lightness()(self.real_D)
-            encoded_TD, fake_T_day, _, real_D = self.netG.encode(self.real_D_T, real_D_noised, from_=self.T, align_first=True)
-            self.fake_D_day = self.netG.decode(encoded_TD, to_=self.D)
-            self.loss_color_day[self.T] += self.compute_loss('latent', encoded_TD, encoded_D, loss_name='color_day',
-                                                             criterion_lambda='color_day')
-            mask_proj = (self.real_D.mean(dim=1, keepdim=True) == 0.5).float() * (self.real_D.std(dim=1, keepdim=True) == 0).float()
-            mask_lum = (self.real_D.mean(dim=1, keepdim=True) < 0.90).float() * (1-mask_proj)
-            self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
-                                                             self.real_D*mask_lum, loss_name='color_day',
-                                                             criterion_lambda='color_day')
-            self.loss_color_day[self.D] += self.compute_loss('sharpness', self.fake_D_day, self.real_D, self.real_D_T,
-                                                             criterion_lambda='color_day')
 
         # combined loss
         self.sum_losses().backward()
@@ -635,7 +622,7 @@ class NightToDay(nn.Module):
         # Backward
         rec_encoded_T = self.netG.encode(self.fake_D, from_=self.D)
         self.rec_T = self.netG.decode(rec_encoded_T, self.T)
-        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.T
+        self.loss_cycle[self.T] += self.compute_loss('cycle', self.rec_T, self.real_T
                                                      if self.lambda_fus > 0 else self.fake_TN,
                                                      loss_name='cycle', criterion_lambda='thermal')
 
@@ -663,16 +650,15 @@ class NightToDay(nn.Module):
             gray_N = .299 * self.real_N[:, 0:1, :, :] + .587 * self.real_N[:, 1:2, :, :] + .114 * self.real_N[:, 2:3, :, :]
             self.loss_fus[self.N] += self.compute_loss('cycle', self.fake_TN, -gray_N.repeat(1, 3, 1, 1),
                                                        loss_name='fus', criterion_lambda='fus')
-            self.loss_fus[self.T] += self.compute_loss('cycle', self.fake_TN, self.remapped_T,
+            self.loss_fus[self.T] += self.compute_loss('cycle', self.fake_TN, self.real_T,
                                                        loss_name='fus', criterion_lambda='fus')
         # endregion
-
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.real_N, self.real_T)
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
-                                                       None, weights=self.class_weight)
+                                                       None)
         self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
-                                                       None, weights=self.class_weight)
+                                                       None)
         # endregion
 
         # combined loss
@@ -721,7 +707,7 @@ class NightToDay(nn.Module):
                 segMask_D_s = interpolate(self.segMask_D.float(), size=rand_size, mode='nearest').long()
                 segMask_TN_s = interpolate(self.segMask_TN.float(), size=rand_size, mode='nearest').long()
                 real_D_pred_seg = self.netS(real_D_s, from_=self.D)
-                fake_TN_pred_seg = self.netS(fake_TN_s, from_=self.T)
+                fake_TN_pred_seg = self.netS(fake_TN_s, from_=self.T).detach()
                 fake_D_pred_seg_d = self.netS(fake_D_s.detach(), from_=self.D)
                 fake_T_pred_seg_d = self.netS(fake_T_s.detach(), from_=self.T)
 
@@ -736,7 +722,7 @@ class NightToDay(nn.Module):
                 self.loss_seg[self.D] += self.compute_loss('seg', fake_T_pred_seg_d,
                                                            self.segMask_D_update.squeeze(1))
                 mask_uncertain = segMask_TN_s == 255
-                self.segMask_TN_update = (UpdateIRGTv1(fake_TN_pred_seg.detach(), fake_D_pred_seg_d,
+                self.segMask_TN_update = (UpdateIRGTv1(fake_TN_pred_seg, fake_D_pred_seg_d,
                                                        255 * torch.ones_like(segMask_D_s), fake_TN_s) *
                                           mask_uncertain + ~mask_uncertain * segMask_TN_s)
                 IR_pred_seg = self.segMask_TN_update

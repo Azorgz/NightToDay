@@ -49,7 +49,6 @@ class NLayerDiscriminatorSN(nn.Module):
             SNConv2d(input_nc, base_dim, kernel_size=kw, stride=2, padding=padw),
             nn.PReLU()
         ]]
-
         nf_mult = 1
         for n in range(1, n_layers):
             nf_mult_prev = nf_mult
@@ -59,7 +58,6 @@ class NLayerDiscriminatorSN(nn.Module):
                           kernel_size=kw, stride=2, padding=padw, bias=use_bias),
                 nn.PReLU()
             ]]
-
         nf_mult_prev = nf_mult
         nf_mult = min(2 ** n_layers, 8)
         sequences += [[
