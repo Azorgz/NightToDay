@@ -9,6 +9,7 @@ from .DatasetBase import TrainDataset, TestDataset
 ROOT_DIR = '/home/godeta/PycharmProjects/TIR2VIS/datasets/'
 # ROOT_DIR = Path(__file__).resolve().parent
 
+
 class FLIR(TrainDataset):
     """
     Dataset class for the FLIR dataset.
@@ -17,7 +18,6 @@ class FLIR(TrainDataset):
     root = '/silenus/PROJECTS/pr-remote-sensing-1a/godeta/datasets/FLIR/' \
         if not ('laptop'in socket.gethostname() or 'workstation' in socket.gethostname()) else \
         f'{str(ROOT_DIR)}/FLIR/'
-
 
     def __init__(self, opt):
         self.train_D = self.root + "FLIR_datasets/trainA"

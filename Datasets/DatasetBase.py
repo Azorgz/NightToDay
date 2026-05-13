@@ -3,7 +3,7 @@ from _socket import gethostname
 
 import oyaml
 import torch
-from kornia.augmentation import Normalize
+from kornia.augmentation import Normalize, RandomCrop
 from kornia.geometry import hflip
 from torch import Tensor
 from torch.utils.data import Dataset
@@ -42,6 +42,17 @@ class TestDataset(Dataset):
         return ImageTensor(path[idx])
 
 
+class Augmentations(list):
+    def __init__(self, *args):
+        super().__init__(args)
+
+    def __call__(self, x):
+        for aug in self:
+            if aug is not None:
+                x = aug(x)
+        return x
+
+
 class TrainDataset(Dataset):
     """
     Base class for datasets.
@@ -63,7 +74,9 @@ class TrainDataset(Dataset):
 
     def __init__(self, opt):
         self.num_classes = opt.num_classes
-        self.augmentations = hflip
+        random_size = (opt.load_size[0] * (torch.rand(1).item() * 0.6 + 0.4)).to(torch.int)
+        self.augmentations = Augmentations([hflip if opt.augmentations['hflip'] else None,
+                                            RandomCrop((random_size, random_size)) if opt.augmentations['random_crop'] else None])
         self.load_size = opt.load_size
         self.resize_and_crop = opt.resize_and_crop
         opt.sampling = opt.sampling if opt.sampling > 0 else 1
