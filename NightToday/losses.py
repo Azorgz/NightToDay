@@ -1275,12 +1275,10 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             std_loss = ((fake_D[b:b + 1] * housing_mask).std(1).mean() +
                         (fake_D[b:b + 1].mean(1) * housing_mask).std(dim=[1, 2, 3])).sum()
             grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True)))
-            grad_T = torch.abs(sobel(T[b:b + 1].mean(1, keepdim=True)))
+            grad_T = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True)))
             housing_grad_loss = (nn.L1Loss()(grad_fake_D * housing_mask,
                                              grad_T * housing_mask) * housing_mask).sum() / (housing_mask.sum() + 1e-6)
-            grad_loss = housing_grad_loss * 3.0 + std_loss
 
-            # 5. Sky contour loss
             sky_contour = sky_mask * contour[b:b + 1]
             if sky_contour.sum() > 0:
                 sky_mean_fake_D = (sky_mask * fake_D[b:b + 1]).sum() / (3 * sky_mask.sum() + 1e-6)
@@ -1289,8 +1287,9 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             else:
                 sky_loss = 0.
 
-            losses[b] += (compo_loss + color_loss + grad_loss +
-                          rec_consistency_loss + sky_loss) * weight_
+            grad_loss = housing_grad_loss * 3.0 + std_loss + sky_loss
+
+            losses[b] += (compo_loss + color_loss + grad_loss + rec_consistency_loss) * weight_
     return losses
 
 
