@@ -112,7 +112,8 @@ class NightToDay(nn.Module):
             self.downsample = torch.nn.AvgPool2d(3, stride=2)
 
             self.criterion_gan = lambda d, r, p_r, f, v: self.GANLoss(d, r, p_r, f, v)
-            self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
+            self.criterion_id = lambda y, t: self.L1((y - t.mean())/t.std(), (t- t.mean())/t.std())
+            # self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
             self.criterion_cycle = lambda rec, real: (nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec, real)
                                                       / self.lambda_cycle)
             self.criterion_latent = lambda y, t: self.L1(y, t.detach())

@@ -573,7 +573,6 @@ class LETNet(nn.Module):
         output3 = self.bn_prelu_4(output3)
 
         #Transformer
-
         b, c, h, w = output3.shape
         output4 = self.transformer1(output3)
 

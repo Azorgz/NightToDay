@@ -1227,6 +1227,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 HL_region = erosion(HL_region, get_disk_kernel(radius_HL // 3, device=mask.device))
 
             housing_mask = torch.relu(total_ - dilation(HL_region, get_disk_kernel(3, device=mask.device)))
+
             # losses fake TN composition
             sky_mask = F.interpolate((seg_mask[b:b + 1] == SKY).float(), size=(h, w), mode='nearest')
             T_adjusted = (T * 0.5 + 0.5) ** (mean_T_light_region / 0.5) * 2 - 1
@@ -1234,6 +1235,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             TN_region = TN * mask_
             compo_loss = (PixelConsistencyLoss(TN_region[b:b + 1], traffic_light_final[b:b + 1],
                                                total_ * (1 - sky_mask)) * 0.5) * weight_
+
             # losses color consistency
             if color == 'red':
                 target_color = torch.tensor([1.0, 0.0, 0.0], device=N.device).view(1, 3, 1, 1)
@@ -1253,7 +1255,7 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
                 ImageTensor(target_color * torch.ones_like(fake_D, device=fake_D.device)))
             color_loss = ((color_dist * HL_region[b:b + 1]).sum() / (HL_region[b:b + 1].sum() + 1e-6) +
                           torch.relu((fake_D[b:b + 1] * 0.5 + 0.5 - target_color) * HL_region[b:b + 1]).sum() / (
-                                  HL_region[b:b + 1].sum() + 1e-6))
+                                  HL_region[b:b + 1].sum() + 1e-6)) + luminosity_loss
 
             # losses rec D consistency
             if rec_T is not None:
@@ -1268,25 +1270,15 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             HL_common = HL_region * HL_fake_T
             if HL_common.sum() > 0:
                 rec_consistency_loss += PixelConsistencyLoss(fake_D[b:b + 1], real_D[b:b + 1], HL_common[b:b + 1])
-            # std_loss = ((fake_D[b:b + 1] * (mask_ - HL_region)).std(1).mean() +
-            #             (fake_D[b:b + 1].mean(1) * (mask_ - HL_region)).std(dim=[1, 2, 3])).sum()
+
+            # grad housing reconstruction
             std_loss = ((fake_D[b:b + 1] * housing_mask).std(1).mean() +
                         (fake_D[b:b + 1].mean(1) * housing_mask).std(dim=[1, 2, 3])).sum()
-            # grad_loss to enhance the gradient of traffic light region
-            # grad_TN = torch.abs(sobel(TN[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
-            # grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True))) * total_[b:b + 1]
-            # grad_loss = (nn.L1Loss()(grad_fake_D, grad_TN) * total_[b:b + 1]).sum() / (
-            #         total_[b:b + 1].sum() + 1e-6) * 2
             grad_fake_D = torch.abs(sobel(fake_D[b:b + 1].mean(1, keepdim=True)))
             grad_T = torch.abs(sobel(T[b:b + 1].mean(1, keepdim=True)))
             housing_grad_loss = (nn.L1Loss()(grad_fake_D * housing_mask,
                                              grad_T * housing_mask) * housing_mask).sum() / (housing_mask.sum() + 1e-6)
-            # 4. Anti-Bleed Edge Enforcement: Stop the blob from leaking into the background
-            mask_boundary = dilation(mask_, torch.ones((3, 3), device=mask.device)) - mask_
-            bleed_loss = (grad_fake_D * mask_boundary * (1 - total_)).sum() / (mask_boundary.sum() + 1e-6)
-
-            # Combine new shape losses (using higher weights to prioritize fixing the blobs)
-            grad_loss = (housing_grad_loss * 3.0) + (bleed_loss * 2.0)
+            grad_loss = housing_grad_loss * 3.0 + std_loss
 
             # 5. Sky contour loss
             sky_contour = sky_mask * contour[b:b + 1]
@@ -1297,8 +1289,8 @@ def TrafLighLumiLoss_TN(N, T, TN, rec_T, real_D, fake_D, fake_T, mask, contour, 
             else:
                 sky_loss = 0.
 
-            losses[b] += (compo_loss + color_loss + luminosity_loss + grad_loss +
-                          rec_consistency_loss + std_loss + sky_loss) * weight_
+            losses[b] += (compo_loss + color_loss + grad_loss +
+                          rec_consistency_loss + sky_loss) * weight_
     return losses
 
 
