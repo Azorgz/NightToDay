@@ -652,7 +652,7 @@ class ContrastiveLoss(nn.Module):
 
 
 class RobustFusionDenoiseLoss(nn.Module):
-    def __init__(self, w_detail=5.0, w_noise=2.0, w_fft=0.1):
+    def __init__(self, w_detail=5.0, w_noise=2.0, w_fft=0.2):
         super().__init__()
         self.w_detail = w_detail
         self.w_noise = w_noise
