@@ -64,8 +64,8 @@ class U_ResNetFusion(nn.Module):
         self.final_conv = nn.Sequential(nn.Conv2d(1, 1,
                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
         self.spatial_aligner = get_wrapper('vis2ir')
-        # self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
-        #                                               thermal_preprocessCfg.scene)
+        self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
+                                                      thermal_preprocessCfg.scene)
 
     def _register_hook(self, output):
         if len(self.hook) > self.count_skip:
@@ -90,7 +90,7 @@ class U_ResNetFusion(nn.Module):
         return tanh_n(n1, n2 or n1)
 
     def forward(self, ir, vis_night, align_first=False, **kwargs):
-        # ir = self.thermal_preprocess(ir, **kwargs)
+        ir = self.thermal_preprocess(ir, **kwargs)
         # vis_night = self.vis_preprocess(vis_night, **kwargs)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
