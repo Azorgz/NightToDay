@@ -44,7 +44,7 @@ class TestDataset(Dataset):
 
 class Augmentations(list):
     def __init__(self, *args):
-        super().__init__(args)
+        super().__init__(*args)
 
     def __call__(self, x):
         for aug in self:
