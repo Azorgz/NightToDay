@@ -551,6 +551,7 @@ class LETNet(nn.Module):
     def forward(self, input):
 
         h, w = input.shape[-2:]
+        print(h, w)
         if h % 32 != 0 or w % 32 != 0:
             input = F.interpolate(input, (h - h % 32, w - w % 32), mode='bilinear', align_corners=False)
 
@@ -599,6 +600,7 @@ class LETNet(nn.Module):
         out = F.interpolate(output6, input.size()[2:], mode='bilinear', align_corners=False)
         out = self.classifier(out)
         out = F.interpolate(out, (h, w), mode='bilinear', align_corners=False)
+        print(out.shape)
         return out
 
 
