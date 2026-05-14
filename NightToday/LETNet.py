@@ -605,4 +605,4 @@ class LETNet(nn.Module):
 if __name__ == '__main__':
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = LETNet(classes=19).to(device)
-    summary(model, (3, 512, 1024))
+    summary(model, (3, 512, 512))

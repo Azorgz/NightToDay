@@ -203,7 +203,7 @@ class G_Plexer(Plexer):
     def decode(self, encoded, to_: str = None):
         assert to_ in self.names_domains, f"Unknown target domain: {to_}"
         out = self.decoders[self.names_domains[to_]](encoded)
-        out = interpolate(out, size=self.ori_shape[-2:], mode='bilinear', align_corners=False)
+        out = interpolate(out, size=self.ori_shape[-2:], mode='bilinear', align_corners=False) if self.ori_shape is not None else out
         return out
 
     def __repr__(self):
