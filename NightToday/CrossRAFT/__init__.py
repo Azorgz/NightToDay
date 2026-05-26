@@ -40,11 +40,12 @@ def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
             else:
                 img_tgt, img_src = img_ir, img_vis
             shape = img_tgt.shape[-2:]
-            # img_tgt_ = interpolate(img_tgt, (256, 256)).to(torch.float32)
-            # img_src_ = interpolate(img_src, (256, 256)).to(torch.float32)
-            flow = self.model(img_tgt, img_src)['flow']
-            # flow = interpolate(flow, size=shape, mode='bilinear', align_corners=True)
+            img_src = interpolate(img_src, size=(256, 256), mode='bilinear', align_corners=False)
+            img_tgt = interpolate(img_tgt, size=(256, 256), mode='bilinear', align_corners=False)
+            flow = self.model(img_tgt * 0.5 + 0.5 if img_tgt.min() < 0 else img_tgt,
+                              img_src * 0.5 + 0.5 if img_src.min() < 0 else img_src)['flow']
             image_proj = self.ST(img_src, flow)
+            image_proj = interpolate(image_proj, size=shape, mode='bilinear', align_corners=False)
             return image_proj
 
     return Model()

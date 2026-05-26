@@ -312,6 +312,10 @@ class S_Plexer(Plexer):
             param_group_b['lr'] = new_lr
             print('Learning rate of SegB is: %.4f.' % param_group_b['lr'])
 
+    def load_weights(self, weights: dict):
+        self.to(device=self.device)
+        self.stage_update()
+
     @property
     def stage(self):
         return self._stage

@@ -119,11 +119,11 @@ def train_denoiser(data_dir, epochs=50, batch_size=16, lr=1e-4, device='cuda'):
             restored_imgs = model(noisy_imgs)
 
             # Loss calculation
-            loss = criterion(restored_imgs, clean_imgs)
+            loss = criterion(restored_imgs, clean_imgs) * 5
             ssim = ssim_criterion(restored_imgs.mean(1, keepdim=True), clean_imgs.mean(1, keepdim=True)).mean()
             tv = TV_criterion(restored_imgs)
             contrast = contrast_criterion(restored_imgs, clean_imgs)
-            loss += tv * 0.1 + contrast * 5 # TV loss helps to reduce noise
+            loss += tv * 0.1 + contrast # TV loss helps to reduce noise
             loss -= ssim * 0.05
 
             # Backward pass

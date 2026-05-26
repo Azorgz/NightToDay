@@ -139,12 +139,12 @@ class TrainDataset(Dataset):
         image_D_T = image_D_T if self.train_D_T else None
         return image_D, image_D_T, image_T, image_N, image_D_seg, image_TN_seg, image_D_edges, image_TN_edges, self.TL_collection
 
-    def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, **kwargs) -> Tensor:
+    def load_image(self, path: list[str], idx: int, crop: bool = False, seg=False, **kwargs) -> ImageTensor:
         """
         Load an image from a given path and return it as a Tensor.
         """
         if path == []:
-            return torch.zeros((1, 3, self.load_size[0], self.load_size[1])) if not seg else torch.ones((1, 1, self.load_size[0], self.load_size[1])) *255
+            return ImageTensor(torch.zeros((1, 3, self.load_size[0], self.load_size[1])) if not seg else torch.ones((1, 1, self.load_size[0], self.load_size[1]))) * 255
         image = ImageTensor(path[idx]) * 255 if seg else ImageTensor(path[idx])
         if crop and self.crop_xxyy:
             crop = self.crop_xxyy[idx]

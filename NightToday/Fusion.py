@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Optional, Tuple
 
 import torch
@@ -148,7 +149,6 @@ class MonotonicThermalLUT(nn.Module):
         # Robust normalization to [0,1]
         x = self.robust_norm(x, p_low=p_low, p_high=p_high, eps=self.eps)
         self.scene_idx = torch.ones([x.shape[0], self.scene], device=x.device) / self.scene
-        # self.scene_idx = self.naive_scene_selection(x)
         # Build monotonic LUT
         increments = F.softplus(torch.mm(self.scene_idx, self.delta)) + self.eps
         luts = torch.cumsum(increments, dim=1)
@@ -168,20 +168,6 @@ class MonotonicThermalLUT(nn.Module):
         else:
             y = y.repeat(1, 3, 1, 1)
         return y
-
-    def naive_scene_selection(self, x):
-        x_mean_t = x[:, :, ::2].mean(dim=[1, 2, 3])
-        x_mean_b = x[:, :, 2::].mean(dim=[1, 2, 3])
-        x_std_t = x[:, :, ::2].std(dim=[1, 2, 3])
-        x_std = x[:, :, ].std(dim=[1, 2, 3])
-        low_lum_t = (x[:, :, ::2] < -0.90).sum(dim=[1, 2, 3]) / torch.tensor([x.shape[0], torch.prod(torch.tensor(x.shape[-2:]))//2])
-        cond1 = x_mean_b > x_mean_t * 2
-        cond2 = x_std_t > x_std
-        cond3 = low_lum_t > 0.1
-        out = torch.zeros([x.shape[0], self.scene], device=x.device)
-        idx = cond1 + 2 * cond2 + 4 * cond3
-        out[:, idx] = 1.
-        return out
 
     def robust_norm(self, x, p_low=0.5, p_high=99.5, eps=1e-6):
         """
@@ -437,7 +423,8 @@ class FastIRDenoiser(nn.Module):
 
     def forward(self, x):
         shortcut = x.clone()
-        x = (x - x.min()) / (x.max() - x.min() + EPS)  # Normalize to [0,1] for better LUT performance
+        x = (x - x.mean()) / (x.std() + EPS)  # Normalize to [0,1] for better LUT performance
+        x = (x - x.min()) / (x.max() - x.min() + EPS)  # Normalize to [0,1]
         low_contrast = x ** 4
         high_contrast = x.clamp(EPS, 1) ** 0.25
         noise = self.intro(torch.cat([x, low_contrast, high_contrast], dim=1))
@@ -450,7 +437,14 @@ class FastIRDenoiser(nn.Module):
     def load(self):
         # Load pretrained weights if available
         try:
-            state_dict = torch.load('checkpoints/fast_ir_denoiser.pth', map_location='cpu')
+            ROOT_DIR = Path(__file__).resolve().parent.parent
+            state_dict = torch.load(ROOT_DIR / 'checkpoints/fast_ir_denoiser.pth', map_location='cpu')
             self.load_state_dict(state_dict, strict=False)
         except FileNotFoundError:
             print("Pretrained weights for FastIRDenoiser not found. Using random initialization.")
+
+    def train(self, mode: bool = True) -> None:
+        super().train(False)
+        # Freeze the denoiser during training
+        for param in self.parameters():
+            param.requires_grad = False

@@ -4,11 +4,11 @@
 PROJECT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 # Download weights
-#LOCAL_PATH="${PROJECT_DIR}/checkpoints/download/"
-#REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/"
-#echo "Project dir: ${PROJECT_DIR}"
-#echo "Syncing to: ${LOCAL_PATH}"
-#rsync -avxH -c "$REMOTE_PATH" "$LOCAL_PATH"
+LOCAL_PATH="${PROJECT_DIR}/checkpoints/download/"
+REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/"
+echo "Project dir: ${PROJECT_DIR}"
+echo "Syncing to: ${LOCAL_PATH}"
+rsync -avxH -c "$REMOTE_PATH" "$LOCAL_PATH"
 #
 #
 ## Download training visuals
@@ -19,8 +19,8 @@ PROJECT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 #rsync -avxH -c "${REMOTE_PATH}" "${LOCAL_PATH}"
 
 
-LOCAL_PATH="${PROJECT_DIR}/checkpoints/"
-REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/"
-echo "Project dir: ${PROJECT_DIR}"
-echo "Syncing to: ${LOCAL_PATH}"
-rsync -avxH -c "$REMOTE_PATH" "$LOCAL_PATH"
+#LOCAL_PATH="${PROJECT_DIR}/checkpoints/"
+#REMOTE_PATH="godeta@cargo.univ-grenoble-alpes.fr:/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/"
+#echo "Project dir: ${PROJECT_DIR}"
+#echo "Syncing to: ${LOCAL_PATH}"
+#rsync -avxH -c "$REMOTE_PATH" "$LOCAL_PATH"

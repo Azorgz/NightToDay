@@ -116,7 +116,7 @@ class NightToDay(nn.Module):
             # self.criterion_id = lambda y, t: self.L1(self.downsample(y), self.downsample(t))
             self.criterion_cycle = lambda rec, real: (nn.SmoothL1Loss(beta=0.5)(rec, real) + self.criterion_ssim(rec, real)
                                                       / self.lambda_cycle)
-            self.criterion_latent = lambda y, t: self.L1(y, t.detach())
+            self.criterion_latent = lambda y, t: self.L1(y.mean(dim=[-1, -2]), t.mean(dim=[-1, -2]).detach()) + self.L1(y.std(dim=[-1, -2]), t.std(dim=[-1, -2]).detach())
             self.criterion_ssim = lambda x, y: SSIM_Loss()((x + 1) / 2, (y + 1) / 2) * self.lambda_ssim
             self.criterion_tv = TVLoss(TVLoss_weight=1)
             self.criterion_color = ColorLoss
@@ -415,17 +415,17 @@ class NightToDay(nn.Module):
         encoded_TN, self.fake_TN, self.remapped_T, self.real_N = self.netG.encode(self.real_T,
                                                                                   self.real_N,
                                                                                   from_=self.T, align_first=True)
+        self.fake_T = self.netG.decode(encoded_D, to_=self.T)
+        self.fake_D = self.netG.decode(encoded_TN, to_=self.D)
 
         # region GAN adv loss
         """D_T(G_T(D))"""
-        self.fake_T = self.netG.decode(encoded_D, to_=self.T)
         self.loss_G[self.T] += self.compute_loss('gan', partial(self.netD, from_=self.T),
                                                  self.real_T, self.pred_real_T, self.fake_T, False, loss_name='G')
         """D_N(G_N(T))"""
         self.loss_G[self.N] += self.compute_loss('gan', partial(self.netD, from_=self.T),
                                                  self.real_T, self.pred_real_T, self.fake_TN, False, loss_name='G')
         """D_D(G_D(T))"""
-        self.fake_D = self.netG.decode(encoded_TN, to_=self.D)
         self.loss_G[self.D] += self.compute_loss('gan', partial(self.netD, from_=self.D), self.real_D,
                                                  self.pred_real_D, self.fake_D, False, loss_name='G')
         # endregion
@@ -446,6 +446,8 @@ class NightToDay(nn.Module):
         if self.lambda_latent > 0:
             self.loss_latent[self.D] += self.compute_loss('latent', rec_encoded_D, encoded_D)
             self.loss_latent[self.T] += self.compute_loss('latent', rec_encoded_TN, encoded_TN)
+            self.loss_latent[self.N] += self.compute_loss('latent', encoded_D, encoded_TN)
+
         # endregion
 
         # region Identity "auto-encode" loss
@@ -466,9 +468,11 @@ class NightToDay(nn.Module):
         # region Fusion
 
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
-        self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.remapped_T, self.real_T, self.real_T)
-        # self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T,
+        # self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.remapped_T, self.real_T, self.real_T)
+        # self.loss_thermal[self.N] += self.compute_loss('thermal', self.fake_TN, self.remapped_T,
         #                                                self.real_N, seg_IR)
+        # self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T,
+        #                                                self.real_T, seg_IR)
         # endregion
 
         # region class-wise loss
@@ -482,13 +486,12 @@ class NightToDay(nn.Module):
                 self.fake_D_com = self.netG.decode(encoded_TN, to_=self.D)
                 self.rec_T_com = None  # to save memory, we can skip this reconstruction
             else:
-                self.TN_com, self.remapped_T_com = self.fake_TN.clone(), self.remapped_T.clone()
                 self.fake_D_com, self.rec_T_com = self.fake_D.clone(), self.rec_T.clone()
+                self.remapped_T_com, self.TN_com = self.remapped_T.clone(), self.fake_TN.clone()
             self.fake_T_com = self.netG.decode(self.netG.encode(self.D_com, from_=self.D), to_=self.T).detach()
-            self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
-            self.loss_trafficlight[self.N] += self.compute_loss('tll', self.N_com, self.remapped_T_com, self.TN_com,
-                                                                self.rec_T_com, self.D_com, self.fake_D_com,
-                                                                self.fake_T_com,
+            # self.rec_D_com = self.netG.decode(self.netG.encode(self.fake_T_com, from_=self.T), to_=self.D)
+            self.loss_trafficlight[self.N] += self.compute_loss('tll', self.N_com, self.remapped_T_com,
+                                                                self.TN_com, self.fake_T_com, self.rec_T_com, self.D_com, self.fake_D_com,
                                                                 segMask_com, contourMask, weights,
                                                                 self.segMask_TN_update,
                                                                 loss_name='trafficlight',
@@ -502,7 +505,7 @@ class NightToDay(nn.Module):
                                                    self.fake_T, self.real_D, self.rec_D, self.edges_D,
                                                    self.get_gradmag(self.fake_T), criterion_lambda='bc', loss_name='sga')
 
-        self.loss_contrastive[self.T] += self.compute_loss('contrastive', self.fake_TN, self.fake_D)
+        # self.loss_contrastive[self.T] += self.compute_loss('contrastive', self.fake_TN, self.fake_D)
 
         self.loss_sga[self.D] += self.compute_loss('IRClsDis', self.segMask_D,
                                                    self.fake_T.mean(dim=1, keepdim=True),
@@ -542,6 +545,8 @@ class NightToDay(nn.Module):
         self.loss_vgg[self.T] += (self.compute_loss('vgg', self.fake_D, self.rec_T) +
                                   self.compute_loss('structuralCorrelationDifference', self.real_T, self.fake_TN) -
                                   self.compute_loss('qabf', self.real_T, -self.real_N, self.fake_TN))
+        self.loss_vgg[self.T] += (self.compute_loss('vgg', self.remapped_T, self.real_T) +
+                                  self.compute_loss('structuralCorrelationDifference', self.real_T, self.remapped_T))
         # endregion
 
         # region Total Variation loss
@@ -778,7 +783,7 @@ class NightToDay(nn.Module):
                 self.loss_seg[self.T] = self.compute_loss('seg', fake_D_pred_seg,
                                                           segMask_TN_update_s.squeeze(1))
                 IR_pred_seg = self.segMask_TN_update
-            return interpolate(IR_pred_seg.argmax(1)[:, None].float(), size=self.input_size, mode='nearest').long()
+            return interpolate(IR_pred_seg.float(), size=self.input_size, mode='nearest').long()
 
     def update_class_criterion(self, labels):
         # labels: (N, H, W)
