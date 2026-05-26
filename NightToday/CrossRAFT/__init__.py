@@ -12,7 +12,8 @@ from .models.cross_raft import CrossRAFT
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
-PROJECT_NAME = "pr-miai-phaims"
+PROJECT_NAME="pr-remote-sensing-1a"
+
 
 def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
     model = CrossRAFT(adapter=True)

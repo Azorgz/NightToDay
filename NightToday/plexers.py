@@ -20,7 +20,8 @@ from .segmentors import SegmentorHeadv2
 from .utilities import weights_init
 
 
-PROJECT_NAME = "pr-miai-phaims"
+PROJECT_NAME="pr-remote-sensing-1a"
+
 class Plexer(nn.Module):
     """
     Base Plexer class for multiple networks.

@@ -47,7 +47,7 @@ from .visualizers import Visualizer
 
 
 # ------------------------ Main GAT Class ------------------------ #
-PROJECT_NAME = "pr-miai-phaims"
+PROJECT_NAME="pr-remote-sensing-1a"
 
 class NightToDay(nn.Module):
     """

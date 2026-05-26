@@ -1,6 +1,6 @@
 PROJECT_DIR="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
-#PROJECT_NAME="pr-remote-sensing-1a"
-PROJECT_NAME="pr-miai-phaims"
+PROJECT_NAME="pr-remote-sensing-1a"
+#PROJECT_NAME="pr-miai-phaims"
 
 mkdir -p "${PROJECT_DIR}/checkpoints/download/conf_server"
 mkdir -p "${PROJECT_DIR}/checkpoints/download/weights"
