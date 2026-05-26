@@ -24,7 +24,7 @@ def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
         path = Path('/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/CrossRAFT/checkpoint-10000.ckpt')
 
     path = str(path)
-    state_dict = torch.load(path, weights_only=True)['state_dict']
+    state_dict = torch.load(path, weights_only=True, map_location=torch.device('cpu'))['state_dict']
     model.load_state_dict(state_dict)
 
     class Model(nn.Module):
