@@ -47,7 +47,7 @@ from .visualizers import Visualizer
 
 
 # ------------------------ Main GAT Class ------------------------ #
-
+PROJECT_NAME = "pr-miai-phaims"
 
 class NightToDay(nn.Module):
     """
@@ -95,7 +95,7 @@ class NightToDay(nn.Module):
             else:
                 self.pedestrian_color = (None, None)
             self.checkpoint_dir = self.opt.training.checkpoint_dir if 'laptop' in socket.gethostname() else \
-                '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
+                f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/NightToday/'
             os.makedirs(self.checkpoint_dir, exist_ok=True)
             self.visualize_dir = self.opt.training.visualize_dir
             os.makedirs(self.visualize_dir, exist_ok=True)
@@ -222,7 +222,7 @@ class NightToDay(nn.Module):
                 assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
                 save_filename = f'{epoch}_net_{self.model_name}_{self.opt.model.gen.fus.type}'
                 path = (os.getcwd() + '/checkpoints/NightToday/') if 'laptop' in socket.gethostname() else \
-                    '/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/NightToday/'
+                    f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/NightToday/'
                 save_path = os.path.join(path, save_filename)
                 checkpoint = torch.load(save_path, weights_only=False, map_location='cpu')
                 if return_checkpoint:

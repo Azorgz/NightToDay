@@ -5,17 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="few updates">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Datasets/DatasetBase.py" beforeDir="false" afterPath="$PROJECT_DIR$/Datasets/DatasetBase.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/CrossRAFT/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/CrossRAFT/__init__.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/__init__.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/download_res.sh" beforeDir="false" afterPath="$PROJECT_DIR$/download_res.sh" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/train_fastIR_denoiser.py" beforeDir="false" afterPath="$PROJECT_DIR$/train_fastIR_denoiser.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -244,30 +234,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00432" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778076180199</created>
-      <option name="number" value="00432" />
-      <option name="presentableId" value="LOCAL-00432" />
-      <option name="project" value="LOCAL" />
-      <updated>1778076180199</updated>
-    </task>
-    <task id="LOCAL-00433" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778077651248</created>
-      <option name="number" value="00433" />
-      <option name="presentableId" value="LOCAL-00433" />
-      <option name="project" value="LOCAL" />
-      <updated>1778077651248</updated>
-    </task>
-    <task id="LOCAL-00434" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778077795478</created>
-      <option name="number" value="00434" />
-      <option name="presentableId" value="LOCAL-00434" />
-      <option name="project" value="LOCAL" />
-      <updated>1778077795479</updated>
     </task>
     <task id="LOCAL-00435" summary="few updates">
       <option name="closed" value="true" />
@@ -637,7 +603,31 @@
       <option name="project" value="LOCAL" />
       <updated>1778667968392</updated>
     </task>
-    <option name="localTasksCounter" value="481" />
+    <task id="LOCAL-00481" summary="few updates">
+      <option name="closed" value="true" />
+      <created>1779778679965</created>
+      <option name="number" value="00481" />
+      <option name="presentableId" value="LOCAL-00481" />
+      <option name="project" value="LOCAL" />
+      <updated>1779778679965</updated>
+    </task>
+    <task id="LOCAL-00482" summary="few updates">
+      <option name="closed" value="true" />
+      <created>1779778789158</created>
+      <option name="number" value="00482" />
+      <option name="presentableId" value="LOCAL-00482" />
+      <option name="project" value="LOCAL" />
+      <updated>1779778789158</updated>
+    </task>
+    <task id="LOCAL-00483" summary="few updates">
+      <option name="closed" value="true" />
+      <created>1779779985620</created>
+      <option name="number" value="00483" />
+      <option name="presentableId" value="LOCAL-00483" />
+      <option name="project" value="LOCAL" />
+      <updated>1779779985620</updated>
+    </task>
+    <option name="localTasksCounter" value="484" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">

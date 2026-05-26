@@ -20,6 +20,7 @@ from .segmentors import SegmentorHeadv2
 from .utilities import weights_init
 
 
+PROJECT_NAME = "pr-miai-phaims"
 class Plexer(nn.Module):
     """
     Base Plexer class for multiple networks.
@@ -264,7 +265,7 @@ class S_Plexer(Plexer):
             if 'laptop' in socket.gethostname():
                 path = BASE_DIR / 'checkpoints' / f'{name}.pth'
             else:
-                path = f'/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/{name}.pth'
+                path = f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/{name}.pth'
             try:
                 net.load_state_dict(torch.load(path), strict=False)
             except FileNotFoundError as e:

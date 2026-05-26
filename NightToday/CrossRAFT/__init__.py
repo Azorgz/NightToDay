@@ -12,7 +12,7 @@ from .models.cross_raft import CrossRAFT
 import warnings
 warnings.filterwarnings("ignore", category=FutureWarning)
 warnings.filterwarnings("ignore", category=UserWarning)
-
+PROJECT_NAME = "pr-miai-phaims"
 
 def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
     model = CrossRAFT(adapter=True)
@@ -21,7 +21,7 @@ def get_wrapper(direction: Literal['ir2vis', 'vis2ir'], **kwargs):
     if 'laptop' in socket.gethostname():
         path = BASE_DIR / 'checkpoints' / 'checkpoint-10000.ckpt'
     else:
-        path = Path('/bettik/PROJECTS/pr-remote-sensing-1a/godeta/checkpoints/CrossRAFT/checkpoint-10000.ckpt')
+        path = f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/CrossRAFT/checkpoint-10000.ckpt'
 
     path = str(path)
     state_dict = torch.load(path, weights_only=True, map_location=torch.device('cpu'))['state_dict']

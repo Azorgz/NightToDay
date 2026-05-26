@@ -1,3 +1,4 @@
+import socket
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -13,6 +14,7 @@ from .modules import ResnetBlock, DropInSwinBlock
 from .utilities import get_norm_layer
 
 EPS = 1e-6
+PROJECT_NAME = "pr-miai-phaims"
 
 
 class U_ResNetFusion(nn.Module):
@@ -437,7 +439,8 @@ class FastIRDenoiser(nn.Module):
     def load(self):
         # Load pretrained weights if available
         try:
-            ROOT_DIR = Path(__file__).resolve().parent.parent
+            ROOT_DIR = Path(__file__).resolve().parent.parent if 'laptop' in socket.gethostname() else \
+                Path(f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/NightToday/')
             state_dict = torch.load(ROOT_DIR / 'checkpoints/fast_ir_denoiser.pth', map_location='cpu')
             self.load_state_dict(state_dict, strict=False)
         except FileNotFoundError:
