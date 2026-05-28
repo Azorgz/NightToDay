@@ -19,8 +19,8 @@ from .modules import Sequential, SwinBlock, DropInSwinBlock
 from .segmentors import SegmentorHeadv2
 from .utilities import weights_init
 
+PROJECT_NAME = "pr-remote-sensing-1a"
 
-PROJECT_NAME="pr-remote-sensing-1a"
 
 class Plexer(nn.Module):
     """
@@ -69,7 +69,7 @@ class Plexer(nn.Module):
         # optimizers = [opt(param_groups, lr=0.001, momentum=0.98, weight_decay=0.005)]
         opt = torch.optim.Adam
         optimizers = [opt((p for net in self.networks for p in net.parameters() if p.requires_grad),
-                              lr=lr, betas=betas)]
+                          lr=lr, betas=betas)]
         setattr(self, 'optimizers', optimizers)
 
     def zero_grads(self, *args):
@@ -205,7 +205,8 @@ class G_Plexer(Plexer):
     def decode(self, encoded, to_: str = None):
         assert to_ in self.names_domains, f"Unknown target domain: {to_}"
         out = self.decoders[self.names_domains[to_]](encoded)
-        out = interpolate(out, size=self.ori_shape[-2:], mode='bilinear', align_corners=False) if self.ori_shape is not None else out
+        out = interpolate(out, size=self.ori_shape[-2:], mode='bilinear',
+                          align_corners=False) if self.ori_shape is not None else out
         return out
 
     def __repr__(self):
@@ -266,7 +267,7 @@ class S_Plexer(Plexer):
             if 'laptop' in socket.gethostname():
                 path = BASE_DIR / 'checkpoints' / f'{name}.pth'
             else:
-                path = f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/{name}.pth'
+                path = f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/NightToday/{name}.pth'
             try:
                 net.load_state_dict(torch.load(path), strict=False)
             except FileNotFoundError as e:
