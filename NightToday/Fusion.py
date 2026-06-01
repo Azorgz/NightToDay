@@ -14,8 +14,7 @@ from .modules import ResnetBlock, DropInSwinBlock
 from .utilities import get_norm_layer
 
 EPS = 1e-6
-PROJECT_NAME = "pr-miai-phaims"
-
+PROJECT_NAME = "pr-remote-sensing-1a"
 
 class U_ResNetFusion(nn.Module):
     """
