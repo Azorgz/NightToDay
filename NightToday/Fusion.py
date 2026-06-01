@@ -439,7 +439,7 @@ class FastIRDenoiser(nn.Module):
         # Load pretrained weights if available
         try:
             ROOT_DIR = Path(__file__).resolve().parent.parent / 'checkpoints/' if 'laptop' in socket.gethostname() else \
-                Path(f'/bettik/PROJECTS/${PROJECT_NAME}/godeta/checkpoints/NightToday')
+                Path(f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/NightToday')
             path = ROOT_DIR / 'fast_ir_denoiser.pth'
             print(path)
             state_dict = torch.load(ROOT_DIR / 'fast_ir_denoiser.pth', map_location='cpu')
