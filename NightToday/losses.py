@@ -401,7 +401,7 @@ def ThermalLoss(TN, T, N, GT_seg=None):
     # gradient_loss = (torch.relu(torch.abs(grad_T_x) - torch.abs(grad_TN_x)) +
     #                  torch.relu(torch.abs(grad_T_y) - torch.abs(grad_TN_y)))
 
-    thermal_noise_loss = ThermalNoiseLoss()(TN, T, N).mean() * 2
+    thermal_noise_loss = ThermalNoiseLoss()(TN, T, N).mean()
 
     return person_loss.mean() + thermal_noise_loss  # + gradient_loss.mean() * 0.5
 
