@@ -49,8 +49,8 @@ class U_ResNetFusion(nn.Module):
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
         for _ in range(n_enc_layers[-1]):
-            # model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
-            model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            # model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
             # model += [DropInSwinBlock(base_dim * mult)]
         self.encoder = nn.ModuleList(model)
         for i, idx in enumerate(self.hook):
