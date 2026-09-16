@@ -166,8 +166,8 @@ class ResnetGenEncoder(nn.Module):
                       nn.PReLU()]
         mult = 2 ** n_downscaling
         for _ in range(n_enc_layers):
-            model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
-            # model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            # model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
             # model += [DropInSwinBlock(base_dim * mult)]
         self.model = nn.Sequential(*model)
 

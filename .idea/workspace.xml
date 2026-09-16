@@ -4,17 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="few updates">
-      <change afterPath="$PROJECT_DIR$/test.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/MyTransform.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/MyTransform.iml" afterDir="false" />
+    <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/generators.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/generators.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/losses.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/losses.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/modules.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/modules.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/upload_datasets.sh" beforeDir="false" afterPath="$PROJECT_DIR$/upload_datasets.sh" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -278,14 +274,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00454" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778156462140</created>
-      <option name="number" value="00454" />
-      <option name="presentableId" value="LOCAL-00454" />
-      <option name="project" value="LOCAL" />
-      <updated>1778156462140</updated>
     </task>
     <task id="LOCAL-00455" summary="few updates">
       <option name="closed" value="true" />
@@ -671,7 +659,15 @@
       <option name="project" value="LOCAL" />
       <updated>1780668113285</updated>
     </task>
-    <option name="localTasksCounter" value="503" />
+    <task id="LOCAL-00503" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789543933473</created>
+      <option name="number" value="00503" />
+      <option name="presentableId" value="LOCAL-00503" />
+      <option name="project" value="LOCAL" />
+      <updated>1789543933473</updated>
+    </task>
+    <option name="localTasksCounter" value="504" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -702,7 +698,8 @@
     <MESSAGE value="day loss updated" />
     <MESSAGE value="Saving pattern update" />
     <MESSAGE value="few updates" />
-    <option name="LAST_COMMIT_MESSAGE" value="few updates" />
+    <MESSAGE value="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py" />
+    <option name="LAST_COMMIT_MESSAGE" value="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py" />
   </component>
   <component name="XDebuggerManager">
     <breakpoint-manager>

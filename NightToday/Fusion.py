@@ -94,6 +94,7 @@ class U_ResNetFusion(nn.Module):
 
         return tanh_n(n1, n2 or n1)
 
+
     def forward(self, ir, vis_night, align_first=False, **kwargs):
         ir = self.thermal_preprocess(ir, **kwargs)
         # vis_night = self.vis_preprocess(vis_night, **kwargs)
@@ -119,6 +120,149 @@ class U_ResNetFusion(nn.Module):
     def scene_idx(self):
         return self.thermal_preprocess.scene_idx
 
+
+# class U_ResNetFusion(nn.Module):
+#     """
+#     Simple ResNet-based fusion module to combine two feature maps.
+#     """
+#
+#     def __init__(self, thermal_preprocessCfg: ThermalPreprocessConfig, hidden_dim=256,
+#                  n_enc_layers: list = None, dropout=0.25, norm_layer='instance', use_bias=True):
+#         super(U_ResNetFusion, self).__init__()
+#         norm_layer = get_norm_layer(norm_layer)
+#         n_downscaling = len(n_enc_layers) - 1
+#         self.base_dim = hidden_dim // (2 ** n_downscaling)
+#
+#         self.hook = []
+#         self.vis_encoder = nn.Sequential(*[nn.ReflectionPad2d(3),
+#                  nn.Conv2d(3, self.base_dim, kernel_size=7, padding=0, bias=use_bias),
+#                  norm_layer(self.base_dim),
+#                  nn.PReLU()])
+#         self.ir_encoder = nn.Sequential(*[nn.ReflectionPad2d(3),
+#                                            nn.Conv2d(1, self.base_dim, kernel_size=7, padding=0, bias=use_bias),
+#                                            norm_layer(self.base_dim),
+#                                            nn.PReLU()])
+#         self.common_encoder = nn.Sequential(*[nn.ReflectionPad2d(3),
+#                  nn.Conv2d(self.base_dim*2, self.base_dim*2, kernel_size=7, padding=0, bias=use_bias),
+#                  norm_layer(self.base_dim*2),
+#                  nn.PReLU()])
+#         color_model = [nn.ReflectionPad2d(3),
+#                        nn.Conv2d(self.base_dim, self.base_dim, kernel_size=7, padding=0, bias=use_bias),
+#                        norm_layer(self.base_dim),
+#                        nn.PReLU()
+#                        ]
+#         model = []
+#         self.res_skip = []
+#         self.count_skip = 0
+#         for i in range(n_downscaling):
+#             mult = 2 ** i
+#             model += [
+#                 nn.Conv2d(self.base_dim * mult, self.base_dim * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+#                 norm_layer(self.base_dim * mult * 2),
+#                 nn.PReLU()]
+#             color_model += [
+#                 nn.Conv2d(self.base_dim * mult, self.base_dim * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
+#                 norm_layer(self.base_dim * mult * 2),
+#                 nn.PReLU()]
+#             self.res_skip.append(nn.Sequential(*[CBAMResnetBlock(self.base_dim * mult * 2, norm_layer=norm_layer,
+#                                                                  dropout=dropout, use_bias=use_bias)] * n_enc_layers[i]))
+#             # self.res_skip.append(nn.Sequential(*[ResnetBlock(self.base_dim * mult * 2, norm_layer=norm_layer,
+#             #                                                  dropout=dropout, use_bias=use_bias)] * n_enc_layers[i]))
+#             # self.res_skip.append(nn.Sequential(*[[DropInSwinBlock(self.base_dim * mult)] * n_enc_layers[i]]))
+#             self.hook.append(len(model) - 2)  # store index of norm for skip connection
+#         self.res_skip = nn.ModuleList(self.res_skip)
+#         mult = 2 ** n_downscaling
+#         for _ in range(n_enc_layers[-1]):
+#             model += [CBAMResnetBlock(self.base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+#             # model += [ResnetBlock(self.base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+#             color_model += [CBAMResnetBlock(self.base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+#             # color_model += [ResnetBlock(self.base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+#             # model += [DropInSwinBlock(self.base_dim * mult)]
+#         self.encoder = nn.ModuleList(model)
+#         self.color_encoder = nn.ModuleList(color_model)
+#         for i, idx in enumerate(self.hook):
+#             self.encoder[idx].register_forward_hook(lambda model, input, output: self._register_hook(output))
+#         self.decoder = nn.ModuleList([])
+#         for i in range(n_downscaling):
+#             mult = 2 ** (n_downscaling - i)
+#             self.decoder.append(nn.Sequential(nn.ConvTranspose2d(self.base_dim * mult, int(self.base_dim * mult // 2),
+#                                                                 kernel_size=4, stride=2,
+#                                                                 padding=1, output_padding=0,
+#                                                                 bias=use_bias), self.tanh_n(mult * 2, mult)))
+#
+#         self.decoder.append(nn.Conv2d(self.base_dim, 1,
+#                                      kernel_size=7, padding=3, padding_mode='reflect'))
+#         self.final_conv = nn.Sequential(nn.Conv2d(1, 1,
+#                                                   kernel_size=7, padding=3, padding_mode='reflect'), nn.Tanh())
+#         self.mix_conv = nn.Sequential(*[
+#                 nn.Conv2d(self.base_dim * 2**(n_downscaling+1), self.base_dim * 2**n_downscaling, kernel_size=3, padding=1, bias=use_bias),
+#                 norm_layer(self.base_dim * 2**n_downscaling),
+#                 nn.PReLU()])
+#         self.spatial_aligner = get_wrapper('vis2ir')
+#         self.thermal_preprocess = MonotonicThermalLUT(thermal_preprocessCfg.bins,
+#                                                       thermal_preprocessCfg.scene)
+#
+#     def _register_hook(self, output):
+#         if len(self.hook) > self.count_skip:
+#             idx = self.hook[self.count_skip]
+#             self.count_skip += 1
+#             setattr(self, f'encoder_hook_{idx}', output)
+#
+#         else:
+#             self.count_skip = 0
+#             self._register_hook(output)
+#
+#     def tanh_n(self, n1=1.0, n2=None):
+#         class tanh_n(nn.Module):
+#             def __init__(self, n_1, n_2):
+#                 super().__init__()
+#                 self.n1 = n_1
+#                 self.n2 = n_2
+#
+#             def forward(self, x):
+#                 return nn.Tanh()(x / self.n1) * self.n2
+#
+#         return tanh_n(n1, n2 or n1)
+#
+#     def encode(self, ir, vis_night, **kwargs):
+#         ir = self.thermal_preprocess(ir, **kwargs)
+#         ir = ir.mean(dim=1, keepdim=True)
+#         ir_feat = self.ir_encoder(ir)
+#         vis_feat = self.vis_encoder(vis_night)
+#         feats = self.common_encoder(torch.cat([ir_feat, vis_feat], dim=1))
+#         x_feat, color_feat = torch.split(feats, feats.shape[1] // 2, dim=1)
+#         for layer in self.encoder:
+#             x_feat = layer(x_feat)
+#         for layer in self.color_encoder:
+#             color_feat = layer(color_feat)
+#         x_feat = torch.cat([x_feat, color_feat], dim=1)
+#         x_feat = self.mix_conv(x_feat)
+#         return x_feat, ir
+#
+#
+#     def forward(self, ir, vis_night=None, align_first=False, **kwargs):
+#         if align_first and vis_night is not None:
+#             vis_night = self.spatial_aligner(vis_night, ir).detach()
+#         if vis_night is None:
+#             vis_night = torch.zeros_like(ir).to(ir.device)
+#             x_feat, ir = self.encode(ir, vis_night, **kwargs)
+#             return x_feat
+#
+#         x_feat, ir = self.encode(ir, vis_night, **kwargs)
+#         ir_feat = x_feat.clone()
+#         for i, layer in enumerate(self.decoder):
+#             if i < len(self.decoder) - 1:
+#                 hook_output = getattr(self, f'encoder_hook_{self.hook[-(i + 1)]}')
+#                 ir_feat = ir_feat + self.res_skip[-(i + 1)](hook_output)
+#             ir_feat = layer(ir_feat)
+#         out = self.tanh_n(1)(self.final_conv(ir_feat))
+#         # return out, ir, vis_night  # match input channels
+#         return out.repeat(1, 3, 1, 1), x_feat, ir, vis_night
+#
+#     def train(self, mode: bool = True) -> None:
+#         super().train(mode)
+#         # self.spatial_aligner.train(False)
+#         return self
 
 class MonotonicThermalLUT(nn.Module):
     """

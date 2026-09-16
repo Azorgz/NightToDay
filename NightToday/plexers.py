@@ -130,14 +130,10 @@ class G_Plexer(Plexer):
         self.input_size = opt.input_size
         self.opt = opt
         fus = opt.fus
-        self.enc_type = fus.type if fus.type in ['IAware', 'UResNet'] else 'UResNet'
-        encoders = [ResnetGenEncoder] * 2
+        encoders = [ResnetGenEncoder, U_ResNetFusion]
         decoders = [ResnetGenDecoder] * 2
-        enc_args = [(fus.preprocess_thermal if fus.type == 'IAware' else 3,
-                     opt.hidden_dim if fus.type == 'IAware' else opt.hidden_dim,
-                     fus.n_res_blocks if fus.type == 'IAware' else opt.n_enc_layers,
-                     fus.dropout if fus.type == 'IAware' else opt.dropout,
-                     opt.downscaling if fus.type == 'IAware' else opt.downscaling)] * 2
+        enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
+                    (fus.preprocess_thermal, fus.hidden_dim, fus.n_res_blocks, fus.dropout)]
         dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
                     (3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
         # block_shared = DropInSwinBlock
@@ -145,18 +141,18 @@ class G_Plexer(Plexer):
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
         # shenc_args = (opt.hidden_dim, )
         fus = opt.fus
-        if fus.type == 'UResNet':
-            fusion_module = U_ResNetFusion
-        else:
-            fusion_module = None
-        if fusion_module is not None:
-            self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_res_blocks,
-                                        dropout=fus.dropout, thermal_preprocessCfg=fus.preprocess_thermal)
-        else:
-            self.fusion = nn.Identity()
+        # if fus.type == 'UResNet':
+        #     fusion_module = U_ResNetFusion
+        # else:
+        #     fusion_module = None
+        # if fusion_module is not None:
+        #     self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_res_blocks,
+        #                                 dropout=fus.dropout, thermal_preprocessCfg=fus.preprocess_thermal)
+        # else:
+        #     self.fusion = nn.Identity()
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
-        self.networks: list = self.encoders + self.decoders + [self.fusion]
+        self.networks: list = self.encoders + self.decoders# + [self.fusion]
         self.names = ([f'GenEnc_{dom}' for dom, i in zip(self.names_domains, range(2))] +
                       [f'GenDec_{dom}' for dom, i in zip(self.names_domains, range(2))] + ['Fusion'])
 
@@ -173,16 +169,12 @@ class G_Plexer(Plexer):
 
     def encode(self, x, *args, from_: str = None, **kwargs):
         assert from_ in self.names_domains, f"Unknown source domain: {from_}"
-        if self.enc_type == 'UResNet' and len(args):
+        if len(args):
             fake_TN, ir, n = self.fusion(x, *args, **kwargs)
             fake_TN = self._resize(fake_TN)
-            output = self.encoders[self.names_domains[from_]](fake_TN)
+            fake_TN, output, ir, n = self.encoders[self.names_domains[from_]](fake_TN)
+            # fake_TN, output, ir, n = self.encoders[self.names_domains[from_]](x, *args, **kwargs)
             output = self.shared_encoder(output)
-        elif self.enc_type == 'IAware' and len(args):
-            x = self._resize(x)
-            output, ir, n = self.encoders[self.names_domains[from_]](x, *args, **kwargs)
-            output = self.shared_encoder(output)
-            fake_TN = self.decoders[self.names_domains[from_]](output)
         else:
             output = self.encoders[self.names_domains[from_]](x)
             return self.shared_encoder(output)
