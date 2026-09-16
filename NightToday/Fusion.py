@@ -6,7 +6,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from kornia.color import rgb_to_hsv, hsv_to_rgb
-from kornia.enhance import image_histogram2d, equalize
 
 from . import ThermalPreprocessConfig
 from .CrossRAFT import get_wrapper
@@ -97,7 +96,6 @@ class U_ResNetFusion(nn.Module):
 
     def forward(self, ir, vis_night, align_first=False, **kwargs):
         ir = self.thermal_preprocess(ir, **kwargs)
-        # vis_night = self.vis_preprocess(vis_night, **kwargs)
         if align_first:
             vis_night = self.spatial_aligner(vis_night, ir).detach()
         x_feat = torch.cat([ir, vis_night], dim=1)  # concatenate along channel dim
@@ -298,7 +296,7 @@ class MonotonicThermalLUT(nn.Module):
         x = self.robust_norm(x, p_low=p_low, p_high=p_high, eps=self.eps)
         self.scene_idx = torch.ones([x.shape[0], self.scene], device=x.device) / self.scene
         # Build monotonic LUT
-        increments = F.softplus(torch.mm(self.scene_idx, self.delta)) + self.eps
+        increments = F.softplus(torch.mm(self.scene_idx, self.delta.to(x.device))) + self.eps
         luts = torch.cumsum(increments, dim=1)
         luts = luts / (luts[:, -1:] + self.eps) * 2 - 1  # normalize to [-1,1]
 
