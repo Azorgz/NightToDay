@@ -40,17 +40,17 @@ class U_ResNetFusion(nn.Module):
                 nn.Conv2d(base_dim * mult, base_dim * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
                 norm_layer(base_dim * mult * 2),
                 nn.ReLU()]
-            self.res_skip.append(nn.Sequential(*[CBAMResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
-                                                           dropout=dropout, use_bias=use_bias)]*n_enc_layers[i]))
-            # self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
-            #                                                  dropout=dropout, use_bias=use_bias)] * n_enc_layers[i]))
+            # self.res_skip.append(nn.Sequential(*[CBAMResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
+            #                                                dropout=dropout, use_bias=use_bias)]*n_enc_layers[i]))
+            self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
+                                                             dropout=dropout, use_bias=use_bias)] * n_enc_layers[i]))
             # self.res_skip.append(nn.Sequential(*[[DropInSwinBlock(base_dim * mult)] * n_enc_layers[i]]))
             self.hook.append(len(model) - 2)  # store index of norm for skip connection
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
         for _ in range(n_enc_layers[-1]):
-            model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
-            # model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            # model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
             # model += [DropInSwinBlock(base_dim * mult)]
         self.encoder = nn.ModuleList(model)
         for i, idx in enumerate(self.hook):
