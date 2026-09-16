@@ -635,11 +635,13 @@ class ContrastiveLoss(nn.Module):
 
 
 class RobustFusionDenoiseLoss(nn.Module):
-    def __init__(self, w_detail=2.5, w_noise=3.0, w_fft=2.0):
+    def __init__(self, w_detail=5.0, w_noise=2.5, w_fft=1.0):  # w_detail=5.0, w_noise=2.5, w_fft=1.0
         super().__init__()
         self.w_detail = w_detail
         self.w_noise = w_noise
         self.w_fft = w_fft
+        # self.sharpfusionLoss = SharpFusionLoss(lam_grad=7.0, lam_lap=4.5, lam_contrast=3.5, lam_freq=1.5)
+        # self.noise_loss = ThermalNoiseLoss()
 
         # Sobel kernels for self-contained fast gradient computation
         kernel_x = torch.tensor([[-1., 0., 1.], [-2., 0., 2.], [-1., 0., 1.]])
@@ -677,6 +679,8 @@ class RobustFusionDenoiseLoss(nn.Module):
         # 1. Convert to Grayscale
         I_f, I_v, I_i = map(self._to_gray, [I_fused, I_vi, I_ir])
 
+        L_intensity = ((I_f + I_v - 1).abs().mean() * 0.1 + (I_f - I_i).abs().mean()) * 10e-2
+
         # 2. Highlight Masking (Fast Morphological Erosion)
         dark_mask = (I_v < 0.9).float()
         mask_hl = -F.max_pool2d(-dark_mask, kernel_size=5, stride=1, padding=2)
@@ -694,12 +698,14 @@ class RobustFusionDenoiseLoss(nn.Module):
         # Force fused image to have AT LEAST the strongest edge from either source.
         G_ref = torch.max(G_v, G_i)
         L_detail = F.relu(G_ref - G_f).mean()
+        # L_detail = self.sharpfusionLoss(I_fused, I_vi, I_ir)
 
         # ==========================================
         # 5. Guided Noise Penalty (Smart TV)
         # ==========================================
         noise_mask = (G_f > G_v) & (G_f > G_i)
         L_noise = (G_f * noise_mask.float()).mean() + self._structure_tensor_loss(G_f_x, G_f_y) * 0.1
+        # L_noise = self.noise_loss(I_fused, I_vi, I_ir)
 
         # ==========================================
         # 6. High-Frequency Spectral Decay (Global Denoise)
@@ -711,7 +717,7 @@ class RobustFusionDenoiseLoss(nn.Module):
         R = torch.sqrt(U ** 2 + V ** 2).unsqueeze(0).unsqueeze(0)  # Bx1xHxW
 
         L_fft = (FFT_f.abs() * R).mean()
-        return self.w_detail * L_detail + self.w_noise * L_noise + self.w_fft * L_fft
+        return self.w_detail * L_detail + self.w_noise * L_noise + L_intensity + self.w_fft * L_fft
 
 
 class SharpFusionLoss(torch.nn.Module):
@@ -855,7 +861,6 @@ class ThermalNoiseLoss(nn.Module):
         X = torch.fft.fftshift(torch.fft.fft2(x, norm='ortho'))
         mag = torch.abs(X)
         R = torch.sqrt(create_meshgrid(H, W, device=x.device).pow(2).sum(dim=-1))
-
         return (mag * (R ** self.alpha)).mean()
 
     # -------- Final denoising loss --------

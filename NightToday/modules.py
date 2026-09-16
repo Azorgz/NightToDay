@@ -248,6 +248,109 @@ class ResnetBlock(nn.Module):
         return out
 
 
+import torch
+import torch.nn as nn
+
+
+class ChannelAttention(nn.Module):
+    """Channel Attention Module of CBAM."""
+
+    def __init__(self, in_planes, reduction=16):
+        super().__init__()
+        self.avg_pool = nn.AdaptiveAvgPool2d(1)
+        self.max_pool = nn.AdaptiveMaxPool2d(1)
+
+        # Shared MLP
+        self.fc = nn.Sequential(
+            nn.Conv2d(in_planes, in_planes // reduction, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_planes // reduction, in_planes, 1, bias=False)
+        )
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = self.fc(self.avg_pool(x))
+        max_out = self.fc(self.max_pool(x))
+        out = avg_out + max_out
+        return self.sigmoid(out)
+
+
+class SpatialAttention(nn.Module):
+    """Spatial Attention Module of CBAM."""
+
+    def __init__(self, kernel_size=7):
+        super().__init__()
+        assert kernel_size in (3, 7), 'kernel size must be 3 or 7'
+        padding = 3 if kernel_size == 7 else 1
+
+        self.conv = nn.Conv2d(2, 1, kernel_size, padding=padding, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        avg_out = torch.mean(x, dim=1, keepdim=True)
+        max_out, _ = torch.max(x, dim=1, keepdim=True)
+        out = torch.cat([avg_out, max_out], dim=1)
+        out = self.conv(out)
+        return self.sigmoid(out)
+
+
+class CBAM(nn.Module):
+    """CBAM Module combining Channel Attention and Spatial Attention sequentially."""
+
+    def __init__(self, planes, reduction=16, kernel_size=7):
+        super().__init__()
+        self.ca = ChannelAttention(planes, reduction)
+        self.sa = SpatialAttention(kernel_size)
+
+    def forward(self, x):
+        x = x * self.ca(x)
+        x = x * self.sa(x)
+        return x
+
+
+class CBAMResnetBlock(nn.Module):
+    """ResNet Block augmented with CBAM attention module."""
+
+    def __init__(self, dim, norm_layer=nn.InstanceNorm2d, dropout=0.0, use_bias=False,
+                 padding_mode='reflect', reduction=16):
+        super().__init__()
+        self.act = nn.PReLU()
+
+        conv_block = []
+        if padding_mode == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+
+        conv_block += [
+            nn.Conv2d(dim, dim, kernel_size=3, padding=1 if padding_mode != 'reflect' else 0,
+                      bias=use_bias, padding_mode=padding_mode),
+            norm_layer(dim),
+            self.act
+        ]
+
+        if dropout:
+            conv_block += [nn.Dropout(dropout)]
+
+        if padding_mode == 'reflect':
+            conv_block += [nn.ReflectionPad2d(1)]
+
+        conv_block += [
+            nn.Conv2d(dim, dim, kernel_size=3, padding=1 if padding_mode != 'reflect' else 0,
+                      bias=use_bias, padding_mode=padding_mode),
+            norm_layer(dim)
+        ]
+
+        self.conv_block = nn.Sequential(*conv_block)
+
+        # Insert CBAM attention block after the convolutions
+        self.cbam = CBAM(planes=dim, reduction=reduction)
+
+    def forward(self, x):
+        # Pass features through residual convs, apply CBAM, then add residual connection
+        out = self.conv_block(x)
+        out = self.cbam(out)
+        return x + out
+
+
 class SequentialContext(nn.Sequential):
     def __init__(self, n_classes, *args):
         super(SequentialContext, self).__init__(*args)

@@ -10,7 +10,7 @@ import torch
 from torch import nn
 
 from .modules import LABToRGB_dEmbed, TransformerDecoderBlock, CrossAttentionFusion, TransformerEncoderBlock, \
-    RGBToLAB_Embed, PatchEmbed, ResnetBlock, DropInSwinBlock
+    RGBToLAB_Embed, PatchEmbed, ResnetBlock, DropInSwinBlock, CBAMResnetBlock
 from .utilities import get_norm_layer
 
 
@@ -166,7 +166,9 @@ class ResnetGenEncoder(nn.Module):
                       nn.PReLU()]
         mult = 2 ** n_downscaling
         for _ in range(n_enc_layers):
-            model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            # model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
+            # model += [DropInSwinBlock(base_dim * mult)]
         self.model = nn.Sequential(*model)
 
     def forward(self, x, *args):

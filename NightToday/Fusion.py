@@ -10,7 +10,7 @@ from kornia.enhance import image_histogram2d, equalize
 
 from . import ThermalPreprocessConfig
 from .CrossRAFT import get_wrapper
-from .modules import ResnetBlock, DropInSwinBlock
+from .modules import ResnetBlock, DropInSwinBlock, CBAMResnetBlock
 from .utilities import get_norm_layer
 
 EPS = 1e-6
@@ -41,15 +41,18 @@ class U_ResNetFusion(nn.Module):
                 nn.Conv2d(base_dim * mult, base_dim * mult * 2, kernel_size=3, stride=2, padding=1, bias=use_bias),
                 norm_layer(base_dim * mult * 2),
                 nn.ReLU()]
-            self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
+            self.res_skip.append(nn.Sequential(*[CBAMResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
                                                            dropout=dropout, use_bias=use_bias)]*n_enc_layers[i]))
+            # self.res_skip.append(nn.Sequential(*[ResnetBlock(base_dim * mult * 2, norm_layer=norm_layer,
+            #                                                  dropout=dropout, use_bias=use_bias)] * n_enc_layers[i]))
             # self.res_skip.append(nn.Sequential(*[[DropInSwinBlock(base_dim * mult)] * n_enc_layers[i]]))
             self.hook.append(len(model) - 2)  # store index of norm for skip connection
         self.res_skip = nn.ModuleList(self.res_skip)
         mult = 2 ** n_downscaling
         for _ in range(n_enc_layers[-1]):
+            # model += [CBAMResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
             model += [ResnetBlock(base_dim * mult, norm_layer=norm_layer, dropout=dropout, use_bias=use_bias)]
-            # model += [DropInSwinBlock(base_dim * mult)] * n_enc_layers[-1]
+            # model += [DropInSwinBlock(base_dim * mult)]
         self.encoder = nn.ModuleList(model)
         for i, idx in enumerate(self.hook):
             self.encoder[idx].register_forward_hook(lambda model, input, output: self._register_hook(output))
@@ -162,7 +165,7 @@ class MonotonicThermalLUT(nn.Module):
             y.append(lut[idx])
 
         y = torch.cat(y, 0)
-        y = self.denoiser_module(y)
+        # y = self.denoiser_module(y)
         y = self.robust_norm(y, p_low=0.0, p_high=100, eps=self.eps) * 2 - 1  # re-normalize to [-1,1]
         if HS is not None:
             y = hsv_to_rgb(torch.cat([HS, y * 0.5 + 0.5], dim=1)) * 2 - 1
@@ -182,139 +185,6 @@ class MonotonicThermalLUT(nn.Module):
         hi = hi.view(B, 1, 1, 1)
 
         return ((x - lo) / (hi - lo + eps)).clamp(0, 1)
-
-
-#
-# class SceneSelector(nn.Module):
-#     def __init__(self,
-#                  scene: int = 8,
-#                  embed_dim: int = 64):
-#         super().__init__()
-#         self.scene = scene
-#         self.first_conv = nn.Sequential(nn.Conv2d(3, 3, 5, padding=2),
-#                                         nn.ReLU(),
-#                                         nn.Conv2d(3, 3, 5, padding=2),
-#                                         nn.ReLU(),
-#                                         nn.Conv2d(3, 1, 5, padding=2),
-#                                         nn.ReLU(),
-#                                         )
-#         self.classifier = nn.Sequential(
-#             nn.AdaptiveAvgPool2d(1),
-#             nn.Flatten(1),
-#             nn.Linear(256, embed_dim),
-#             nn.Linear(embed_dim, scene))
-#
-#     def forward(self, x, *args):
-#         """
-#         x: IR Tensor of shape (B,1,H,W) or (B,3,H,W)
-#            assumed normalized to [0,1]
-#         args: complementary modality for scene selection
-#         """
-#         if x.shape[1] == 1:
-#             x_ = x.repeat(1, 3, 1, 1)
-#         elif x.shape[1] == 3:
-#             x_ = x
-#         else:
-#             raise NotImplementedError
-#         x_rs = F.interpolate(x_, (256, 256))
-#         x_conv = self.first_conv(x_rs)
-#         x_patches = self.split(x_conv)
-#         scene_logits = self.classifier(x_patches)
-#         if args is not None:
-#             for arg in args:
-#                 if arg.shape[1] == 1:
-#                     y = arg.repeat(1, 3, 1, 1)
-#                 elif arg.shape[1] == 3:
-#                     y = arg
-#                 else:
-#                     raise NotImplementedError
-#                 y_rs = F.interpolate(y, (256, 256))
-#                 y_conv = self.first_conv(y_rs)
-#                 y_patches = self.split(y_conv)
-#                 y_digit = self.classifier(y_patches)
-#                 scene_logits = scene_logits + y_digit
-#
-#         scene_idx = torch.softmax(scene_logits, dim=-1)  # (B, scene)
-#         return scene_idx
-#
-#     def split(self, x: torch.Tensor) -> torch.Tensor:
-#         """Split the input into small patches with sliding window."""
-#         x_patch_list = []
-#         for j in range(16):
-#             j0 = j * 16
-#             j1 = j0 + 16
-#
-#             for i in range(16):
-#                 i0 = i * 16
-#                 i1 = i0 + 16
-#                 x_patch_list.append(x[..., j0:j1, i0:i1])
-#
-#         return torch.cat(x_patch_list, dim=1)
-#
-#
-# # -----------------------------------------------------------
-# # Utilities
-# # -----------------------------------------------------------
-#
-# def gradient(x):
-#     dx = x[:, :, :, 1:] - x[:, :, :, :-1]
-#     dy = x[:, :, 1:, :] - x[:, :, :-1, :]
-#     return dx, dy
-#
-#
-# def highlight_mask(vis, threshold=0.95, softness=25.0):
-#     # vis in [-1,1] → convert to [0,1]
-#     vis = (vis + 1) * 0.5
-#     lum = 0.299 * vis[:, 0:1] + \
-#           0.587 * vis[:, 1:2] + \
-#           0.114 * vis[:, 2:3]
-#     col = torch.max(vis, dim=1, keepdim=True)[0] - torch.min(vis, dim=1, keepdim=True)[0]
-#     lum = lum * (1 - col)  # boost saturated highlights
-#     return torch.sigmoid((lum - threshold) * softness)
-#
-#
-# # -----------------------------------------------------------
-# # Attention Blocks
-# # -----------------------------------------------------------
-#
-# class CrossModalAttention(nn.Module):
-#     def __init__(self, dim):
-#         super().__init__()
-#         self.query = nn.Conv2d(dim, dim, 1)
-#         self.key   = nn.Conv2d(dim, dim, 1)
-#         self.value = nn.Conv2d(dim, dim, 1)
-#         self.gamma = nn.Parameter(torch.zeros(1))
-#
-#     def forward(self, ir_feat, vis_feat):
-#         Q = self.query(ir_feat)
-#         K = self.key(vis_feat)
-#         V = self.value(vis_feat)
-#
-#         attn = torch.softmax(
-#             torch.sum(Q * K, dim=1, keepdim=True), dim=-1
-#         )
-#         out = ir_feat + self.gamma * attn * V
-#         return out
-#
-#
-# class SelfAttention(nn.Module):
-#     def __init__(self, dim):
-#         super().__init__()
-#         self.query = nn.Conv2d(dim, dim, 1)
-#         self.key   = nn.Conv2d(dim, dim, 1)
-#         self.value = nn.Conv2d(dim, dim, 1)
-#         self.gamma = nn.Parameter(torch.zeros(1))
-#
-#     def forward(self, feat):
-#         Q = self.query(feat)
-#         K = self.key(feat)
-#         V = self.value(feat)
-#
-#         attn = torch.softmax(
-#             torch.sum(Q * K, dim=1, keepdim=True), dim=-1
-#         )
-#         out = feat + self.gamma * attn * V
-#         return out
 
 
 class SimpleGate(nn.Module):

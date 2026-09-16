@@ -111,11 +111,13 @@ class Plexer(nn.Module):
             if i < len(self.names):
                 if self.names[i] in weights:
                     try:
+                        # if 'Fusion' in self.names[i]:
+                        #     continue
                         net.load_state_dict(weights[self.names[i]], strict=True)
-                    except RuntimeError as e:
+                    except (RuntimeError or KeyError) as e:
                         print(f"Error loading weights for {self.names[i]}: {e}, loading with strict=False.")
-                        pass
-                        # net.load_state_dict(weights[self.names[i]], strict=False)
+                        # pass
+                        net.load_state_dict(weights[self.names[i]], strict=False)
         self.to(device=self.device)
 
 
@@ -182,7 +184,7 @@ class G_Plexer(Plexer):
             output = self.shared_encoder(output)
             fake_TN = self.decoders[self.names_domains[from_]](output)
         else:
-            output = self.encoders[self.names_domains[from_]](x, *args, **kwargs)
+            output = self.encoders[self.names_domains[from_]](x)
             return self.shared_encoder(output)
         return output, fake_TN, ir, n
 

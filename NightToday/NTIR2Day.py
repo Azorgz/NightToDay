@@ -467,12 +467,12 @@ class NightToDay(nn.Module):
 
         # region Fusion
 
-        self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
+        self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.remapped_T)
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.remapped_T, self.real_T, self.real_T)
         self.loss_thermal[self.N] += self.compute_loss('thermal', self.fake_TN, self.remapped_T,
                                                        self.real_N, seg_IR)
-        # self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T,
-        #                                                self.real_T, seg_IR)
+        self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T,
+                                                       self.real_T, seg_IR)
         # endregion
 
         # region class-wise loss
@@ -663,10 +663,10 @@ class NightToDay(nn.Module):
         # endregion
         self.loss_sharpness[self.N] += self.compute_loss('sharpness', self.fake_TN, self.real_N, self.real_T)
         self.loss_sharpness[self.T] += self.compute_loss('sharpness', self.rec_T, self.real_N, self.real_T)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
-                                                       None)
-        self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
-                                                       None)
+        # self.loss_thermal[self.T] += self.compute_loss('thermal', self.fake_TN, self.remapped_T, self.real_N,
+        #                                                None)
+        # self.loss_thermal[self.T] += self.compute_loss('thermal', self.remapped_T, self.real_T, self.real_T,
+        #                                                None)
         # endregion
 
         # combined loss
