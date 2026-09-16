@@ -130,26 +130,25 @@ class G_Plexer(Plexer):
         self.input_size = opt.input_size
         self.opt = opt
         fus = opt.fus
-        encoders = [ResnetGenEncoder, U_ResNetFusion]
+        encoders = [ResnetGenEncoder, ResnetGenEncoder] * 2
+        # encoders = [ResnetGenEncoder, U_ResNetFusion]
         decoders = [ResnetGenDecoder] * 2
-        enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling),
-                    (fus.preprocess_thermal, fus.hidden_dim, fus.n_res_blocks, fus.dropout)]
-        dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling),
-                    (3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)]
+        enc_args = [(3, opt.hidden_dim, opt.n_enc_layers, opt.dropout, opt.downscaling)]*2 #,
+                    # (fus.preprocess_thermal, fus.hidden_dim, fus.n_res_blocks, fus.dropout)]
+        dec_args = [(3, opt.hidden_dim, opt.n_dec_layers, opt.dropout, opt.downscaling)] * 2
         # block_shared = DropInSwinBlock
         block_shared = ResnetBlock
         shenc_args = (opt.n_shared_layers, opt.hidden_dim, nn.BatchNorm2d)
         # shenc_args = (opt.hidden_dim, )
-        fus = opt.fus
-        # if fus.type == 'UResNet':
-        #     fusion_module = U_ResNetFusion
-        # else:
-        #     fusion_module = None
-        # if fusion_module is not None:
-        #     self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_res_blocks,
-        #                                 dropout=fus.dropout, thermal_preprocessCfg=fus.preprocess_thermal)
-        # else:
-        #     self.fusion = nn.Identity()
+        if fus.type == 'UResNet':
+            fusion_module = U_ResNetFusion
+        else:
+            fusion_module = None
+        if fusion_module is not None:
+            self.fusion = fusion_module(hidden_dim=fus.hidden_dim, n_enc_layers=fus.n_res_blocks,
+                                        dropout=fus.dropout, thermal_preprocessCfg=fus.preprocess_thermal)
+        else:
+            self.fusion = nn.Identity()
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
         self.networks: list = self.encoders + self.decoders# + [self.fusion]
