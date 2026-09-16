@@ -151,7 +151,7 @@ class G_Plexer(Plexer):
             self.fusion = nn.Identity()
         self.encoders = [encoder(*enc_arg).train(False) for encoder, enc_arg in zip(encoders, enc_args)]
         self.decoders = [decoder(*dec_arg).train(False) for decoder, dec_arg in zip(decoders, dec_args)]
-        self.networks: list = self.encoders + self.decoders# + [self.fusion]
+        self.networks: list = self.encoders + self.decoders + [self.fusion]
         self.names = ([f'GenEnc_{dom}' for dom, i in zip(self.names_domains, range(2))] +
                       [f'GenDec_{dom}' for dom, i in zip(self.names_domains, range(2))] + ['Fusion'])
 

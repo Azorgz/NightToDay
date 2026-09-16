@@ -296,7 +296,7 @@ class MonotonicThermalLUT(nn.Module):
         x = self.robust_norm(x, p_low=p_low, p_high=p_high, eps=self.eps)
         self.scene_idx = torch.ones([x.shape[0], self.scene], device=x.device) / self.scene
         # Build monotonic LUT
-        increments = F.softplus(torch.mm(self.scene_idx, self.delta.to(x.device))) + self.eps
+        increments = F.softplus(torch.mm(self.scene_idx, self.delta)) + self.eps
         luts = torch.cumsum(increments, dim=1)
         luts = luts / (luts[:, -1:] + self.eps) * 2 - 1  # normalize to [-1,1]
 
