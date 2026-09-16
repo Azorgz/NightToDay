@@ -171,7 +171,7 @@ class G_Plexer(Plexer):
         if len(args):
             fake_TN, ir, n = self.fusion(x, *args, **kwargs)
             fake_TN = self._resize(fake_TN)
-            fake_TN, output, ir, n = self.encoders[self.names_domains[from_]](fake_TN)
+            output = self.encoders[self.names_domains[from_]](fake_TN)
             # fake_TN, output, ir, n = self.encoders[self.names_domains[from_]](x, *args, **kwargs)
             output = self.shared_encoder(output)
         else:
