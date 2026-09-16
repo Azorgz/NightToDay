@@ -220,7 +220,7 @@ class NightToDay(nn.Module):
         if self.opt.training.resume or self.opt.model.mode == 'test':
             if checkpoint is None:
                 assert isinstance(epoch, (str, int)), "When loading full checkpoints, epoch must be str or int."
-                save_filename = f'{epoch}_net_{self.model_name}_{self.opt.model.gen.fus.type}'
+                save_filename = f'{epoch}_net_{self.model_name}'
                 path = (os.getcwd() + '/checkpoints/NightToday/') if 'laptop' in socket.gethostname() else \
                     f'/bettik/PROJECTS/{PROJECT_NAME}/godeta/checkpoints/NightToday/'
                 save_path = os.path.join(path, save_filename)
@@ -576,7 +576,7 @@ class NightToDay(nn.Module):
             self.loss_color_day[self.D] += self.compute_loss('cycle', self.fake_D_day*mask_lum,
                                                              self.real_D*mask_lum, loss_name='color_day',
                                                              criterion_lambda='color_day')
-            self.loss_color_day[self.D] += self.compute_loss('sharpness', self.fake_D_day, self.real_D, self.real_D_T,
+            self.loss_color_day[self.D] += self.compute_loss('sharpness', self.fake_D_day, self.real_D, self.real_D,
                                                              criterion_lambda='color_day')
 
         if self.lambda_scale_robustness > 0.0:

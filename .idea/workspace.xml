@@ -5,12 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="429c79ef-0217-43a6-9b4a-011b8569bf5f" name="Changes" comment="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/Fusion.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/Fusion.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/configs/conf.yaml" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/configs/conf.yaml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/generators.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/generators.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/NightToday/plexers.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/plexers.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/upload_datasets.sh" beforeDir="false" afterPath="$PROJECT_DIR$/upload_datasets.sh" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/NightToday/NTIR2Day.py" beforeDir="false" afterPath="$PROJECT_DIR$/NightToday/NTIR2Day.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -274,62 +269,6 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1753105788418</updated>
-    </task>
-    <task id="LOCAL-00455" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778156519727</created>
-      <option name="number" value="00455" />
-      <option name="presentableId" value="LOCAL-00455" />
-      <option name="project" value="LOCAL" />
-      <updated>1778156519727</updated>
-    </task>
-    <task id="LOCAL-00456" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778162219395</created>
-      <option name="number" value="00456" />
-      <option name="presentableId" value="LOCAL-00456" />
-      <option name="project" value="LOCAL" />
-      <updated>1778162219395</updated>
-    </task>
-    <task id="LOCAL-00457" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778652641755</created>
-      <option name="number" value="00457" />
-      <option name="presentableId" value="LOCAL-00457" />
-      <option name="project" value="LOCAL" />
-      <updated>1778652641755</updated>
-    </task>
-    <task id="LOCAL-00458" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778654553761</created>
-      <option name="number" value="00458" />
-      <option name="presentableId" value="LOCAL-00458" />
-      <option name="project" value="LOCAL" />
-      <updated>1778654553761</updated>
-    </task>
-    <task id="LOCAL-00459" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778654871570</created>
-      <option name="number" value="00459" />
-      <option name="presentableId" value="LOCAL-00459" />
-      <option name="project" value="LOCAL" />
-      <updated>1778654871570</updated>
-    </task>
-    <task id="LOCAL-00460" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778654897282</created>
-      <option name="number" value="00460" />
-      <option name="presentableId" value="LOCAL-00460" />
-      <option name="project" value="LOCAL" />
-      <updated>1778654897282</updated>
-    </task>
-    <task id="LOCAL-00461" summary="few updates">
-      <option name="closed" value="true" />
-      <created>1778656596794</created>
-      <option name="number" value="00461" />
-      <option name="presentableId" value="LOCAL-00461" />
-      <option name="project" value="LOCAL" />
-      <updated>1778656596794</updated>
     </task>
     <task id="LOCAL-00462" summary="few updates">
       <option name="closed" value="true" />
@@ -667,7 +606,63 @@
       <option name="project" value="LOCAL" />
       <updated>1789543933473</updated>
     </task>
-    <option name="localTasksCounter" value="504" />
+    <task id="LOCAL-00504" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789551671207</created>
+      <option name="number" value="00504" />
+      <option name="presentableId" value="LOCAL-00504" />
+      <option name="project" value="LOCAL" />
+      <updated>1789551671207</updated>
+    </task>
+    <task id="LOCAL-00505" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789551812147</created>
+      <option name="number" value="00505" />
+      <option name="presentableId" value="LOCAL-00505" />
+      <option name="project" value="LOCAL" />
+      <updated>1789551812147</updated>
+    </task>
+    <task id="LOCAL-00506" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789552537827</created>
+      <option name="number" value="00506" />
+      <option name="presentableId" value="LOCAL-00506" />
+      <option name="project" value="LOCAL" />
+      <updated>1789552537827</updated>
+    </task>
+    <task id="LOCAL-00507" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789552597210</created>
+      <option name="number" value="00507" />
+      <option name="presentableId" value="LOCAL-00507" />
+      <option name="project" value="LOCAL" />
+      <updated>1789552597210</updated>
+    </task>
+    <task id="LOCAL-00508" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789552652826</created>
+      <option name="number" value="00508" />
+      <option name="presentableId" value="LOCAL-00508" />
+      <option name="project" value="LOCAL" />
+      <updated>1789552652826</updated>
+    </task>
+    <task id="LOCAL-00509" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789552689195</created>
+      <option name="number" value="00509" />
+      <option name="presentableId" value="LOCAL-00509" />
+      <option name="project" value="LOCAL" />
+      <updated>1789552689195</updated>
+    </task>
+    <task id="LOCAL-00510" summary="Integrate CBAMResnetBlock into Fusion and generators; update loss calculations in losses.py">
+      <option name="closed" value="true" />
+      <created>1789552749684</created>
+      <option name="number" value="00510" />
+      <option name="presentableId" value="LOCAL-00510" />
+      <option name="project" value="LOCAL" />
+      <updated>1789552749684</updated>
+    </task>
+    <option name="localTasksCounter" value="511" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
